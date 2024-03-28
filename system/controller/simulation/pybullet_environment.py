@@ -71,15 +71,15 @@ def vectors_in_one_direction(v1, v2) -> bool:
 class PybulletEnvironment:
     """This class deals with everything pybullet or environment (obstacles) related"""
 
-    def __init__(self, visualize, dt, env_model, mode=None, build_data_set=False, start=None, orientation=-np.pi/2, frame_limit=5000):
+    def __init__(self, env_model, dt, mode=None, visualize=False, build_data_set=False, start=None, orientation=-np.pi/2, frame_limit=5000):
         """ Create environment.
         
         arguments:
-        visualize   -- opens JAVA application to see agent in environment
-        dt          -- timestep for simulation
         env_model   -- layout of obstacles in the environment 
                     (choices: "plane", "Savinov_val2", "Savinov_val3", "Savinov_test7")
+        dt          -- timestep for simulation
         mode        -- choose goal vector calculation (choices: "analytical", "keyboard", "pod", "linear_lookahead")
+        visualize   -- opens JAVA application to see agent in environment
         buildDataSet-- camera images are only taken when this is true
         start       -- the agent's [x,y] starting position (default [0,0])
         orientation -- the agent's starting orientation (default np.pi/2 (faces North))
@@ -701,7 +701,7 @@ if __name__ == "__main__":
     env_model = "Savinov_val3"
 
     dt = 1e-2
-    env = PybulletEnvironment(True, dt, env_model, mode="keyboard", start=[-1, -2])
+    env = PybulletEnvironment(env_model, dt, visualize=True, mode="keyboard", start=[-0.5, 0])
     env.keyboard_simulation()
 
     # plot the agent's trajectory in the environment

@@ -99,7 +99,7 @@ class TopologicalNavigation(object):
         src_pos = list(path[0].env_coordinates)
 
         dt = 1e-2
-        env = PybulletEnvironment(False, dt, self.env_model, self.method, build_data_set=True, start=src_pos)
+        env = PybulletEnvironment(self.env_model, dt, self.method, build_data_set=True, start=src_pos)
 
         if plotting:
             plot.plotTrajectoryInEnvironment(env, cognitive_map=self.cognitive_map, path=path)
@@ -207,7 +207,7 @@ if __name__ == "__main__":
     tj = TopologicalNavigation(env_model, model, pc_network, cognitive_map, gc_network, pod)
 
     dt = 1e-2
-    env = PybulletEnvironment(False, dt, env_model, "analytical", build_data_set=True)
+    env = PybulletEnvironment(env_model, dt, "analytical", build_data_set=True)
     plot.plotTrajectoryInEnvironment(env, goal=False, cognitive_map=tj.cognitive_map, trajectory=False)
 
     successful = 0

@@ -70,7 +70,7 @@ def display_trajectories(filename, env_model):
     y = [i[1] for i in xy_coordinates]
 
     # get dimensions
-    env = PybulletEnvironment(False, 1e-2, env_model, mode="analytical")
+    env = PybulletEnvironment(env_model, 1e-2, mode="analytical")
     fig, ax = plt.subplots()
     hh = ax.hist2d(x, y, bins=[np.arange(env.dimensions[0], env.dimensions[1], 0.1)
         , np.arange(env.dimensions[2], env.dimensions[3], 0.1)], norm="symlog")
@@ -100,7 +100,7 @@ def valid_location(env_model):
     """ Sample valid location for agent in the environment """
     while True:
         x, y = sample_location(env_model)
-        env = PybulletEnvironment(False, 1e-2, env_model, mode="pod", start=[x, y])
+        env = PybulletEnvironment(env_model, 1e-2, mode="pod", start=[x, y])
         if not env.detect_maze_agent_contact():
             env.end_simulation()
             return [x, y]
@@ -134,7 +134,7 @@ def waypoint_movement(env_model, cam_freq, traj_length, map_layout, gc_network):
     samples = []
     visualize = False
     dt = 1e-2
-    env = PybulletEnvironment(visualize, dt, env_model, "analytical", build_data_set=True, start=start)
+    env = PybulletEnvironment(env_model, dt, "analytical", build_data_set=True, start=start)
 
     while len(samples) < traj_length / cam_freq:
         goal = sample_location(env_model)

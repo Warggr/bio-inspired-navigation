@@ -216,7 +216,7 @@ if __name__ == '__main__':
 
     fr = list(cognitive_map.node_network.nodes)[random.randint(0, len(list(cognitive_map.node_network.nodes)) - 1)]
     to = list(cognitive_map.node_network.nodes)[random.randint(0, len(list(cognitive_map.node_network.nodes)) - 1)]
-    env = PybulletEnvironment(False, dt, env_model, "combo", build_data_set=True,
+    env = PybulletEnvironment(env_model, dt, visualize=False, mode="combo", build_data_set=True,
                               start=list(fr.env_coordinates))
     gc_network.set_as_current_state(fr.gc_connections)
     stop, pc = vector_navigation(env, list(to.env_coordinates), gc_network, to.gc_connections, model="combo",

@@ -648,7 +648,7 @@ if __name__ == "__main__":
     cm.draw()
 
     dt = 1e-2
-    env = PybulletEnvironment(False, dt, env_model, "analytical", build_data_set=True)
+    env = PybulletEnvironment(env_model, dt, visualize=False, mode="analytical", build_data_set=True)
     import random
 
     for i in range(10):

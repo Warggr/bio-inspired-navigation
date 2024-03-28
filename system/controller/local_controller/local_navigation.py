@@ -75,7 +75,7 @@ def create_gc_spiking(start, goal):
 
     dt = 1e-2
     from system.controller.simulation.pybullet_environment import PybulletEnvironment
-    env = PybulletEnvironment(False, dt, "plane", mode="analytical", start=list(start))
+    env = PybulletEnvironment("plane", dt, mode="analytical", start=list(start))
     env.goal_pos = goal
 
     # Grid-Cell Initialization
@@ -287,7 +287,7 @@ if __name__ == "__main__":
 
         from system.controller.simulation.pybullet_environment import PybulletEnvironment
 
-        env = PybulletEnvironment(False, dt, env_model, "analytical", start=start)
+        env = PybulletEnvironment(env_model, dt, "analytical", start=start)
 
         vector_navigation(env, goal, gc_network, target_gc_spiking=target_spiking, model=model, step_limit=float('inf'),
                           plot_it=True, exploration_phase=False)
@@ -315,7 +315,7 @@ if __name__ == "__main__":
             # model = "linear_lookahead"
             # model = "combo"
 
-            env = PybulletEnvironment(False, dt, env_model, model, start=[0, 0])
+            env = PybulletEnvironment(env_model, dt, model, start=[0, 0])
 
             # changes the update fraction and arrival threshold according to the chosen model
             if model == "pod":
@@ -349,7 +349,7 @@ if __name__ == "__main__":
                 """ alternatively: generate spiking at goal then navigate there before returning to the start """
                 start_spiking = gc_network.consolidate_gc_spiking()
                 target_spiking = create_gc_spiking(start, goal)
-                env = PybulletEnvironment(False, dt, env_model, model, start=list(start))
+                env = PybulletEnvironment(env_model, dt, model, start=list(start))
 
                 if model == "pod":
                     env.pod_arrival_threshold = 0.2
@@ -423,7 +423,7 @@ if __name__ == "__main__":
                 gc_network = None
                 target_spiking = None
 
-            env = PybulletEnvironment(False, 1e-2, env_model, "analytical", start=start)
+            env = PybulletEnvironment(env_model, 1e-2, "analytical", start=start)
 
             env.mapping = mapping
             env.combine = combine
@@ -450,7 +450,7 @@ if __name__ == "__main__":
                 gc_network = None
                 target_spiking = None
 
-            env = PybulletEnvironment(False, 1e-2, env_model, "analytical", start=start)
+            env = PybulletEnvironment(env_model, 1e-2, "analytical", start=start)
 
             env.mapping = mapping
             env.combine = combine
@@ -476,7 +476,7 @@ if __name__ == "__main__":
                 gc_network = None
                 target_spiking = None
 
-            env = PybulletEnvironment(False, 1e-2, env_model, "analytical", start=start)
+            env = PybulletEnvironment(env_model, 1e-2, "analytical", start=start)
 
             env.mapping = mapping
             env.combine = combine
@@ -502,7 +502,7 @@ if __name__ == "__main__":
                 gc_network = None
                 target_spiking = None
 
-            env = PybulletEnvironment(False, 1e-2, env_model, "analytical", start=start)
+            env = PybulletEnvironment(env_model, 1e-2, "analytical", start=start)
 
             env.mapping = mapping
             env.combine = combine

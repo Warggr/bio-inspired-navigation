@@ -259,7 +259,7 @@ class ReachabilityDataset(data.Dataset):
     def get_camera_view(self, map_name, sample):
         # return img of position
         dt = 1e-2
-        env = PybulletEnvironment(False, dt, map_name, "analytical", build_data_set=True)
+        env = PybulletEnvironment(map_name, dt, "analytical", build_data_set=True)
         img = env.camera((sample[0], sample[1]))
         env.end_simulation()
         return img
