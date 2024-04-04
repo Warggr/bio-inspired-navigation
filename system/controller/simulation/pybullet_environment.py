@@ -42,13 +42,15 @@ import sys
 import pybullet_data
 import numpy as np
 import math
+from typing import List, Optional, Any, Tuple
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../.."))
 import system.plotting.plotResults as plot
 from system.bio_model.grid_cell_model import GridCellNetwork
 
+from system.controller.simulation.math_utils import Vector2D, vectors_in_one_direction, intersect, compute_angle
 
-def closest_subsegment(values):
+def closest_subsegment(values : List[float]) -> (int, int):
     values = np.array(values)
     if not np.any(values >= 0):
         return -1, -1
@@ -62,18 +64,17 @@ def closest_subsegment(values):
         end_index += 1
     return start_index, end_index
 
-
-def vectors_in_one_direction(v1, v2) -> bool:
-    dot_product = np.dot(v1, v2)
-    return dot_product >= 0
-
-
 class PybulletEnvironment:
     """This class deals with everything pybullet or environment (obstacles) related"""
 
-    def __init__(self, env_model, dt, mode=None, visualize=False, build_data_set=False, start=None, orientation=-np.pi/2, frame_limit=5000):
+    # threshold for goal_vector length that signals arrival at goal
+    pod_arrival_threshold = 0.5
+    linear_lookahead_arrival_threshold = 0.2
+    analytical_arrival_threshold = 0.1
+
+    def __init__(self, env_model : str, dt : float, mode=None, visualize=False, build_data_set=False, start=None, orientation=-np.pi/2, frame_limit=5000):
         """ Create environment.
-        
+
         arguments:
         env_model   -- layout of obstacles in the environment 
                     (choices: "plane", "Savinov_val2", "Savinov_val3", "Savinov_test7")
@@ -182,6 +183,7 @@ class PybulletEnvironment:
         self.max_speed = max_speed
 
         self.mode = mode  # choose navigation mode, different decoders have different thresholds for e.g. arrival
+        self.arrival_threshold = getattr(PybulletEnvironment, self.mode + '_arrival_threshold')
 
         self.buffer = 0  # buffer for checking if agent got stuck, discards timesteps spent turning towards the goal
 
@@ -191,11 +193,6 @@ class PybulletEnvironment:
         self.ray_length = 1  # length of the beams
         self.mapping = 1.5  # see local_navigation experiments
         self.combine = 1.5
-
-        # threshold for goal_vector length that signals arrival at goal
-        self.pod_arrival_threshold = 0.5
-        self.lin_look_arrival_threshold = 0.2
-        self.analytical_arrival_threshold = 0.1
 
     def __load_obj(self, objectFilename, textureFilename):
         """load object files with specified texture into the environment"""
@@ -227,8 +224,7 @@ class PybulletEnvironment:
 
     def camera(self, agent_pos_orn=None):
         """ simulates a camera mounted on the robot, creating images """
-        if not self.buildDataSet and not self.visualize:
-            return
+        assert self.buildDataSet or self.visualize # why would we create images otherwise
 
         distance = 100000
         img_w, img_h = 64, 64
@@ -305,13 +301,21 @@ class PybulletEnvironment:
         v_left = (self.forward - self.turn) * self.max_speed
         v_right = (self.forward + self.turn) * self.max_speed
         gains = [v_left, v_right]
-        self.change_speed(gains)
+        self.step(gains)
+        self.camera()
+        return True
+
+    def step(self, gains):
+        # change speed
+        p.setJointMotorControlArray(bodyUniqueId=self.carID,
+                            jointIndices=[4, 6],
+                            controlMode=p.VELOCITY_CONTROL,
+                            targetVelocities=gains,
+                            forces=[10, 10])
         p.stepSimulation()
         self.save_position_and_speed()
         if self.visualize:
             time.sleep(self.dt / 5)
-        self.camera()
-        return True
 
     def keyboard_simulation(self):
         """ Control the agent with your keyboard. SPACE ends the simulation."""
@@ -330,29 +334,9 @@ class PybulletEnvironment:
 
         gains = self.compute_gains(goal_vector)
 
-        self.change_speed(gains)
-        p.stepSimulation()
+        self.step(gains)
 
-        self.save_position_and_speed()
-        if self.visualize:
-            time.sleep(self.dt / 5)
-
-    def intersect(self, p1, v1, p2, v2):
-        # Calculate determinant
-        det = v1[0] * v2[1] - v1[1] * v2[0]
-
-        # Parallel rays do not intersect
-        if det == 0:
-            return False
-
-        # Calculate the relative position of intersection
-        t = ((p2[0] - p1[0]) * v2[1] - (p2[1] - p1[1]) * v2[0]) / det
-        u = ((p2[0] - p1[0]) * v1[1] - (p2[1] - p1[1]) * v1[0]) / det
-
-        # Check if the intersection is in the direction of both rays
-        return t >= 0 and u >= 0
-
-    def navigation_step(self, gc: GridCellNetwork = None, pod=None, obstacles=True):
+    def navigation_step(self, gc: Optional[GridCellNetwork] = None, pod=None, obstacles=True):
         """ One navigation step for the agent. 
             Calculate or update the goal vector.
             Calculate obstacle vector.
@@ -382,7 +366,7 @@ class PybulletEnvironment:
 
             # combine goal and obstacle vector
             multiple = 1 if vectors_in_one_direction(normed_goal_vector, obstacle_vector) else -1
-            if not self.intersect(self.xy_coordinates[-1], normed_goal_vector, point, obstacle_vector * multiple):
+            if not intersect(self.xy_coordinates[-1], normed_goal_vector, point, obstacle_vector * multiple):
                 multiple = 0
             movement = list(normed_goal_vector * self.combine + obstacle_vector * multiple)
         else:
@@ -393,28 +377,14 @@ class PybulletEnvironment:
         if gc:
             xy_speed = self.xy_speeds[-1]
             gc.track_movement(xy_speed)
-        self.camera()
+        # self.camera()
         return point, obstacle_vector, movement
 
-    def compute_angle(self, vec_1, vec_2):
-        length_vector_1 = np.linalg.norm(vec_1)
-        length_vector_2 = np.linalg.norm(vec_2)
-        if length_vector_1 == 0 or length_vector_2 == 0:
-            return 0
-        unit_vector_1 = vec_1 / length_vector_1
-        unit_vector_2 = vec_2 / length_vector_2
-        dot_product = np.dot(unit_vector_1, unit_vector_2)
-        angle = np.arccos(dot_product)
-
-        vec = np.cross([vec_1[0], vec_1[1], 0], [vec_2[0], vec_2[1], 0])
-
-        return angle * np.sign(vec[2])
-
-    def compute_gains(self, goal_vector):
+    def compute_gains(self, goal_vector) -> Tuple[float, float]:
         """ computes the motor gains resulting from (inhibited) goal vector"""
         current_angle = self.orientation_angle[-1]
         current_heading = [np.cos(current_angle), np.sin(current_angle)]
-        diff_angle = self.compute_angle(current_heading, goal_vector) / np.pi
+        diff_angle = compute_angle(current_heading, goal_vector) / np.pi
 
         # threshold for turning: turning too sharply is not biologically accurate
         if abs(diff_angle) > math.radians(30 / math.pi):
@@ -432,13 +402,6 @@ class PybulletEnvironment:
         v_right = self.max_speed * (1 + diff_angle * 2) * gain
 
         return [v_left, v_right]
-
-    def change_speed(self, gains):
-        p.setJointMotorControlArray(bodyUniqueId=self.carID,
-                                    jointIndices=[4, 6],
-                                    controlMode=p.VELOCITY_CONTROL,
-                                    targetVelocities=gains,
-                                    forces=[10, 10])
 
     def save_position_and_speed(self):
         [position, angle] = p.getBasePositionAndOrientation(self.carID)
@@ -465,7 +428,7 @@ class PybulletEnvironment:
         if self.visualize:
             p.addUserDebugLine(start, end, color, width)
 
-    def ray_detection_egocentric(self):
+    def ray_detection_egocentric(self) -> (List[Any], List[float], List[Any]):
         """ returns the egocentric distance to obstacles in numRays directions """
 
         if self.visualize:
@@ -479,7 +442,7 @@ class PybulletEnvironment:
         rayHitColor = [1, 0, 0]
         rayMissColor = [1, 1, 1]
 
-        ray_angles = []
+        ray_angles : List[float] = []
 
         for i in range(numRays):
             rayFromPoint = p.getLinkState(self.carID, 0)[0]  # linkWorldPosition
@@ -568,7 +531,7 @@ class PybulletEnvironment:
         direction_vector = direction_vector * 1.5 / min(rays[start_index:end_index + 1])
         return hit_points[0], direction_vector
 
-    def calculate_goal_vector_analytically(self, goal=None):
+    def calculate_goal_vector_analytically(self, goal=None) -> Vector2D:
         """ Uses a precise goal vector. """
         goal_pos = goal if goal is not None else self.goal_pos
         rayFromPoint = p.getLinkState(self.carID, 0)[0]  # linkWorldPosition
@@ -581,21 +544,12 @@ class PybulletEnvironment:
         from system.controller.local_controller.local_navigation import compute_navigation_goal_vector
         return compute_navigation_goal_vector(gc_network, self.nr_ofsteps, self, model=self.mode, pod=pod_network)
 
-    def reached(self, goal_vector):
-        if self.mode == "pod" and abs(np.linalg.norm(goal_vector)) < self.pod_arrival_threshold:
-            return True
-
-        if self.mode == "linear_lookahead" and abs(np.linalg.norm(goal_vector)) < self.lin_look_arrival_threshold:
-            return True
-
-        if self.mode == "analytical" and abs(
-                np.linalg.norm(goal_vector)) < self.analytical_arrival_threshold:
-            return True
-        return False
+    def reached(self, goal_vector : Vector2D) -> bool:
+        return abs(np.linalg.norm(goal_vector)) < self.arrival_threshold
 
     def get_status(self):
         ''' Returns robot status during navigation
-        
+
         returns:
         0   -- robot still moving
         1   -- robot arrived at goal
@@ -645,7 +599,7 @@ class PybulletEnvironment:
 
             current_angle = self.orientation_angle[-1]
             current_heading = [np.cos(current_angle), np.sin(current_angle)]
-            diff_angle = self.compute_angle(current_heading, normed_goal_vector) / np.pi
+            diff_angle = compute_angle(current_heading, normed_goal_vector) / np.pi
 
             gain = min(np.linalg.norm(normed_goal_vector) * 5, 1)
 
@@ -659,22 +613,14 @@ class PybulletEnvironment:
                 direction = np.sign(diff_angle)
                 if direction > 0:
                     v_left = max_speed * gain * -1
-                    v_right = max_speed * gain
                 else:
                     v_left = max_speed * gain
-                    v_right = max_speed * gain * -1
             else:
                 v_left = 0
-                v_right = 0
 
-            gains = [v_left, v_right]
+            gains = [v_left, -v_left]
 
-            self.change_speed(gains)
-            p.stepSimulation()
-
-            self.save_position_and_speed()
-            if self.visualize:
-                time.sleep(self.dt / 5)
+            self.step(gains)
 
         # turning in place does not mean the agent is stuck
         self.buffer = len(self.xy_coordinates)
