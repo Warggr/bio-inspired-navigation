@@ -11,12 +11,15 @@
 import os
 import sys
 
+if __name__ == "__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+
 from system.bio_model.cognitive_map import CognitiveMapInterface
 from system.bio_model.place_cell_model import PlaceCellNetwork
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../.."))
 from system.controller.local_controller.decoder.linear_lookahead_no_rewards import *
 from system.controller.local_controller.decoder.phase_offset_detector import PhaseOffsetDetectorNetwork
+from system.controller.simulation.math_utils import Vector2D
 from system.bio_model.grid_cell_model import GridCellNetwork
 
 import system.plotting.plotResults as plot
@@ -112,13 +115,13 @@ def setup_gc_network(dt):
     return gc_network
 
 
-def get_observations(env):
+def get_observations(env : 'PyBulletEnvironment'):
     # observations with context length k=10 and delta T = 3
     observations = env.images[::3][-1:]
     return [np.transpose(observation[2], (2, 0, 1)) for observation in observations]
 
 
-def vector_navigation(env, goal, gc_network, target_gc_spiking=None, model="combo",
+def vector_navigation(env, goal : Vector2D, gc_network, target_gc_spiking=None, model="combo",
                       step_limit=float('inf'), plot_it=False, obstacles=True, pod=PhaseOffsetDetectorNetwork(16, 9, 40),
                       collect_data_freq=False, collect_data_reachable=False, exploration_phase=False,
                       pc_network: PlaceCellNetwork = None, cognitive_map: CognitiveMapInterface = None):
@@ -410,111 +413,40 @@ if __name__ == "__main__":
     elif experiment == "obstacle_avoidance":
 
         def three_trials(model, working_combinations, num_ray_dir, cone, mapping, combine):
-            """ TRIAL 0 -----------------------------------------------------------------------------------------------------------------------"""
-            start = [-1, -2]
-            goal = [1.5, 1.25]
-            env_model = "obstacle_map_0"
+            nr_steps = 0
+            for trial in range(4):
+                if trial == 0:
+                    start, goal = [-1, -2], [1.5, 1.25]
+                elif trial == 1:
+                    start, goal = [-1, -2], [0, 2]
+                elif trial == 2:
+                    start, goal = [0, -2], [-2, 2]
+                elif trial == 3:
+                    start, goal = [-2.5, -2], [-1, -1]
 
-            # initialize grid cell network and create target spiking
-            if model == "combo":
-                gc_network = setup_gc_network(1e-2)
-                target_spiking = create_gc_spiking(start, goal)
-            else:
-                gc_network = None
-                target_spiking = None
+                env_model = f"obstacle_map_{trial}"
 
-            env = PybulletEnvironment(env_model, 1e-2, "analytical", start=start)
+                # initialize grid cell network and create target spiking
+                if model == "combo":
+                    gc_network = setup_gc_network(1e-2)
+                    target_spiking = create_gc_spiking(start, goal)
+                else:
+                    gc_network = None
+                    target_spiking = None
 
-            env.mapping = mapping
-            env.combine = combine
-            env.num_ray_dir = num_ray_dir
-            env.tactile_cone = cone
+                env = PybulletEnvironment(env_model, 1e-2, "analytical", start=start)
 
-            over, _ = vector_navigation(env, goal, gc_network=gc_network, target_gc_spiking=target_spiking, model=model,
-                                        plot_it=True, step_limit=10000, obstacles=True)
-            # if over != 1: return
-            print("here", over, mapping, combine, num_ray_dir, cone)
+                env.mapping = mapping
+                env.combine = combine
+                env.num_ray_dir = num_ray_dir
+                env.tactile_cone = cone
 
-            nr_steps = env.nr_ofsteps
+                over, _ = vector_navigation(env, goal, gc_network=gc_network, target_gc_spiking=target_spiking, model=model,
+                                            plot_it=True, step_limit=10000, obstacles=(True if trial == 0 else False))
+                assert over == 1
+                print(trial, over, mapping, combine, num_ray_dir, cone)
 
-            """ TRIAL 1 -----------------------------------------------------------------------------------------------------------------------"""
-            start = [-1, -2]
-            goal = [0, 2]
-            env_model = "obstacle_map_1"
-
-            # initialize grid cell network and create target spiking
-            if model == "combo":
-                gc_network = setup_gc_network(1e-2)
-                target_spiking = create_gc_spiking(start, goal)
-            else:
-                gc_network = None
-                target_spiking = None
-
-            env = PybulletEnvironment(env_model, 1e-2, "analytical", start=start)
-
-            env.mapping = mapping
-            env.combine = combine
-            env.num_ray_dir = num_ray_dir
-            env.tactile_cone = cone
-
-            over, _ = vector_navigation(env, goal, gc_network=gc_network, target_gc_spiking=target_spiking, model=model,
-                                        plot_it=True, step_limit=10000, obstacles=False)
-            # if over != 1: return
-            print("here", over, mapping, combine, num_ray_dir, cone)
-
-            nr_steps += env.nr_ofsteps
-
-            """ TRIAL 2 -----------------------------------------------------------------------------------------------------------------------"""
-            start = [0, -2]
-            goal = [-2, 2]
-            env_model = "obstacle_map_2"
-
-            if model == "combo":
-                gc_network = setup_gc_network(1e-2)
-                target_spiking = create_gc_spiking(start, goal)
-            else:
-                gc_network = None
-                target_spiking = None
-
-            env = PybulletEnvironment(env_model, 1e-2, "analytical", start=start)
-
-            env.mapping = mapping
-            env.combine = combine
-            env.num_ray_dir = num_ray_dir
-            env.tactile_cone = cone
-
-            over, _ = vector_navigation(env, goal, gc_network=gc_network, target_gc_spiking=target_spiking, model=model,
-                                        plot_it=True, step_limit=10000, obstacles=False)
-            # if over != 1: return
-
-            nr_steps += env.nr_ofsteps
-
-            """ TRIAL 3 -----------------------------------------------------------------------------------------------------------------------"""
-            start = [-2.5, -2]
-            goal = [-1, -1]
-            env_model = "obstacle_map_3"
-
-            # initialize grid cell network and create target spiking
-            if model == "combo":
-                gc_network = setup_gc_network(1e-2)
-                target_spiking = create_gc_spiking(start, goal)
-            else:
-                gc_network = None
-                target_spiking = None
-
-            env = PybulletEnvironment(env_model, 1e-2, "analytical", start=start)
-
-            env.mapping = mapping
-            env.combine = combine
-            env.num_ray_dir = num_ray_dir
-            env.tactile_cone = cone
-
-            over, _ = vector_navigation(env, goal, gc_network=gc_network, target_gc_spiking=target_spiking, model=model,
-                                        plot_it=True, step_limit=10000, obstacles=False)
-            # if over != 1: return
-            print(over, mapping, combine, num_ray_dir, cone)
-
-            nr_steps += env.nr_ofsteps
+                nr_steps += env.nr_ofsteps
 
             # save all combinations that passed all three tests and how many time steps the agent took in total
             working_combinations.append((nr_ofrays, cone, mapping, combine, nr_steps))
