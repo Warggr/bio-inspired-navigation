@@ -1,2 +1,5 @@
+**/__pycache__/
+runs/
 system/controller/reachability_estimator/data/*
 system/bio_model/data/*
+data/*

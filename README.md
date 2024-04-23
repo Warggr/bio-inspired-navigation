@@ -70,7 +70,7 @@ Available environments:
 ----
 
 ### Local Controller
-[system/controller/local_controller/local_navigation.py](https://github.com/Fedannie/bio-inspired-navigation/blob/main/system/controller/local_controller/local_navigation.py)
+[system/controller/local_controller/local_navigation.py](system/controller/local_controller/local_navigation.py)
 
 Test navigating with the local controller using different movement vector and goal vector calculation methods in different environments.
 
@@ -160,14 +160,14 @@ Adjust ***connection_re_type*** and ***creation_re_type***:
 To adjust what values are considered as reachable adjust the creation and connection thresholds in pc_network.py and cognitivemap.py.
 
 #### Cognitive Map
-[system/bio_model/cognitive_map.py](https://github.com/Fedannie/bio-inspired-navigation/blob/main/system/bio_model/cognitive_map.py)
+[system/bio_model/cognitive_map.py](system/bio_model/cognitive_map.py)
 
 Perform the experiments described in subsection 6.3 Cognitive Map Construction
 
 Update the connections on the cognitive map or draw it.
 
 #### Navigation
-[system/controller/topological/topological_navigation.py](https://github.com/Fedannie/bio-inspired-navigation/blob/main/system/controller/topological/topological_navigation.py)
+[system/controller/topological/topological_navigation.py](system/controller/topological/topological_navigation.py)
 
 Perform the experiments described in subsection 6.4.1 Topological Navigation and 6.6 Overall Performance
 Test navigation through the maze.
