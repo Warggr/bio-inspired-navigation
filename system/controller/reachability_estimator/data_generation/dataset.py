@@ -67,8 +67,8 @@ class Sample:
         self.src_img = env.camera([self.src_pos, self.src_angle])
         self.dst_img = env.camera([self.dst_pos, self.dst_angle])
         # TODO: src_img.flatten(), dst_img.flatten()
-        self.src_distances = env.lidar([self.src_pos, self.src_angle])[0]
-        self.dst_distances = env.lidar([self.dst_pos, self.dst_angle])[0]
+        self.src_distances = env.lidar([self.src_pos, self.src_angle]).distances
+        self.dst_distances = env.lidar([self.dst_pos, self.dst_angle]).distances
 
 
 class SampleConfig:
