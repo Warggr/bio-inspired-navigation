@@ -390,8 +390,14 @@ def create_and_save_reachability_samples(
 
     try:
         dset = f[DATASET_KEY]
-        start_index = dset.size + 1
-        # TODO: if existing size is bigger than required size, copy the dataset
+        old_size = dset.size
+        start_index = old_size + 1
+
+        if old_size < nr_samples:
+            # Hint: this might fail if somehow the dtype changed from one dataset to the other
+            dset = f.create_dataset('tmp', dtype=dtype, data=dset[:], maxshape=(nr_samples,))
+            del f[DATASET_KEY]
+            f.move('tmp', DATASET_KEY)
     except KeyError:
         dset = f.create_dataset(DATASET_KEY, data=np.array([], dtype=dtype), dtype=dtype, maxshape=(nr_samples,))
         start_index = 1
@@ -401,8 +407,8 @@ def create_and_save_reachability_samples(
     sum_r = 0
     buffer = []
 
-    last_flush = 0
-    for i in (bar := tqdm(range(start_index, nr_samples+1))):
+    last_flush = start_index - 1
+    for i in (bar := tqdm(range(start_index, nr_samples+1), initial=start_index, total=nr_samples)):
         item = None
         while item is None:
             random_index = random.randrange(rd.traj_len_cumsum[-1])
