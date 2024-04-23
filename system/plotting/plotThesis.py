@@ -102,27 +102,21 @@ def plot_grid_cell_modules(gc_modules, i=None, plot_target=False, plot_matches=F
     plt.close()
 
 
-def plot_grid_cell(gc_modules_start, gc_modules_goal):
+def plot_grid_cell(*gc_modules, rows_per_module=1):
 
-    fig, axes = plt.subplots(2, len(gc_modules_start))
+    columns = int(len(gc_modules[0]) / rows_per_module)
+    fig, axes = plt.subplots(rows_per_module * len(gc_modules), columns)
 
-    for m, gc in enumerate(gc_modules_start):
-        ax = axes[0, m]
-        ax.axes.get_xaxis().set_visible(False)
+    for i_module, gc_modules in enumerate(gc_modules):
+        for m, gc in enumerate(gc_modules):
+            row, col = int(m / columns) + rows_per_module * i_module, m % columns
+            ax = axes[row, col]
+            ax.axes.get_xaxis().set_visible(False)
 
-        if m != 0:
-            ax.axes.get_yaxis().set_visible(False)
+            if col != 0:
+                ax.axes.get_yaxis().set_visible(False)
 
-        ax.imshow(gc.reshape(40, 40), origin="lower", cmap=tum_blue_map)
-
-    for m, gc in enumerate(gc_modules_goal):
-        ax = axes[1, m]
-        ax.axes.get_xaxis().set_visible(False)
-
-        if m != 0:
-            ax.axes.get_yaxis().set_visible(False)
-
-        ax.imshow(gc.reshape(40, 40), origin="lower", cmap=tum_blue_map)
+            ax.imshow(gc.reshape(40, 40), origin="lower", cmap=tum_blue_map)
 
     plt.show()
     plt.close()

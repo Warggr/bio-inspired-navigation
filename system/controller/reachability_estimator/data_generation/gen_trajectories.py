@@ -148,7 +148,10 @@ def waypoint_movement(env_model, cam_freq, traj_length, map_layout, gc_network):
             print_debug("No path found!")
             continue
 
+        from numbers import Number
         for g in waypoints:
+            assert isinstance(g[0], Number), g            
+
             # if trajectory_length has been reached the trajectory can be saved
             if len(samples) > traj_length / cam_freq:
                 break
@@ -178,7 +181,8 @@ def generate_multiple_trajectories(out_hd5_obj, num_traj, trajectory_length, cam
     dtype = np.dtype([
         ('xy_coordinates', (np.float32, 2)),
         ('orientation', np.float32),
-        ('grid_cell_spiking', (np.float32, 9600))
+        ('grid_cell_spiking', (np.float32, 9600)),
+        ('')
     ])
 
     seed = 123457
@@ -249,10 +253,14 @@ if __name__ == "__main__":
     Adjust filename, env_model, num_traj, traj_length and cam_freq 
     """
     test = True
-    if test:
+    if len(sys.argv) == 6:
+        _, filename, env_model, num_traj, trajectory_length, cam_freq = sys.argv
+        print_debug(sys.argv)
+        generate_and_save_trajectories(filename, str(env_model), int(num_traj), int(trajectory_length), int(cam_freq))
+    elif test:
         print("Testing trajectory generation in available mazes.")
         print("Testing Savinov_val3")
-        generate_and_save_trajectories("trajectories", "Savinov_val3", 1000, 3000, 10)
+        generate_and_save_trajectories("trajectories", "Savinov_val3", num_traj=1000, traj_length=3000, cam_freq=10)
         display_trajectories("trajectories", "Savinov_val3")
         # print("Testing Savinov_val2")
         # save_trajectories("test_2", "Savinov_val2", 1, 3000, 10)
@@ -260,10 +268,6 @@ if __name__ == "__main__":
         # print("Testing Savinov_test7")
         # save_trajectories("test_3", "Savinov_test7", 1, 3000, 10)
         # display_trajectories("test_3", "Savinov_test7")
-    elif len(sys.argv) == 6:
-        _, filename, env_model, num_traj, trajectory_length, cam_freq = sys.argv
-        print_debug(sys.argv)
-        generate_and_save_trajectories(filename, str(env_model), int(num_traj), int(trajectory_length), int(cam_freq))
     else:
         num_traj = 1000
         trajectory_length = 3000

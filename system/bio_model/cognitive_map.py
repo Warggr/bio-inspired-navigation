@@ -36,7 +36,7 @@ def sample_normal(m, s):
     return np.random.normal(m, s)
 
 
-class CognitiveMapInterface:
+class CognitiveMapInterface(ABC):
     def __init__(self, reachability_estimator: ReachabilityEstimator, load_data_from: str = None, debug: bool = True):
         """ Abstract base class defining the interface for cognitive map implementations.
 
@@ -58,6 +58,7 @@ class CognitiveMapInterface:
         # last active node
         self.prior_idx_pc_firing = None
 
+    @abstractmethod
     def track_vector_movement(self, pc_firing: [float], created_new_pc: bool, pc: PlaceCell, **kwargs):
         """ Abstract function used to incorporate changes to the map after each vector navigation
 
@@ -136,8 +137,8 @@ class CognitiveMapInterface:
         """
 
         directory = os.path.join(get_path_top(), relative_folder)
-        if not os.path.exists(directory):
-            raise ValueError("cognitive map not found")
+        #if not os.path.exists(directory):
+        #    raise ValueError("cognitive map not found")
         self.node_network = nx.read_gpickle(os.path.join(directory, filename))
         if self.debug:
             self.draw()
@@ -260,7 +261,7 @@ class CognitiveMap(CognitiveMapInterface):
             self._connect_single_node(p)
             self.print_debug("connecting finished")
 
-    def track_vector_movement(self, pc_firing: [float], created_new_pc: bool, pc: PlaceCell, **kwargs):
+    def track_vector_movement(self, pc_firing: [float], created_new_pc: bool, pc: PlaceCell, lidar: [float] = None, **kwargs):
         """Keeps track of curren/t place cell firing and creation of new place cells"""
 
         # get the currently active place cell
@@ -270,6 +271,7 @@ class CognitiveMap(CognitiveMapInterface):
         # Check if we have entered a new place cell
         if created_new_pc:
             entered_different_pc = True
+            pc.distances = lidar
             self.add_node_to_map(pc)
 
         elif pc_active_firing > self.active_threshold and self.prior_idx_pc_firing != idx_pc_active:
@@ -644,14 +646,13 @@ if __name__ == "__main__":
     env_model = "Savinov_val3"
     debug = True
 
-    re = reachability_estimator_factory(connection_re_type, weights_file=weights_filename, env_model=env_model,
+    re = reachability_estimator_factory(connection_re_type, weights_file=weights_filename, #env_model=env_model,
                                         debug=debug, with_spikings=True)
     # Select the version of the cognitive map to use
     cm = LifelongCognitiveMap(reachability_estimator=re, load_data_from=map_filename)
     cm.draw()
 
-    dt = 1e-2
-    env = PybulletEnvironment(env_model, dt, visualize=False, mode="analytical", build_data_set=True)
+    env = PybulletEnvironment(env_model, visualize=False, mode="analytical", build_data_set=True)
     import random
 
     for i in range(10):
@@ -676,4 +677,4 @@ if __name__ == "__main__":
         plt.show()
         plt.close()
 
-        plot_grid_cell(start.gc_connections, finish.gc_connections)
+        plot_grid_cell(start.gc_connections, finish.gc_connections, rows_per_module=2)

@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Tuple
 
-Vector2D = Tuple[float, float]
+from system.types import Vector2D
 
 def vectors_in_one_direction(v1 : Vector2D, v2 : Vector2D) -> bool:
     dot_product = np.dot(v1, v2)

@@ -31,17 +31,24 @@ import os
 
 import range_libc
 
-from map_utils import a_star#, rasterize_line
-from math_utils import depth_to_xy_plane, depth_to_xy, compute_normals
+if __name__ == "__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
+    from map_occupancy_helpers.map_utils import a_star#, rasterize_line
+    from map_occupancy_helpers.math_utils import depth_to_xy_plane, depth_to_xy, compute_normals
+    import map_occupancy_helpers.map_utils_cpp as map_cpp
+else:
+    from .map_occupancy_helpers.map_utils import a_star#, rasterize_line
+    from .map_occupancy_helpers.math_utils import depth_to_xy_plane, depth_to_xy, compute_normals
+    import map_occupancy_helpers.map_utils_cpp as map_cpp
 
-
-import map_utils_cpp as map_cpp
+from typing import Tuple, List
+Vector2D = Tuple[float, float]
 
 class Map(object):
     def __init__(self,
                  occupancy_grid,
                  resolution,
-                 origin,
+                 origin : Vector2D,
                  path_map=None,
                  path_map_division=7,
                  path_map_dilation=2,
@@ -190,7 +197,7 @@ class Map(object):
         """
         return ((xys - np.array(self.origin)) * n_division).astype(np.int32)
 
-    def continuous_coord(self, x, y, n_division):
+    def continuous_coord(self, x, y, n_division) -> Vector2D:
         """
         The inverse operation of grid_coord()
         """
@@ -232,7 +239,7 @@ class Map(object):
         dilated = np.clip(255.0 - (distance_map / n_iter) * 255.0, 0.0, None)
         return dilated
 
-    def find_path(self, start_pos, goal_pos):
+    def find_path(self, start_pos : Vector2D, goal_pos : Vector2D) -> List[Vector2D]:
         start_coord = self.grid_coord(start_pos[0], start_pos[1], self.path_map_division)
         goal_coord = self.grid_coord(goal_pos[0], goal_pos[1], self.path_map_division)
 
@@ -241,9 +248,11 @@ class Map(object):
         if waypoints is None:
             return [(start_pos, goal_pos)]
 
+        from numbers import Number
         res = []
         for x, y in waypoints:
             cx, cy = self.continuous_coord(x, y, self.path_map_division)
+            assert isinstance(cx, Number)
             res.append((cx, cy))
 
         return res

@@ -34,15 +34,14 @@ def get_path():
     return dirname
 
 
-def _load_weights(model_file, nets, net_opts):
-    state = load_model(os.path.dirname(model_file),
-                       os.path.basename(model_file), load_to_cpu=True)
+def _load_weights(model_file, nets : Model, **kwargs):
+    state = load_model( os.path.dirname(model_file), os.path.basename(model_file), load_to_cpu=True, **kwargs)
     epoch = int(state['epoch'])
 
-    for name, net in nets.items():
+    for name, net in nets.nets.items():
         net.load_state_dict(state['nets'][name])
 
-    for name, opt in net_opts.items():
+    for name, opt in nets.optimizers.items():
         opt.load_state_dict(state['optims'][name])
         # Move the parameters stored in the optimizer into gpu
         for opt_state in opt.state.values():
@@ -52,16 +51,16 @@ def _load_weights(model_file, nets, net_opts):
     return epoch
 
 
-def _save_model(nets, net_opts, epoch, global_args, model_file):
+def _save_model(nets : Model, epoch, global_args, model_file):
     """ save current state of the model """
     state = {
         'epoch': epoch,
         'global_args': global_args,
         'optims': {
-            name: opt.state_dict() for name, opt in net_opts.items()
+            name: opt.state_dict() for name, opt in nets.optimizers.items()
         },
         'nets': {
-            name: net.state_dict() for name, net in nets.items()
+            name: net.state_dict() for name, net in nets.nets.items()
         }
     }
     save_model(state, epoch, '', model_file)
@@ -126,7 +125,7 @@ def run_test_model(dataset):
     writer.add_scalar("fscore/Testing", test_f1, 1)
 
 
-def tensor_log(title, loader, train_device, model_variant, writer, epoch, nets, backbone, position_loss_weight = 0.6, angle_loss_weight = 0.3):
+def tensor_log(title, loader, train_device, writer, epoch, net : Model, position_loss_weight = 0.6, angle_loss_weight = 0.3):
     """ Log accuracy, precision, recall and f1score for dataset in loader."""
     with torch.no_grad():
         log_loss = 0
@@ -139,14 +138,16 @@ def tensor_log(title, loader, train_device, model_variant, writer, epoch, nets, 
         recall = BinaryRecall()
         f1 = BinaryF1Score()
         for idx, item in enumerate(loader):
-            if model_variant == 'spikings':
-                batch_src_imgs, batch_dst_imgs, batch_reachability, batch_transformation, batch_src_spikings, batch_dst_spikings = item
+            batch_src_imgs, batch_dst_imgs, batch_reachability, batch_transformation, *other_data = item
+            batch_src_spikings, batch_dst_spikings, batch_src_distances = None, None, None
+            other_data = iter(other_data)
+            if net.with_grid_cell_spikings:
+                batch_src_spikings, batch_dst_spikings = next(other_data), next(other_data)
                 batch_src_spikings = batch_src_spikings.to(device=train_device, non_blocking=True).float()
                 batch_dst_spikings = batch_dst_spikings.to(device=train_device, non_blocking=True).float()
-            else:
-                batch_src_imgs, batch_dst_imgs, batch_reachability, batch_transformation = item
-                batch_src_spikings = None
-                batch_dst_spikings = None
+            if net.with_lidar:
+                batch_src_distances = next(other_data)
+                batch_src_distances = batch_src_distances.to(device=train_device, non_blocking=True).float()
             # Get predictions
             src_img = batch_src_imgs.to(device=train_device, non_blocking=True)
             dst_imgs = batch_dst_imgs.to(device=train_device, non_blocking=True)
@@ -157,7 +158,7 @@ def tensor_log(title, loader, train_device, model_variant, writer, epoch, nets, 
 
             src_batch = src_img.float()
             dst_batch = dst_imgs.float()
-            prediction = get_prediction(nets, backbone, model_variant, src_batch, dst_batch, batch_transformation, batch_src_spikings, batch_dst_spikings)
+            prediction = net.get_prediction(src_batch, dst_batch, batch_transformation, batch_src_spikings, batch_dst_spikings, batch_src_distances)
             reachability_prediction, position_prediction, angle_prediction = prediction
 
             loss_reachability = torch.nn.functional.binary_cross_entropy(reachability_prediction, r,
@@ -193,7 +194,7 @@ def tensor_log(title, loader, train_device, model_variant, writer, epoch, nets, 
         writer.add_scalar("Fscore/" + title, log_f1, epoch)
 
 
-def train_multiframedst(nets, net_opts, dataset, global_args):
+def train_multiframedst(net : Model, dataset : H5Dataset, global_args):
     """ Train the model on a multiframe dataset. """
     (
         model_file,
@@ -207,11 +208,9 @@ def train_multiframedst(nets, net_opts, dataset, global_args):
         train_device,
         log_interval,
         save_interval,
-        model_variant,
         position_loss_weight,
         angle_loss_weight,
         backbone,
-        with_grid_cell_spikings
     ) = [global_args[_] for _ in ['model_file',
                                   'resume',
                                   'batch_size',
@@ -223,11 +222,9 @@ def train_multiframedst(nets, net_opts, dataset, global_args):
                                   'train_device',
                                   'log_interval',
                                   'save_interval',
-                                  'model_variant',
                                   'position_loss_weight',
                                   'angle_loss_weight',
                                   'backbone',
-                                  'with_grid_cell_spikings'
     ]]
 
     # For Tensorboard: log the runs
@@ -237,9 +234,13 @@ def train_multiframedst(nets, net_opts, dataset, global_args):
 
     # Resume: load weights and continue training
     if resume:
-        epoch = _load_weights(model_file, nets, net_opts)
-        torch.manual_seed(231239 + epoch)
-        print('loaded saved state. epoch: %d' % epoch)
+        try:
+            epoch = _load_weights(model_file, nets)
+            torch.manual_seed(231239 + epoch)
+            print('loaded saved state. epoch: %d' % epoch)
+        except FileNotFoundError:
+            epoch = 0
+            print('No saved state found. Starting from the beginning. epoch: 0')
 
     # This is a direct copy of rmp_nav
     # FIXME: hack to mitigate the bug in torch 1.1.0's schedulers
@@ -255,7 +256,7 @@ def train_multiframedst(nets, net_opts, dataset, global_args):
             step_size=lr_decay_epoch,
             gamma=lr_decay_rate,
             last_epoch=last_epoch)
-        for name, opt in net_opts.items()
+        for name, opt in nets.optimizers.items()
     }
 
     n_samples = samples_per_epoch
@@ -280,49 +281,59 @@ def train_multiframedst(nets, net_opts, dataset, global_args):
         last_log_time = time.time()
 
         for idx, item in enumerate(loader):
-            if with_grid_cell_spikings:
-                batch_src_imgs, batch_dst_imgs, batch_reachability, batch_transformation, batch_src_spikings, batch_dst_spikings = item
-                src_spikings_batch = batch_src_spikings.to(device=train_device, non_blocking=True).float()
-                dst_spikings_batch = batch_dst_spikings.to(device=train_device, non_blocking=True).float()
-            else:
-                batch_src_imgs, batch_dst_imgs, batch_reachability, batch_transformation = item
-                src_spikings_batch = None
-                dst_spikings_batch = None
-            # Zeros optimizer gradient
-            for _, opt in net_opts.items():
-                opt.zero_grad()
-
-            # Get predictions
-            src_img = batch_src_imgs.to(device=train_device, non_blocking=True)
-            dst_img = batch_dst_imgs.to(device=train_device, non_blocking=True)
-            r = batch_reachability.to(device=train_device, non_blocking=True)
-            r = torch.clamp(r, 0.0, 1.0)
-            transformation = batch_transformation.to(device=train_device, non_blocking=True)
+            src_imgs, dst_imgs, reachability, transformation = item[:4]
+            src_imgs = src_imgs.to(device=train_device, non_blocking=True).float()
+            dst_imgs = dst_imgs.to(device=train_device, non_blocking=True).float()
+            try:
+                assert not torch.any(src_imgs.isnan())
+                assert not torch.any(dst_imgs.isnan())
+                assert not torch.any(reachability.isnan())
+            except AssertionError:
+                print(f'src_imgs with ids [{idx}] contained NaN - skipping')
+            reachability = reachability.to(device=train_device, non_blocking=True)
+            reachability = torch.clamp(reachability, 0.0, 1.0)
+            transformation = transformation.to(device=train_device, non_blocking=True)
             position = transformation[:, 0:2]
             angle = transformation[:, -1]
 
-            src_batch = src_img.float()
-            dst_batch = dst_img.float()
+            other_params = iter(item[4:])
+            other_args = []
+            if nets.with_grid_cell_spikings:
+                src_spikings, dst_spikings = next(other_params), next(other_params)
+                src_spikings = src_spikings.to(device=train_device, non_blocking=True).float()
+                dst_spikings = dst_spikings.to(device=train_device, non_blocking=True).float()
+                other_args += [ src_spikings, dst_spikings ]
+            if nets.with_lidar:
+                src_distances = next(other_params)
+                src_distances = src_distances.to(device=train_device, non_blocking=True).float()
+                other_args.append(src_distances)
 
-            prediction = get_prediction(nets, backbone, model_variant, src_batch, dst_batch, batch_transformation, src_spikings_batch, dst_spikings_batch)
+            # Zeros optimizer gradient
+            for _, opt in nets.optimizers.items():
+                opt.zero_grad()
+
+            # Get predictions
+            prediction = nets.get_prediction(src_imgs, dst_imgs, transformation, *other_args)
 
             reachability_prediction, position_prediction, angle_prediction = prediction
+            assert not np.isnan(sum(reachability_prediction.detach().numpy()))
 
             # Loss
-            loss_reachability = torch.nn.functional.binary_cross_entropy(reachability_prediction, r, reduction='none')
+            loss_reachability = torch.nn.functional.binary_cross_entropy(reachability_prediction, reachability, reduction='none')
             if position_prediction is None:
                 loss = loss_reachability
             else:
                 loss_position = torch.sqrt(torch.sum(torch.nn.functional.mse_loss(position_prediction, position, reduction='none'), dim=1))
                 loss_angle = torch.sqrt(torch.nn.functional.mse_loss(angle_prediction, angle, reduction='none'))
-                loss = loss_reachability + r @ (position_loss_weight * loss_position + angle_loss_weight * loss_angle)
+                loss = loss_reachability + reachability @ (position_loss_weight * loss_position + angle_loss_weight * loss_angle)
 
             loss = loss.sum()
+            assert not loss.isnan()
             # backwards gradient
             loss.backward()
 
             # optimizer step
-            for _, opt in net_opts.items():
+            for _, opt in nets.optimizers.items():
                 opt.step()
 
             # Logging the run
@@ -347,7 +358,7 @@ def train_multiframedst(nets, net_opts, dataset, global_args):
         if epoch % save_interval == 0:
             print('saving model...')
             writer.flush()
-            _save_model(nets, net_opts, epoch, global_args, model_file)
+            _save_model(nets, epoch, global_args, model_file)
 
         # Validation
         valid_loader = DataLoader(valid_dataset,
@@ -355,11 +366,14 @@ def train_multiframedst(nets, net_opts, dataset, global_args):
                                   num_workers=n_dataset_worker)
 
         # log performance on the validation set
-        tensor_log("Validation", valid_loader, train_device, model_variant, writer, epoch, nets, backbone, position_loss_weight, angle_loss_weight)
+        try:
+            tensor_log("Validation", valid_loader, train_device, writer, epoch, nets, position_loss_weight, angle_loss_weight)
+        except AssertionError:
+            print('Could not compute val error due to NaN :(')
 
 
-def validate_func(model_file, nets, net_opts, dataset, backbone, batch_size, train_device, model_variant, position_loss_weight, angle_loss_weight):
-    epoch = _load_weights(model_file, nets, net_opts)
+def validate_func(model_file, net : Model, dataset, batch_size, train_device, position_loss_weight, angle_loss_weight):
+    epoch = _load_weights(model_file, nets)
     print('loaded saved state. epoch: %d' % epoch)
     train_size = int(0.8 * len(dataset))
     valid_size = len(dataset) - train_size
@@ -372,8 +386,7 @@ def validate_func(model_file, nets, net_opts, dataset, backbone, batch_size, tra
                               num_workers=0)
 
     # log performance on the validation set
-    tensor_log("Validation", valid_loader, train_device, model_variant, writer, epoch, nets, backbone, position_loss_weight,
-               angle_loss_weight)
+    tensor_log("Validation", valid_loader, train_device, writer, epoch, net, position_loss_weight, angle_loss_weight)
     writer.flush()
 
 
@@ -388,9 +401,29 @@ if __name__ == '__main__':
 
     """
 
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('mode', choices=['train', 'test', 'validate'])
+    parser.add_argument('--spikings', dest='with_grid_cell_spikings', help='Grid cell spikings are included in the dataset', action='store_true')
+    parser.add_argument('--lidar', dest='with_lidar', help='LIDAR distances are included in the dataset', action='store_true')
+    parser.add_argument('--pair-conv', dest='with_conv_layer', help='Pair-conv neural network', action='store_true', default=True)
+    parser.add_argument('--with_dist', help='<TODO: I\'m not sure what that is>', action='store_true')
+    parser.add_argument('--resume', action='store_true')
+
+    args = parser.parse_args()
+
+    suffix = (''
+        + ('+spikings' if args.with_grid_cell_spikings else '')
+        + ('+lidar' if args.with_lidar else '')
+    )
+    suffix_out = (suffix
+        + ('+conv' if args.with_conv_layer else '')
+    )
+
     global_args = {
-        'model_file': os.path.join(os.path.dirname(__file__), "../data/models/no_siamese_mse_updated"),
-        'resume': False,
+        'model_file': os.path.join(os.path.dirname(__file__), "..", "data", "models", "reachability_network" + suffix_out),
+        'resume': args.resume,
         'batch_size': 64,
         'samples_per_epoch': 10000,
         'max_epochs': 50,
@@ -399,38 +432,31 @@ if __name__ == '__main__':
         'n_dataset_worker': 0,
         'log_interval': 20,
         'save_interval': 5,
-        'model_variant': "spikings",  # "pair_conv",#"with_dist",#"the_only_variant",
+        'model_kwargs': { key: getattr(args, key) for key in ['with_grid_cell_spikings', 'with_lidar', 'with_conv_layer', 'with_dist'] },
         'train_device': "cpu",
         'position_loss_weight': 0.006,
         'angle_loss_weight': 0.003,
         'backbone': 'convolutional',  # convolutional, res_net
-        'with_grid_cell_spikings': True,
         'external_link': False
     }
 
     # Defining the NN and optimizers
-    nets = initialize_network(global_args['backbone'], global_args['model_variant'])
+    nets = Model.create_from_config(global_args['backbone'], **global_args['model_kwargs'])
 
-    testing = False
-    validate = False
-
-    if validate:
+    if args.mode == "validate":
         hd5file = "trajectories.hd5"
         directory = get_path()
         directory = os.path.join(directory, "data/reachability")
         filepath = os.path.join(directory, hd5file)
         filepath = os.path.realpath(filepath)
         validate_func(global_args['model_file'],
-                 {name: spec['net'] for name, spec in nets.items()},
-                 {name: spec['opt'] for name, spec in nets.items()},
+                 nets,
                  H5Dataset(filepath),
-                 global_args['backbone'],
                  global_args['batch_size'],
                  global_args['train_device'],
-                 global_args['model_variant'],
                  global_args['position_loss_weight'],
                  global_args['angle_loss_weight'])
-    elif testing:
+    elif args.mode == "test":
         # Testing
         hd5file = "trajectories.hd5"
         directory = get_path()
@@ -441,26 +467,14 @@ if __name__ == '__main__':
         dataset = H5Dataset(filepath)
 
         run_test_model(dataset)
-    else:
+    elif args.mode == "train":
         # Training
-        hd5file = "dataset_spikings.hd5"
-
-        directory = get_path()
-        directory = os.path.join(directory, "data/reachability")
-        filepath = os.path.join(directory, hd5file)
+        filepath = os.path.join(get_path(), "data", "reachability", 'dataset' + suffix + '.hd5')
         filepath = os.path.realpath(filepath)
 
-        if global_args['with_grid_cell_spikings']:
-            dataset = H5DatasetWithSpikings(filepath, global_args['external_link'])
-        else:
-            dataset = H5Dataset(filepath, global_args['external_link'])
+        dataset = H5Dataset(filepath, global_args['external_link'])
 
         train_multiframedst(
-            nets={
-                name: spec['net'] for name, spec in nets.items()
-            },
-            net_opts={
-                name: spec['opt'] for name, spec in nets.items() if spec['opt'] is not None
-            },
+            nets,
             dataset=dataset,
             global_args=global_args)

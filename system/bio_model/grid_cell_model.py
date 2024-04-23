@@ -9,7 +9,7 @@
 """
 import numpy as np
 import os
-
+from typing import List
 
 # Grid Cell model is based on Edvardsen 2015. Please refer to the thesis or the paper for detailed explanations
 
@@ -154,7 +154,7 @@ class GridCellNetwork:
 
     def __init__(self, n, M, dt, gmin, gmax=None, from_data=False, gc_name="gc_model_6"):
 
-        self.gc_modules = []  # array holding objects GridCellModule
+        self.gc_modules : List[GridCellModule] = []
         self.dt = dt
 
         if not from_data:

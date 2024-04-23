@@ -14,20 +14,13 @@ import tabulate
 
 import sys
 import os
+from abc import ABC, abstractmethod
+from typing import Type, Dict
 import system.controller.reachability_estimator.networks as networks
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.bio_model.place_cell_model import PlaceCell
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-
-
-def get_path():
-    """ returns path to data storage folder """
-    dirname = os.path.dirname(__file__)
-    return dirname
-
-
-def reachability_estimator_factory(type: str = 'distance', **kwargs):
+def reachability_estimator_factory(type: str = 'distance', device: str = 'cpu', debug: bool = False, **kwargs) -> 'ReachabilityEstimator':
     """ Returns an instance of the reachability estimator interface
 
     arguments:
@@ -43,20 +36,19 @@ def reachability_estimator_factory(type: str = 'distance', **kwargs):
         ReachabilityEstimator object of the corresponding type
     """
     if type == 'distance':
-        return DistanceReachabilityEstimator(device=kwargs.get('device', 'cpu'), debug=kwargs.get('debug', False))
+        return DistanceReachabilityEstimator(device=device, debug=debug)
     elif type == 'neural_network':
-        return NetworkReachabilityEstimator(device=kwargs.get('device', 'cpu'), debug=kwargs.get('debug', False),
-                                            weights_file=kwargs.get('weights_file', None), with_spikings=kwargs.get('with_spikings', False))
+        return NetworkReachabilityEstimator.from_file(device=device, debug=debug, **kwargs)
     elif type == 'simulation':
-        return SimulationReachabilityEstimator(device=kwargs.get('device', 'cpu'), debug=kwargs.get('debug', False),
+        return SimulationReachabilityEstimator(device=device, debug=debug,
                                                env_model=kwargs.get('env_model', None))
     elif type == 'view_overlap':
-        return ViewOverlapReachabilityEstimator(device=kwargs.get('device', 'cpu'), debug=kwargs.get('debug', False))
+        return ViewOverlapReachabilityEstimator(device=device, debug=debug)
     print("Reachability estimator type not defined: " + type)
     return None
 
 
-class ReachabilityEstimator:
+class ReachabilityEstimator(ABC):
     def __init__(self, threshold_same: float, threshold_reachable: float, device: str = 'cpu', debug: bool = False):
         """ Abstract base class defining the interface for reachability estimator implementations.
 
@@ -76,6 +68,7 @@ class ReachabilityEstimator:
         if self.debug:
             print(*params)
 
+    @abstractmethod
     def predict_reachability(self, start: PlaceCell, goal: PlaceCell) -> float:
         """ Abstract function, determines reachability factor between two locations """
         pass
@@ -90,6 +83,7 @@ class ReachabilityEstimator:
         reachability_factor = self.predict_reachability(p, q)
         return self.pass_threshold(reachability_factor, self.threshold_reachable), reachability_factor
 
+    @abstractmethod
     def pass_threshold(self, reachability_factor, threshold) -> bool:
         """ Abstract function, decides if the reachability value passes the threshold """
         pass
@@ -121,61 +115,81 @@ class DistanceReachabilityEstimator(ReachabilityEstimator):
         """ Two nodes are reachable if the distance is less than the threshold """
         return reachability_factor < threshold
 
+WEIGHTS_FOLDER = os.path.join(os.path.dirname(__file__), "data/models")
 
 class NetworkReachabilityEstimator(ReachabilityEstimator):
-    def __init__(self, device: str = 'cpu', debug: bool = True, weights_file: str = None, with_spikings: bool = False,
-                 weights_folder: str = None, backbone: str = 'convolutional', batch_size: int = 64):
-        """ Creates a network-based reachability estimator that judges reachability
-            between two locations based on observations and grid cell spikings
+    """ Creates a network-based reachability estimator that judges reachability
+        between two locations based on observations and grid cell spikings """
 
+    def __init__(self, backbone: networks.Model, device: str = 'cpu', debug: bool = True, batch_size: int = 64, with_spikings : bool = False, with_dist : bool = False):
+        """
         arguments:
+        backbone: str       -- neural network used as a backbone
         device: str         -- device used for calculations (default cpu)
         debug: bool         -- is in debug mode
-        weights_file: str   -- file with weights to load the snapshot from
         with_spikings: bool -- flag indicates whether to include grid cell firing to input
-        weights_folder: sre -- path to the folder with weights files
-        backbone: str       -- variant of the neural network, used when not loading from a snapshot, possible values:
-                               ['convolutional' (default), 'resnet', 'siamese']
-        batch_size: int     -- size of batches (default 64), used when not loading from a snapshot
+        batch_size: int     -- size of batches (default 64)
         """
         super().__init__(threshold_same=0.933, threshold_reachable=0.4, device=device, debug=debug)
 
         self.with_spikings = with_spikings
-        if weights_folder is None:
-            weights_folder = os.path.join(get_path(), "data/models")
+        self.with_dist = with_dist
+
+        self.backbone = backbone
+        self.batch_size = batch_size
+
+    @staticmethod
+    def from_file(weights_file: str, weights_folder: str = WEIGHTS_FOLDER, *args, **kwargs):
+        """ Loads a NetworkReachabilityEstimator from a snapshot in a file.
+
+        arguments:
+        weights_file: str   -- file with weights to load the snapshot from
+        weights_folder: sre -- path to the folder with weights files
+        
+        other arguments are passed to the NetworkReachabilityEstimator constructor
+        """
         weights_filepath = os.path.join(weights_folder, weights_file)
         state_dict = torch.load(weights_filepath, map_location='cpu')
-        self.print_debug('loaded %s' % weights_file)
+        # self.print_debug('loaded %s' % weights_file)
+
         global_args = state_dict.get('global_args', {})
-        self.print_debug('global args:')
-        self.print_debug(tabulate.tabulate(global_args.items()))
 
-        self.backbone = global_args.get('backbone', backbone)
-        self.model_variant = global_args['model_variant']
-        self.batch_size = global_args.get('batch_size', batch_size)
+        # self.print_debug('global args:')
+        # self.print_debug(tabulate.tabulate(global_args.items()))
 
-        self.nets = networks.initialize_network(self.backbone, self.model_variant)
-        self.nets = {name: spec['net'] for name, spec in self.nets.items()}
+        backbone_classname = global_args.get('backbone')
+        batch_size = global_args.get('batch_size')
+        model_variant = global_args.get('model_variant')
 
-        self.print_debug(self.nets)
+        backbone = networks.Model.create_from_config(backbone_classname, model_variant)
 
-        for name, net in self.nets.items():
+        # self.print_debug(backbone.nets)
+
+        for name, net in backbone.nets.items():
             net.load_state_dict(state_dict['nets'][name])
             net.train(False)
 
+        return NetworkReachabilityEstimator(backbone, *args, **kwargs)
+
     def predict_reachability(self, start: PlaceCell, goal: PlaceCell) -> float:
         """ Predicts reachability value between two locations """
+        args = [ start.observations[0], goal.observations[-1] ]
         if self.with_spikings:
             if isinstance(goal.gc_connections, list):
                 goal.gc_connections = np.array(goal.gc_connections)
-            return self.predict_reachability_batch([start.observations[0]], [goal.observations[-1]],
-                                                   [spikings_reshape(start.gc_connections.flatten())],
-                                                   [spikings_reshape(np.array(goal.gc_connections).flatten())])[0]
-        return self.predict_reachability_batch([start.observations[0]], [goal.observations[-1]])[0]
+            args += [
+                spikings_reshape(start.gc_connections.flatten()),
+                spikings_reshape(goal.gc_connections.flatten())
+            ]
+        if self.with_dist:
+            args += [ start.distances ]
+        args = [ [arg] for arg in args ] # predict_reachability_batch expects batches / lists for each param
+        return self.predict_reachability_batch(*args)[0]
 
     def predict_reachability_batch(self, starts: [numpy.ndarray | torch.Tensor], goals: [numpy.ndarray | torch.Tensor],
-                                   src_spikings: [numpy.ndarray | torch.Tensor] = None,
-                                   goal_spikings: [numpy.ndarray | torch.Tensor] = None) -> [float]:
+        src_spikings: [numpy.ndarray | torch.Tensor] = None, goal_spikings: [numpy.ndarray | torch.Tensor] = None,
+        src_distances: numpy.ndarray = None, # goal_distances: numpy.ndarray = None,                        
+    ) -> [float]:
         """ Predicts reachability for multiple location pairs
 
         arguments:
@@ -191,8 +205,11 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         [float] -- reachability values
         """
 
-        def get_prediction(src_batch: [numpy.ndarray | torch.Tensor], dst_batch: [numpy.ndarray | torch.Tensor],
-                           src_spikings: [numpy.ndarray] = None, goal_spikings: [numpy.ndarray] = None) -> [float]:
+        def get_prediction(
+            src_batch: [numpy.ndarray | torch.Tensor], dst_batch: [numpy.ndarray | torch.Tensor],
+            src_spikings: [numpy.ndarray] = None, goal_spikings: [numpy.ndarray] = None,
+            src_distances: [numpy.ndarray] = None, # goal_distances: [numpy.ndarray] = None,
+        ) -> (float, float, float):
             """ Helper function, main logic for predicting reachability for multiple location pairs """
             with torch.no_grad():
                 if isinstance(src_batch[0], np.ndarray):
@@ -213,28 +230,36 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
                         dst_batch = torch.stack(dst_batch)
                 else:
                     raise RuntimeError('Unsupported datatype: %s' % type(dst_batch[0]))
-                if self.with_spikings:
-                    return networks.get_prediction(self.nets, self.backbone, self.model_variant,
-                                                   torch.from_numpy(src_batch).float(),
-                                                   torch.from_numpy(dst_batch).float(),
-                                                   batch_src_spikings=torch.from_numpy(src_spikings).float(),
-                                                   batch_dst_spikings=torch.from_numpy(goal_spikings).float())
 
-                return networks.get_prediction(self.nets, self.backbone, self.model_variant,
-                                               torch.from_numpy(src_batch).float(),
-                                               torch.from_numpy(dst_batch).float())
+                additional_info = {}
+                if self.with_spikings:
+                    additional_info['batch_src_spikings'] = torch.from_numpy(src_spikings).float()
+                    additional_info['batch_dst_spikings'] = torch.from_numpy(goal_spikings).float()
+                if self.with_dist:
+                    additional_info['batch_src_distances'] = torch.from_numpy(src_distances).float()
+                    # additional_info['batch_dst_distances'] = torch.from_numpy(goal_distances).float()
+
+                return self.backbone.get_prediction(
+                    torch.from_numpy(src_batch).float(),
+                    torch.from_numpy(dst_batch).float(),
+                    **additional_info
+                )
 
         assert len(starts) == len(goals)
         n = len(starts)
 
-        results = []
+        results : [(float, float, float)] = []
         n_remaining = n
         batch_size = min(self.batch_size, len(starts))
         while n_remaining > 0:
-            results.append(get_prediction(starts[n - n_remaining: n - n_remaining + batch_size],
-                                          goals[n - n_remaining: n - n_remaining + batch_size],
-                                          src_spikings[n - n_remaining: n - n_remaining + batch_size],
-                                          goal_spikings[n - n_remaining: n - n_remaining + batch_size])[0])
+            batch_indices = slice(n - n_remaining, n - n_remaining + batch_size)
+            results.append(
+                get_prediction(
+                    starts[slice], goals[slice],
+                    src_spikings[slice], goal_spikings[slice],
+                    src_distances[slice], goal_distances[slice],
+                )[0]
+            )
             n_remaining -= batch_size
         return torch.cat(results, dim=0).data.cpu().numpy()
 

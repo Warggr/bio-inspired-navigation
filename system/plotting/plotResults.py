@@ -151,11 +151,11 @@ def plotTrajectoryInEnvironment(env, title="", xy_coordinates=None, env_model=No
 def plotStartGoalDataset(env_model, starts_goals):
     # get the dimensions without having to adjust them here
     from system.controller.simulation.pybullet_environment import PybulletEnvironment
-    env = PybulletEnvironment(False, 1e-2, env_model, mode="analytical")
+    env = PybulletEnvironment(env_model, mode="analytical")
 
     fig, ax = plt.subplots()
     add_environment(ax, env)
-    for e in starts_goals:
+    for i, e in enumerate(starts_goals):
         start, goal = e
         circle = plt.Circle((start[0], start[1]), 0.2, color=TUM_colors['TUMAccentBlue'], alpha=1)
         ax.add_artist(circle)
@@ -167,7 +167,7 @@ def plotStartGoalDataset(env_model, starts_goals):
 
 def plotStartGoalPair(env_model, start_position, start_heading, target_position, target_heading):
     from system.controller.simulation.pybullet_environment import PybulletEnvironment
-    env = PybulletEnvironment(False, 1e-2, env_model, mode="analytical")
+    env = PybulletEnvironment(env_model, mode="analytical")
 
     fig, ax = plt.subplots()
     add_environment(ax, env)

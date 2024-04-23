@@ -36,8 +36,8 @@ def get_path():
     return dirname
 
 
-plotting = False  # if True: plot every reachability rollout
-debug = False  # if True: print debug output
+plotting = os.getenv('PLOTTING', False)  # if True: plot every reachability rollout
+debug = os.getenv('DEBUG', False)  # if True: print debug output
 
 
 def print_debug(*params):
@@ -46,19 +46,95 @@ def print_debug(*params):
         print(*params)
 
 
+class Sample:
+    envs : Dict[str, PybulletEnvironment] = {}
+
+    def __init__(
+        self,
+        src: Tuple[types.Vector2D, types.Angle, types.Spikings],
+        dst: Tuple[types.Vector2D, types.Angle, types.Spikings],
+        map_name: str,
+    ):
+        self.src_pos, self.src_angle, self.src_spikings = src
+        self.dst_pos, self.dst_angle, self.dst_spikings = dst
+
+        try:
+            env = Sample.envs[map_name]
+        except KeyError:
+            env = PybulletEnvironment(map_name, mode="analytical", build_data_set=True)
+            Sample.envs[map_name] = env
+
+        self.src_img = env.camera([self.src_pos, self.src_angle])
+        self.dst_img = env.camera([self.dst_pos, self.dst_angle])
+        # TODO: src_img.flatten(), dst_img.flatten()
+        self.src_distances = env.lidar([self.src_pos, self.src_angle])[0]
+        self.dst_distances = env.lidar([self.dst_pos, self.dst_angle])[0]
+
+
+class SampleConfig:
+    def __init__(self,
+        grid_cell_spikings=False,
+        lidar=False,
+    ):
+        self.with_grid_cell_spikings = grid_cell_spikings
+        self.with_lidar = lidar
+    def dtype(self):
+        fields = [
+            ('start_observation', (np.int32, 16384)), # 64 x 64 x 4
+            ('goal_observation', (np.int32, 16384)), # using (64, 64, 4) would be more elegant but H5py doesn't accept it
+            ('reached', bool),
+            ('start', (np.float32, 2)),  # x, y
+            ('goal', (np.float32, 2)),  # x, y
+            ('start_orientation', np.float32),  # theta
+            ('goal_orientation', np.float32)  # theta
+        ]
+        if self.with_grid_cell_spikings:
+            fields += [
+                ('start_spikings', (np.float32, 9600)),  # 40 * 40 * 6
+                ('goal_spikings', (np.float32, 9600))  # 40 * 40 * 6
+            ]
+        if self.with_lidar:
+            NUMBER_OF_WHISKERS = 52
+            fields += [
+                ('start_lidar', (np.float32, NUMBER_OF_WHISKERS)),
+                ('goal_lidar', (np.float32, NUMBER_OF_WHISKERS)),
+            ]
+        dtype = np.dtype(fields)
+        return dtype
+    def suffix(self) -> str:
+        return (''
+            + ('+spikings' if self.with_grid_cell_spikings else '')
+            + ('+lidar' if self.with_lidar else '')
+        )
+
+    def to_tuple(self, sample : Sample, reachable : bool) -> Tuple:
+        """ Returns a tuple which can be put into a Numpy array of type self.dtype() """
+        tup = [
+            sample.src_img.flatten(), sample.dst_img.flatten(),
+            reachable,
+            sample.src_pos, sample.dst_pos,
+            sample.src_angle, sample.dst_angle,
+        ]
+        if self.with_grid_cell_spikings:
+            tup += [ sample.src_spikings, sample.dst_spikings ]
+        if self.with_lidar:
+            tup += [ sample.src_distances, sample.dst_distances ]
+        return tuple(tup)
+
+
 class ReachabilityDataset(data.Dataset):
     '''
     Generate data for the reachability estimator training.
-    
+
     arguments:
     hd5_files           -- hd5_files containing trajectories used to generate reachability data
                             format: attributes: agent, map; data per timestep: xy_coordinates, orientation, grid cell spiking
                             see gen_trajectories.py for details
-                 
+
     distance_min/max    --  min/max distance between goal and start
     range_min/max       --  min/max timesteps between goal and start
     frame_interval      --  number of timesteps between frames
-    
+
     For details see original source code: https://github.com/xymeng/rmp_nav
     '''
 
@@ -183,11 +259,11 @@ class ReachabilityDataset(data.Dataset):
     def __len__(self):
         return self.traj_len_cumsum[-1]
 
-    def _draw_sample_same_traj(self, idx):
+    def _draw_sample_same_traj(self, idx) -> (str, Tuple[types.Vector2D, types.Angle, types.Spikings], Tuple[types.Vector2D, types.Angle, types.Spikings], float):
         """ Draw a source and goal sample from the same trajectory.
             Their distance will be between distance_min and distance_max.
-            They will be seperated by timesteps in range of range_min to range_max.
-        
+            They will be separated by timesteps in range of range_min to range_max.
+
         returns:
         name of map, source sample, destination sample
         """
@@ -257,28 +333,14 @@ class ReachabilityDataset(data.Dataset):
             path_l = path_length(waypoints)
             return map_name, src_sample, dst_sample, path_l
 
-    def get_camera_view(self, map_name, sample):
-        # return img of position
-        dt = 1e-2
-        env = PybulletEnvironment(map_name, dt, "analytical", build_data_set=True)
-        img = env.camera((sample[0], sample[1]))
-        env.end_simulation()
-        return img
-
-    def __getitem__(self, idx):
+    def __getitem__(self, idx) -> Tuple[Sample, bool]:
         ''' Loads or creates a sample. Sample contains ... 
-        
+
         returns:
-        
-        src_image
-        dst_image
+
+        sample containing start and end points
         reachability
-        start and goal position
-        first decoded goal vector
-        src img after turn
-        distance between goal and agent
-        src grid cell spikings
-        dst grid cell spikings'''
+        '''
         self._init_once(idx)
 
         # choose with probability p from same/different trajectory
@@ -294,160 +356,106 @@ class ReachabilityDataset(data.Dataset):
             pair = self._draw_sample_same_traj(idx)
         map_name, src_sample, dst_sample, path_l = pair
 
-        src_img = self.get_camera_view(map_name, src_sample)[2]
-        dst_img = self.get_camera_view(map_name, dst_sample)[2]
+        sample = Sample(src_sample, dst_sample, map_name=map_name)
 
-        print(f"Computing reachability for {(src_sample[0], src_sample[1])}, {(dst_sample[0], dst_sample[1])}")
+        #print(f"Computing reachability for {sample.src_pos}, {sample.dst_pos}")
         try:
-            r = 1.0 if self.view_overlap_reachability_controller.reachable(map_name, src_sample, dst_sample, path_l, src_img, dst_img) else 0.0
+            r = self.view_overlap_reachability_controller.reachable(map_name, src_sample, dst_sample, path_l, sample.src_img, sample.dst_img)
         except ValueError:
             return None
-        print(f"Reachability computed {r}")
+        #print(f"Reachability computed {r}")
 
-        # image transformation
-        return src_img.flatten(), dst_img.flatten(), r, [src_sample[0], dst_sample[0]], [src_sample[1], dst_sample[1]], src_sample[2], dst_sample[2]
+        return sample, r
 
 
-def create_and_save_reachability_samples(filename, nr_samples, traj_file, with_grid_cell_spikings=False):
+DATASET_KEY = 'positions'
+
+def create_and_save_reachability_samples(
+    rd : ReachabilityDataset, f : h5py.File,
+    nr_samples=1000,
+    flush_freq=50,
+    config = SampleConfig(),
+) -> h5py.File:
     """ Create reachability samples.
-    
+
     arguments:
-    filename    -- save the data in filename
-    nr_samples  -- the number of samples that will be generated
-    traj_file   -- name of the file used for trajectories
+    rd : dataset to draw positions from
     """
-    dirname = get_path()
-    dirname = os.path.join(dirname, "data/reachability")
-    directory = os.path.join(dirname, filename)
-    filepath = os.path.realpath(directory)
-    f = h5py.File(filepath + ".hd5", 'a')
-
-    # Trajectories
-    dirname = get_path()
-    dirname = os.path.join(dirname, "data/trajectories")
-    directory = os.path.join(dirname, traj_file)
-    filename = os.path.realpath(directory)
-
-    rd = ReachabilityDataset([filename])
 
     env_model = rd.map_names[0]
     print_debug("env_model: ", env_model)
     f.attrs.create('map_type', env_model)
 
-    if with_grid_cell_spikings:
-        dtype = np.dtype([
-            ('start_observation', (np.int32, 16384)),  # 64 * 64 * 4
-            ('goal_observation', (np.int32, 16384)),
-            ('reached', np.float32),
-            ('start', (np.float32, 2)),  # x, y
-            ('goal', (np.float32, 2)),  # x, y
-            ('start_orientation', np.float32),  # theta
-            ('goal_orientation', np.float32),  # theta
-            ('start_spikings', (np.float32, 9600)),  # 40 * 40 * 6
-            ('goal_spikings', (np.float32, 9600))  # 40 * 40 * 6
-        ])
-    else:
-        dtype = np.dtype([
-            ('start_observation', (np.int32, 16384)),  # 64 * 64 * 4
-            ('goal_observation', (np.int32, 16384)),
-            ('reached', np.float32),
-            ('start', (np.float32, 2)),  # x, y
-            ('goal', (np.float32, 2)),  # x, y
-            ('start_orientation', np.float32),  # theta
-            ('goal_orientation', np.float32)  # theta
-        ])
+    dtype = config.dtype()
 
-    seed = 555555
-    rng_sampleid = np.random.RandomState(seed)
+    try:
+        dset = f[DATASET_KEY]
+        start_index = dset.size + 1
+        # TODO: if existing size is bigger than required size, copy the dataset
+    except KeyError:
+        dset = f.create_dataset(DATASET_KEY, data=np.array([], dtype=dtype), dtype=dtype, maxshape=(nr_samples,))
+        start_index = 1
 
-    i = 0
+    from tqdm import tqdm
+
     sum_r = 0
-    while i < nr_samples:
-        import time
-        start_time = time.time()
-        sample_id = rng_sampleid.randint(0xfffffff)
-        dset_name = '/%08x' % sample_id
+    buffer = []
 
-        print('processing sample %d id: %08x' % (i, sample_id))
+    last_flush = 0
+    for i in (bar := tqdm(range(start_index, nr_samples+1))):
+        item = None
+        while item is None:
+            random_index = random.randrange(rd.traj_len_cumsum[-1])
+            item = rd[random_index]
 
-        if dset_name in f:
-            print('dataset %s exists. skipped' % dset_name)
-            i += 1
-            continue
+        sample, reachable = item
+        sum_r += int(reachable)
 
-        random_index = random.randrange(rd.traj_len_cumsum[-1])
-        item = rd.__getitem__(random_index)
-        if not item:
-            print(f'Failed to get item {random_index}')
-            continue
-        src_img, dst_img, r, s, orientations, src_spikings, dst_spikings = item
-
-        sample = (
-            src_img,
-            dst_img,
-            r,
-            s[0],
-            s[1],
-            orientations[0],
-            orientations[1]
-            # first_gv, #not used
-            # orientations[1] - orientations[0], #not used
-            # img_after_turn[2].flatten(), #not used
-            # dist #not used
-        )
-        if with_grid_cell_spikings:
-            sample = (*sample, src_spikings, dst_spikings)
-
-        dset = f.create_dataset(
-            dset_name,
-            data=np.array([sample], dtype=dtype),
-            maxshape=(None,), dtype=dtype)
-
-        f.flush()
-        i += 1
-        sum_r += r
-        print(f"--- {time.time() - start_time} seconds --- to create {i}th sample, percentage reachable {sum_r / i}")
+        buffer.append(config.to_tuple(sample, reachable))
+        if i % flush_freq == 0 or i == nr_samples - 1:
+            tqdm.write(f'Flushing at {i=}')
+            dset.resize((i,))
+            dset[last_flush:] = np.array(buffer, dtype=dtype)
+            f.flush()
+            bar.set_description(f"percentage reachable: {sum_r / i}")
+            buffer = []
+            last_flush = i
+    return f
 
 
-def display_samples(filename, imageplot=False):
+def display_samples(hf : h5py.File, imageplot=False):
     """ Display information about dataset file
     
     if imageplot: plot the stored images
     Calculate the percentage of reached/failed samples.
     """
 
-    dirname = get_path()
-    directory = os.path.join(dirname, "data/reachability")
-    directory = os.path.realpath(directory)
-    hf = h5py.File(directory + "/" + filename, 'r')
     env_model = hf.attrs["map_type"]
+    dataset = hf[DATASET_KEY]
 
-    print("Number of samples: " + str(len(hf.keys())))
+    print(f"Number of samples:", dataset.size)
     reached = 0
-    count = len(hf.keys())
+    count = dataset.size
     reach = []
     starts_goals = []
-    for i, key in enumerate(list(hf.keys())):
+    for i, datapoint in enumerate(dataset):
         if i % 1000 == 0:
             print("At sample number", i)
         if imageplot and i > 5000:
             break
-        d = hf[key][()][0]
 
-        if imageplot:
-            img = np.reshape(d[0], (64, 64, 4))
+        if imageplot and i < 5:
+            img = np.reshape(datapoint[0], (64, 64, 4))
             imgplot = plt.imshow(img)
             plt.show()
 
-            dat = np.array_split(d[1], 10)
-            for dt in dat:
-                img = np.reshape(dt, (64, 64, 4))
-                imgplot = plt.imshow(img)
-                plt.show()
-        if d[2] == 1.0:
+            img = np.reshape(datapoint[1], (64, 64, 4))
+            imgplot = plt.imshow(img)
+            plt.show()
+        if datapoint[2] == 1.0:
             reached += 1
-        starts_goals.append((d[3], d[4]))
-        reach.append(d[2])
+        starts_goals.append((datapoint[3], datapoint[4]))
+        reach.append(datapoint[2])
     print("overall", count)
     print("reached", reached)
     print("failed", count - reached)
@@ -458,34 +466,69 @@ def display_samples(filename, imageplot=False):
 
 if __name__ == "__main__":
     """ Generate a dataset of reachability samples or load from an existing one.
-    
+
     Testing:
     Generate or load and display a few samples.
-    
+
     Parameterized call:
         Save to/load from filename
         Generate until there are num_samples samples
         Use trajectories from traj_file
-        
+
     Default: time the generation of 50 samples
     """
+    import argparse
 
-    test = True
-    if test:
-        # create_and_save_reachability_samples("dataset_spikings", 200000, "trajectories.hd5", with_grid_cell_spikings=True)
-        display_samples("dataset_spikings.hd5")
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest='action')
+    time_parser = subparsers.add_parser('time')
+    test_parser = subparsers.add_parser('test')
+    test_parser.add_argument('basename', help='Base file name of generated dataset file', nargs='?', default='dataset')
+    time_parser.add_argument('basename', help='Base file name of generated dataset file', nargs='?', default='reachability_fifty_samples')
+    test_parser.add_argument('traj_file', help='Dataset of trajectories', nargs='?', default='trajectories.hd5')
+    time_parser.add_argument('traj_file', help='Dataset of trajectories', nargs='?', default='trajectories_Savinov3.hd5')
+    test_parser.add_argument('-n', '--num-samples', type=int, dest='num_samples', default=200000)
+    time_parser.add_argument('-n', '--num-samples', type=int, dest='num_samples', default=50)
+    test_parser.add_argument('--flush-freq', type=int, dest='flush_freq', default=1000)
+    test_parser.add_argument('--spikings', help='Grid cell spikings are included in the dataset', action='store_true')
+    test_parser.add_argument('--lidar', help='LIDAR distances are included in the dataset', action='store_true')
+    test_parser.add_argument('--extension', help='extension of the dataset file', default='.hd5')
+    test_parser.add_argument('--image-plot', help='Show image of samples taken', action='store_true')
+
+    args = parser.parse_args()
+    if args.action == 'time':
+        import time
+
+        start = time.time()
+        create_and_save_reachability_samples(args.basename, args.num_samples, args.traj_file)
+        end = time.time()
+        print("Time elapsed:", end - start)
+
+    elif args.action == 'test':
+        # Input file
+        filename = os.path.join(get_path(), "data", "trajectories", args.traj_file)
+        filename = os.path.realpath(filename)
+        rd = ReachabilityDataset([filename])
+
+        config = SampleConfig(grid_cell_spikings=args.spikings, lidar=args.lidar)
+
+        # Output file
+        dataset_name = args.basename + config.suffix()
+
+        filename = os.path.join(get_path(), "data", "reachability", dataset_name + args.extension)
+        filename = os.path.realpath(filename)
+        print(filename)
+        f = h5py.File(filename, 'a')
+
+        create_and_save_reachability_samples(
+            rd, f,
+            nr_samples=args.num_samples,
+            flush_freq=args.flush_freq,
+            config=config,
+        )
+        print("Finished creating samples. Now displaying them")
+        display_samples(f, imageplot=True)
         # create_and_save_reachability_samples("test2", 1, "test_2.hd5")
         # display_samples("test2.hd5")
         # create_and_save_reachability_samples("test3", 1, "test_3.hd5")
         # display_samples("test3.hd5")
-    elif len(sys.argv) == 4:
-        _, filename, num_samples, traj_file = sys.argv
-        print_debug(sys.argv)
-        create_and_save_reachability_samples(filename, int(num_samples), traj_file)
-    else:
-        import time
-
-        start = time.time()
-        create_and_save_reachability_samples("reachability_fifty_sampels", 50, "trajectories_Savinov3.hd5")
-        end = time.time()
-        print(end - start)

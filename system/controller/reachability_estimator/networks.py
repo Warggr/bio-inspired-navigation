@@ -8,6 +8,7 @@
 ***************************************************************************************
 """
 import math
+import numpy as np
 
 import torch
 import torchvision
@@ -15,113 +16,185 @@ from torch import nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 from torchmetrics import MeanSquaredError
+from abc import ABC, abstractmethod
+from typing import Dict, Optional, Iterable, Tuple
+
+class AutoAdamOptimizer: # Sentinel value
+    pass
+
+class NNModuleWithOptimizer:
+    __slots__ = ('net', 'opt')
+    def __init__(self, net : nn.Module, opt : torch.optim.Optimizer|None = AutoAdamOptimizer):
+        if opt is AutoAdamOptimizer:
+            opt = torch.optim.Adam(net.parameters(), lr=3.0e-4, eps=1.0e-5)
+        self.net = net
+        self.opt = opt
+
+class Model(ABC):
+    """ Interface for networks """
+    def __init__(self, nets : Dict[str, NNModuleWithOptimizer]):
+        self.nets = { name: val.net for name, val in nets.items() }
+        self.optimizers = { name: val.opt for name, val in nets.items() }
+
+    @abstractmethod
+    def get_prediction(self,
+        src_batch, dst_batch,
+        batch_transformation=None,
+        batch_src_spikings=None, batch_dst_spikings=None,
+        batch_src_distances=None, batch_dst_distances=None,
+    ) -> (float, float, float):
+        ...
+
+    @staticmethod
+    def create_from_config(backbone_classname : str, **model_kwargs) -> 'Model':
+        backbone_classes : Dict[str, Type[Model]] = {
+            'convolutional': CNN, 'resnet': ResNet, 'siamese': Siamese
+        }
+        return backbone_classes[backbone_classname](**model_kwargs)
 
 
-def initialize_siamese():
-    nets = {}
+class Siamese(Model):
+    def __init__(self):
+        nets = {}
+        net = GridCellSiameseNetwork()
+        nets["grid_cell_network"] = NNModuleWithOptimizer(
+            net = net,
+            opt = torch.optim.Adam(net.parameters(), lr=3.0e-3, eps=1.0e-5)
+        )
+        super().__init__(nets)
 
-    net = GridCellSiameseNetwork()
-    nets["grid_cell_network"] = {
-        'net': net,
-        'opt': torch.optim.Adam(net.parameters(), lr=3.0e-3, eps=1.0e-5)
-    }
+    def get_prediction(self,
+        src_batch, dst_batch,
+        batch_transformation=None,
+        batch_src_spikings=None, batch_dst_spikings=None
+    ) -> (float, float, float):
+        return get_grid_cell(batch_src_spikings, batch_dst_spikings), None, None
 
+
+class CNN(Model):
+    def __init__(self, with_conv_layer=True, with_dist=False, with_grid_cell_spikings=False, with_lidar=False):
+        self.with_conv_layer = with_conv_layer
+        self.with_dist = with_dist
+        self.with_grid_cell_spikings = with_grid_cell_spikings
+        self.with_lidar = with_lidar
+        # Defining the NN and optimizers
+
+        input_dim = 512 # if self.with_conv_layer else 5120
+        if with_dist:
+            input_dim += 3
+        if with_grid_cell_spikings:
+            input_dim += 1
+        if with_lidar:
+            input_dim += 10
+
+        nets = initialize_regressors({})
+        nets["img_encoder"] = NNModuleWithOptimizer( ImagePairEncoderV2(init_scale=1.0))
+        if self.with_conv_layer:
+            nets["conv_encoder"] = NNModuleWithOptimizer( ConvEncoder(init_scale=1.0, input_dim=512, no_weight_init=False))
+        if self.with_lidar:
+            nets["lidar_encoder"] = NNModuleWithOptimizer( LidarEncoder(52, 10) )
+        nets["fully_connected"] = NNModuleWithOptimizer( FCLayers(init_scale=1.0, input_dim=input_dim, no_weight_init=False))
+
+        super().__init__(nets)
+
+    def get_prediction(self,
+        src_batch, dst_batch,
+        batch_transformation=None,
+        batch_src_spikings=None, batch_dst_spikings=None,
+        batch_src_distances=None,
+    ) -> (float, float, float):
+        batch_size, c, h, w = dst_batch.size()
+        # Extract features
+        x = self.nets['img_encoder'](src_batch, dst_batch)
+        assert not torch.any(x.isnan())
+
+        if self.with_conv_layer:
+            # Convolutional Layer
+            x = self.nets['conv_encoder'](x.view(batch_size, -1, 1))
+            assert not torch.any(x.isnan())
+
+        if self.with_grid_cell_spikings:
+            spikings_features = get_grid_cell(batch_src_spikings, batch_dst_spikings)
+            x = torch.cat((x, spikings_features.unsqueeze(1)), 1)
+            assert not torch.any(x.isnan())
+
+        if self.with_dist:
+            x = torch.cat((batch_transformation, x), 1)
+            assert not torch.any(x.isnan())
+
+        if self.with_lidar:
+            lidar_features = self.nets['lidar_encoder'](batch_src_distances)
+            x = torch.cat((x, lidar_features), 1)
+            assert not torch.any(x.isnan())
+
+        assert not torch.any(x.isnan())
+
+        # Get prediction
+        linear_features = self.nets['fully_connected'](x)
+
+        assert not torch.any(linear_features.isnan())
+
+        reachability_prediction = self.nets["reachability_regression"](linear_features)
+        position_prediction = self.nets["position_regression"](linear_features)
+        angle_prediction = self.nets["angle_regression"](linear_features)
+
+        return reachability_prediction, position_prediction, angle_prediction
+
+def initialize_regressors(nets) -> Dict[str, NNModuleWithOptimizer]:
+    nets["angle_regression"] = NNModuleWithOptimizer( AngleRegression(init_scale=1.0, no_weight_init=False))
+    nets["position_regression"] = NNModuleWithOptimizer( PositionRegression(init_scale=1.0, no_weight_init=False))
+    nets["reachability_regression"] = NNModuleWithOptimizer( ReachabilityRegression(init_scale=1.0, no_weight_init=False))
     return nets
 
+class ResNet(Model):
+    def __init__(self):
+        # Defining the NN and optimizers
+        input_dim = 64
+        nets = initialize_regressors({})
 
-def initialize_cnn(model_variant='convolutional'):
-    # Defining the NN and optimizers
-    if model_variant == "pair_conv":
-        input_dim = 512
-    elif model_variant == "with_dist":
-        input_dim = 512 + 3
-    elif model_variant == 'spikings':
-        input_dim = 512 + 1
-    else:
-        input_dim = 5120
+        nets["fully_connected"] = NNModuleWithOptimizer(**{
+            'net': FcWithDropout(init_scale=1.0, input_dim=input_dim * 2, no_weight_init=False),
+        })
 
-    nets = initialize_regressors({})
+        net = torchvision.models.resnet18(pretrained=True, num_classes=input_dim)
+        weight1 = net.conv1.weight.clone()
+        new_first_layer = nn.Conv2d(4, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False).requires_grad_()
+        new_first_layer.weight[:, :3, :, :].data[...] = Variable(weight1, requires_grad=True)
+        net.conv1 = new_first_layer
 
-    net = FCLayers(init_scale=1.0, input_dim=input_dim, no_weight_init=False)
-    nets["fully_connected"] = {
-        'net': net,
-        'opt': torch.optim.Adam(net.parameters(), lr=3.0e-4, eps=1.0e-5)
-    }
+        nets["res_net"] = NNModuleWithOptimizer(**{
+            'net': net,
+            'opt': None
+        })
+        super().__init__(nets)
 
-    net = ConvEncoder(init_scale=1.0, input_dim=512, no_weight_init=False)
-    nets["conv_encoder"] = {
-        'net': net,
-        'opt': torch.optim.Adam(net.parameters(), lr=3.0e-4, eps=1.0e-5)
-    }
+    def get_prediction(self,
+        src_batch, dst_batch,
+        batch_transformation=None,
+        batch_src_spikings=None, batch_dst_spikings=None,
+        batch_src_distances=None, batch_dst_distances=None,
+    ) -> (float, float, float):
+        # Extract features
+        src_features = self.nets['res_net'](src_batch.view(batch_size, c, h, w))
+        dst_features = self.nets['res_net'](dst_batch.view(batch_size, c, h, w))
 
-    net = ImagePairEncoderV2(init_scale=1.0)
-    nets["img_encoder"] = {
-        'net': net,
-        'opt': torch.optim.Adam(net.parameters(), lr=3.0e-4, eps=1.0e-5)
-    }
+        # Convolutional Layer
+        pair_features = torch.cat([src_features, dst_features], dim=1)
 
-    return nets
+        # Get prediction
+        linear_features = self.nets['fully_connected'](pair_features)
+        reachability_prediction = self.nets["reachability_regression"](linear_features)
+        position_prediction = self.nets["position_regression"](linear_features)
+        angle_prediction = self.nets["angle_regression"](linear_features)
 
-
-def initialize_regressors(nets):
-    net = AngleRegression(init_scale=1.0, no_weight_init=False)
-    nets["angle_regression"] = {
-        'net': net,
-        'opt': torch.optim.Adam(net.parameters(), lr=3.0e-4, eps=1.0e-5)
-    }
-    net = PositionRegression(init_scale=1.0, no_weight_init=False)
-    nets["position_regression"] = {
-        'net': net,
-        'opt': torch.optim.Adam(net.parameters(), lr=3.0e-4, eps=1.0e-5)
-    }
-    net = ReachabilityRegression(init_scale=1.0, no_weight_init=False)
-    nets["reachability_regression"] = {
-        'net': net,
-        'opt': torch.optim.Adam(net.parameters(), lr=3.0e-4, eps=1.0e-5)
-    }
-    return nets
-
-
-def initialize_res_net():
-    # Defining the NN and optimizers
-    input_dim = 64
-    nets = initialize_regressors({})
-
-    net = FcWithDropout(init_scale=1.0, input_dim=input_dim * 2, no_weight_init=False)
-    nets["fully_connected"] = {
-        'net': net,
-        'opt': torch.optim.Adam(net.parameters(), lr=3.0e-4, eps=1.0e-5)
-    }
-
-    net = torchvision.models.resnet18(pretrained=True, num_classes=input_dim)
-    weight1 = net.conv1.weight.clone()
-    new_first_layer = nn.Conv2d(4, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False).requires_grad_()
-    new_first_layer.weight[:, :3, :, :].data[...] = Variable(weight1, requires_grad=True)
-    net.conv1 = new_first_layer
-
-    nets["res_net"] = {
-        'net': net,
-        'opt': None
-    }
-    return nets
-
-
-def initialize_network(backbone='convolutional', model_variant='convolutional'):
-    if backbone == 'convolutional':
-        return initialize_cnn(model_variant)
-    elif backbone == 'res_net':
-        return initialize_res_net()
-    elif backbone == 'siamese':
-        return initialize_siamese()
-    else:
-        raise ValueError("Backbone not implemented")
+        return reachability_prediction, position_prediction, angle_prediction
 
 
 compare_mse = MeanSquaredError()
 module_weights = torch.FloatTensor([32, 16, 8, 4, 2, 1])
 
 
-def get_grid_cell(batch_src_spikings, batch_dst_spikings):
+def get_grid_cell(batch_src_spikings, batch_dst_spikings) -> [float]:
     """
     Calculate the similarity between two arrays of grid cell modules using Structural Similarity Index (SSIM)
     with weighted aggregation.
@@ -129,7 +202,6 @@ def get_grid_cell(batch_src_spikings, batch_dst_spikings):
     Args:
     array1 (list of numpy arrays): First array of grid cell modules.
     array2 (list of numpy arrays): Second array of grid cell modules.
-    module_weights (list of float): List of weights for each module. Must have the same length as arrays.
 
     Returns:
     float: Weighted SSIM-based similarity score.
@@ -138,8 +210,8 @@ def get_grid_cell(batch_src_spikings, batch_dst_spikings):
     batch_similarity_scores = torch.zeros(6, batch_size)
 
     for ch in range(6):
-        batch_similarity_scores[ch] = compare_mse(batch_src_spikings[:, ch:ch + 1, :, :],
-                                                  batch_dst_spikings[:, ch:ch + 1, :, :])
+        batch_similarity_scores[ch] = compare_mse(batch_src_spikings[:, ch].flatten(),
+                                                  batch_dst_spikings[:, ch].flatten())
     batch_similarity_scores = torch.FloatTensor(batch_similarity_scores)
     batch_similarity_scores = torch.transpose(batch_similarity_scores, 0, 1)
     batch_similarity_scores = (batch_similarity_scores * module_weights).sum(1) / module_weights.sum()
@@ -148,108 +220,9 @@ def get_grid_cell(batch_src_spikings, batch_dst_spikings):
     return batch_similarity_scores
 
 
-def get_prediction_convolutional(nets, model_variant, src_batch, dst_batch, batch_transformation, batch_src_spikings,
-                                 batch_dst_spikings):
-    batch_size, c, h, w = dst_batch.size()
-    if model_variant == "the_only_variant":
-        # Extract features
-        pair_features = nets['img_encoder'](
-            src_batch.view(batch_size, c, h, w),
-            dst_batch.view(batch_size, c, h, w).view(batch_size, -1))
-
-        # Get prediction
-        linear_features = nets['fully_connected'](pair_features)
-        reachability_prediction = nets["reachability_regression"](linear_features)
-        position_prediction = nets["position_regression"](linear_features)
-        angle_prediction = nets["angle_regression"](linear_features)
-    elif model_variant == "pair_conv":
-        # Extract features
-        pair_features = nets['img_encoder'](
-            src_batch.view(batch_size, c, h, w),
-            dst_batch.view(batch_size, c, h, w)).view(batch_size, 1, -1)
-
-        # Convolutional Layer
-        conv_feature = nets['conv_encoder'](pair_features.transpose(1, 2))
-
-        # Get prediction
-        linear_features = nets['fully_connected'](conv_feature)
-        reachability_prediction = nets["reachability_regression"](linear_features)
-        position_prediction = nets["position_regression"](linear_features)
-        angle_prediction = nets["angle_regression"](linear_features)
-    elif model_variant == 'spikings':
-        # Extract features
-        pair_features = nets['img_encoder'](
-            src_batch.view(batch_size, c, h, w),
-            dst_batch.view(batch_size, c, h, w)).view(batch_size, 1, -1)
-
-        # Convolutional Layer
-        conv_feature = nets['conv_encoder'](pair_features.transpose(1, 2))
-
-        spikings_features = get_grid_cell(batch_src_spikings, batch_dst_spikings)
-
-        # Get prediction
-        linear_features = nets['fully_connected'](torch.cat((conv_feature, spikings_features.unsqueeze(1)), 1))
-        reachability_prediction = nets["reachability_regression"](linear_features)
-        position_prediction = nets["position_regression"](linear_features)
-        angle_prediction = nets["angle_regression"](linear_features)
-    elif model_variant == "with_dist":
-        # Extract features
-        pair_features = nets['img_encoder'](
-            src_batch.view(batch_size, c, h, w),
-            dst_batch.view(batch_size, c, h, w)).view(batch_size, 1, -1)
-
-        # Convolutional Layer
-        conv_feature = nets['conv_encoder'](pair_features.transpose(1, 2))
-
-        # Get prediction
-        linear_features = nets['fully_connected'](torch.cat((batch_transformation, conv_feature), 1))
-        reachability_prediction = nets["reachability_regression"](linear_features)
-        position_prediction = nets["position_regression"](linear_features)
-        angle_prediction = nets["angle_regression"](linear_features)
-    else:
-        print("This variant does not exist")
-        return
-    return reachability_prediction, position_prediction, angle_prediction
-
-
-def get_prediction_resnet(nets, model_variant, src_batch, dst_batch, batch_src_spikings, batch_dst_spikings):
-    batch_size, c, h, w = dst_batch.size()
-    if model_variant == "the_only_variant":
-        raise NotImplementedError
-    elif model_variant == "pair_conv":
-        # Extract features
-        src_features = nets['res_net'](src_batch.view(batch_size, c, h, w))
-        dst_features = nets['res_net'](dst_batch.view(batch_size, c, h, w))
-
-        # Convolutional Layer
-        pair_features = torch.cat([src_features, dst_features], dim=1)
-
-        # Get prediction
-        linear_features = nets['fully_connected'](pair_features)
-        reachability_prediction = nets["reachability_regression"](linear_features)
-        position_prediction = nets["position_regression"](linear_features)
-        angle_prediction = nets["angle_regression"](linear_features)
-    elif model_variant == "with_dist":
-        raise NotImplementedError
-    else:
-        raise ValueError("This variant does not exist")
-    return reachability_prediction, position_prediction, angle_prediction
-
-
-def get_prediction(nets, backbone, model_variant, src_batch, dst_batch, batch_transformation=None,
-                   batch_src_spikings=None, batch_dst_spikings=None):
-    if backbone == 'convolutional':
-        return get_prediction_convolutional(nets, model_variant, src_batch, dst_batch, batch_transformation,
-                                            batch_src_spikings, batch_dst_spikings)
-    elif backbone == 'res_net':
-        return get_prediction_resnet(nets, model_variant, src_batch, dst_batch, batch_src_spikings, batch_dst_spikings)
-    elif backbone == 'siamese':
-        return get_grid_cell(batch_src_spikings, batch_dst_spikings), None, None
-
-
 class GridCellSiameseNetwork(nn.Module):
     def __init__(self, no_weight_init=False):
-        super(GridCellSiameseNetwork, self).__init__()
+        super().__init__()
 
         self.conv1 = nn.Conv2d(in_channels=6, out_channels=16, kernel_size=3, stride=1, padding=1)
         self.relu1 = nn.ReLU()
@@ -287,7 +260,7 @@ class GridCellSiameseNetwork(nn.Module):
 
 class AngleRegression(nn.Module):
     def __init__(self, init_scale=1.0, bias=True, no_weight_init=False):
-        super(AngleRegression, self).__init__()
+        super().__init__()
 
         self.fc = nn.Linear(4, 1, bias=bias)
         self.sigmoid = nn.Sigmoid()
@@ -309,7 +282,7 @@ class AngleRegression(nn.Module):
 
 class PositionRegression(nn.Module):
     def __init__(self, init_scale=1.0, bias=True, no_weight_init=False):
-        super(PositionRegression, self).__init__()
+        super().__init__()
 
         self.fc = nn.Linear(4, 2, bias=bias)
 
@@ -339,7 +312,9 @@ class ReachabilityRegression(nn.Module):
 
     def forward(self, x):
         x = self.fc(x)
+        assert not np.isnan(sum(x.detach().numpy()))
         x = self.sigmoid(x)
+        assert not np.isnan(sum(x.detach().numpy()))
         return x.squeeze(1)
 
 
@@ -372,6 +347,15 @@ class FcWithDropout(nn.Module):
         x = self.fc4(x)
         return x
 
+
+class LidarEncoder(nn.Module):
+    def __init__(self, input_dim=52, output_dim=10):
+        super().__init__()
+        self.fc = nn.Linear(input_dim, output_dim)
+
+    def forward(self, x):
+        x = self.fc(x)
+        return x
 
 class FCLayers(nn.Module):
     def __init__(self, input_dim=512, init_scale=1.0, bias=True, no_weight_init=False):

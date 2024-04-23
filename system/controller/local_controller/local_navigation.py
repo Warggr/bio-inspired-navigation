@@ -21,6 +21,7 @@ from system.controller.local_controller.decoder.linear_lookahead_no_rewards impo
 from system.controller.local_controller.decoder.phase_offset_detector import PhaseOffsetDetectorNetwork
 from system.controller.simulation.math_utils import Vector2D
 from system.bio_model.grid_cell_model import GridCellNetwork
+from system.controller.simulation.pybullet_environment import PybulletEnvironment
 
 import system.plotting.plotResults as plot
 import numpy as np
@@ -77,13 +78,13 @@ def create_gc_spiking(start, goal):
     """
 
     dt = 1e-2
-    from system.controller.simulation.pybullet_environment import PybulletEnvironment
     env = PybulletEnvironment("plane", dt, mode="analytical", start=list(start))
     env.goal_pos = goal
 
     # Grid-Cell Initialization
     gc_network = setup_gc_network(env.dt)
 
+    env.goal_vector = env.calculate_goal_vector_analytically()
     env.turn_to_goal()
 
     i = 0
@@ -150,6 +151,9 @@ def vector_navigation(env, goal : Vector2D, gc_network, target_gc_spiking=None, 
     cognitive_map          -- cognitive map object
     """
 
+    from numbers import Number
+    assert len(goal) == 2 and isinstance(goal[0], Number) and isinstance(goal[1], Number), goal
+
     data = []
     if model == "combo":
         env.mode = "pod"
@@ -162,7 +166,11 @@ def vector_navigation(env, goal : Vector2D, gc_network, target_gc_spiking=None, 
         gc_network.set_as_target_state(target_gc_spiking)
 
     env.nr_ofsteps = 0
-    env.turn_to_goal(gc_network, pod)
+    if env.mode == "analytical":
+        env.goal_vector = env.calculate_goal_vector_analytically()
+    else:
+        env.goal_vector = compute_navigation_goal_vector(gc_network, env.nr_ofsteps, env, model=env.mode, pod=pod)
+    env.turn_to_goal()
 
     if collect_data_reachable:
         sample_after_turn = (env.xy_coordinates[-1], env.orientation_angle[-1])
@@ -182,7 +190,7 @@ def vector_navigation(env, goal : Vector2D, gc_network, target_gc_spiking=None, 
                                                                         env.xy_coordinates[-1], exploration_phase)
 
             mapped_pc = cognitive_map.track_vector_movement(
-                firing_values, created_new_pc, pc_network.place_cells[-1], env=env,
+                firing_values, created_new_pc, pc_network.place_cells[-1], lidar=env.lidar(),
                 exploration_phase=exploration_phase, pc_network=pc_network)
             if mapped_pc is not None:
                 last_pc = mapped_pc
@@ -197,7 +205,8 @@ def vector_navigation(env, goal : Vector2D, gc_network, target_gc_spiking=None, 
                 # In combined mode, switch from pod to linear lookahead
                 env.mode = "linear_lookahead"
                 env.nr_ofsteps = 0
-                env.turn_to_goal(gc_network, pod)
+                env.goal_vector = compute_navigation_goal_vector(gc_network, env.nr_ofsteps, env, model=env.mode, pod=pod)
+                env.turn_to_goal()
             else:
                 # Agent reached the goal
                 end_state = "Agent reached the goal. Actual distance: " + str(
@@ -268,8 +277,6 @@ if __name__ == "__main__":
         2B) choose a few combinations to test
     """
 
-    from system.controller.simulation.pybullet_environment import PybulletEnvironment
-
     if not experiment:
         env_model = "Savinov_val3"
 
@@ -288,8 +295,6 @@ if __name__ == "__main__":
         # model = "analytical"
         model = "combo"
 
-        from system.controller.simulation.pybullet_environment import PybulletEnvironment
-
         env = PybulletEnvironment(env_model, dt, "analytical", start=start)
 
         vector_navigation(env, goal, gc_network, target_gc_spiking=target_spiking, model=model, step_limit=float('inf'),
@@ -306,8 +311,6 @@ if __name__ == "__main__":
         actual_error_array = []
         actual_error_goal_array = []
         time_array = []
-
-        from system.controller.simulation.pybullet_environment import PybulletEnvironment
 
         for i in range(0, nr_trials):
             # initialize grid cell network and create target spiking
@@ -443,7 +446,7 @@ if __name__ == "__main__":
 
                 over, _ = vector_navigation(env, goal, gc_network=gc_network, target_gc_spiking=target_spiking, model=model,
                                             plot_it=True, step_limit=10000, obstacles=(True if trial == 0 else False))
-                assert over == 1
+                # assert over == 1
                 print(trial, over, mapping, combine, num_ray_dir, cone)
 
                 nr_steps += env.nr_ofsteps

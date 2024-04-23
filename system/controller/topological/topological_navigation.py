@@ -21,7 +21,7 @@ from system.controller.local_controller.decoder.phase_offset_detector import Pha
 from system.controller.simulation.pybullet_environment import PybulletEnvironment
 from system.bio_model.cognitive_map import LifelongCognitiveMap, CognitiveMapInterface
 from system.bio_model.place_cell_model import PlaceCellNetwork, PlaceCell
-from system.controller.local_controller.local_navigation import vector_navigation, setup_gc_network
+from system.controller.local_controller.local_navigation import vector_navigation, setup_gc_network, compute_navigation_goal_vector
 import system.plotting.plotResults as plot
 
 # if True plot results
@@ -38,7 +38,7 @@ class TopologicalNavigation(object):
 
         arguments:
         env_model: str -- name of the environment model
-        model: str -- type of goal vector calculation, possible values: ['pod', 'linear_lookahead', 'combo']
+        method: str -- type of goal vector calculation, possible values: ['pod', 'linear_lookahead', 'combo']
         pc_network: PlaceCellNetwork -- place cell network
         cognitive_map: CognitiveMapInterface -- cognitive map object
         gc_network: GridCellNetwork -- grid cell network
@@ -100,7 +100,8 @@ class TopologicalNavigation(object):
         src_pos = list(path[0].env_coordinates)
 
         dt = 1e-2
-        env = PybulletEnvironment(self.env_model, dt, self.method, build_data_set=True, start=src_pos)
+        simple_method = 'pod' if self.method == 'combo' else self.method
+        env = PybulletEnvironment(self.env_model, dt, simple_method, build_data_set=True, start=src_pos)
 
         if plotting:
             plot.plotTrajectoryInEnvironment(env, cognitive_map=self.cognitive_map, path=path)
@@ -173,8 +174,8 @@ class TopologicalNavigation(object):
         """
         closest_node = None
         for node in self.cognitive_map.node_network.nodes:
-            goal_vector = env.get_goal_vector(self.gc_network, self.pod,
-                                              goal=node.env_coordinates)  # recalculate goal_vector
+            goal_vector = compute_navigation_goal_vector(self.gc_network, env.nr_ofsteps, env, model=env.mode, pod=self.pod)
+            env.goal_vector = goal_vector
             if env.reached(goal_vector):
                 closest_node = node
                 new_path = self.cognitive_map.find_path(node, goal)
@@ -207,8 +208,7 @@ if __name__ == "__main__":
 
     tj = TopologicalNavigation(env_model, model, pc_network, cognitive_map, gc_network, pod)
 
-    dt = 1e-2
-    env = PybulletEnvironment(env_model, dt, "analytical", build_data_set=True)
+    env = PybulletEnvironment(env_model, mode="analytical", build_data_set=True)
     plot.plotTrajectoryInEnvironment(env, goal=False, cognitive_map=tj.cognitive_map, trajectory=False)
 
     successful = 0

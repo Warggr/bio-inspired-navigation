@@ -42,13 +42,48 @@ import sys
 import pybullet_data
 import numpy as np
 import math
-from typing import List, Optional, Any, Tuple
+from typing import List, Optional, Any, Tuple, Iterable
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../.."))
 import system.plotting.plotResults as plot
 from system.bio_model.grid_cell_model import GridCellNetwork
 
-from system.controller.simulation.math_utils import Vector2D, vectors_in_one_direction, intersect, compute_angle
+from system.controller.simulation.math_utils import vectors_in_one_direction, intersect, compute_angle
+from system.types import Vector2D
+
+Angle = float # assumed to be in radians
+
+class LidarReading:
+    def __init__(self, distances: List[float], angles: List[Angle]):
+        self.distances = distances
+        self.angles = angles
+    
+    def __getitem__(self, index):
+        return self.distances[index]
+
+    @staticmethod
+    def angles(
+        start_angle,
+        tactile_cone = math.radians(310),
+        num_ray_dir = 62, # number of directions to check (e.g. 16,51,71)
+        blind_spot_cone = math.radians(50),
+    ) -> Iterable[Angle]:
+        max_angle = tactile_cone / 2
+        for angle_offset in np.linspace(-max_angle, max_angle, num=num_ray_dir):
+            if abs(angle_offset) < blind_spot_cone / 2:
+                continue
+            yield start_angle + angle_offset
+
+class types:
+    DepthImage = np.ndarray
+    Vector2D = Vector2D
+    Vector3D = Tuple[float, float, float]
+    Spikings = List[float]
+    Angle = Angle
+    Image = np.ndarray
+    LidarReading = LidarReading
+
+types.PositionAndOrientation = Tuple[types.Vector3D, types.Angle]
 
 def closest_subsegment(values : List[float]) -> (int, int):
     values = np.array(values)
@@ -72,7 +107,9 @@ class PybulletEnvironment:
     linear_lookahead_arrival_threshold = 0.2
     analytical_arrival_threshold = 0.1
 
-    def __init__(self, env_model : str, dt : float, mode=None, visualize=False, build_data_set=False, start=None, orientation=-np.pi/2, frame_limit=5000):
+    WHISKER_LENGTH = 0.1
+
+    def __init__(self, env_model : str, dt : float = 1e-2, mode=None, visualize=False, build_data_set=False, start=None, orientation=-np.pi/2, frame_limit=5000):
         """ Create environment.
 
         arguments:
@@ -106,7 +143,7 @@ class PybulletEnvironment:
 
         base_position = [0, 0.05, 0.02]  # [0, 0.05, 0.02] ensures that it actually starts at origin
 
-        # environment choices       
+        # environment choices
         if env_model == "Savinov_val3":
             base_position = [-2, 0.05, 0.02]
             p.resetDebugVisualizerCamera(cameraDistance=10, cameraYaw=0, cameraPitch=-70,
@@ -169,13 +206,14 @@ class PybulletEnvironment:
 
         self.xy_coordinates = []  # keeps track of agent's coordinates at each time step
         self.orientation_angle = []  # keeps track of agent's orientation at each time step
+        # TODO: this should be encoded in head cells
         self.xy_speeds = []  # keeps track of agent's speed (vector) at each time step
         self.nr_ofsteps = 0  # keeps track of number of steps taken with current decoder (used for switching between pod and linlook decoder)
         self.speeds = []  # keeps track of agent's speed (value) at each time step
         self.goal_vector_array = []  # keeps track of agent's goal vector at each time step
 
         self.buildDataSet = build_data_set  # when true create camera images
-        self.images = []  # if buildDataSet: collect images
+        self.images : list[Image] = []  # if buildDataSet: collect images
         self.frame_limit = frame_limit
 
         self.save_position_and_speed()  # save initial configuration
@@ -183,14 +221,13 @@ class PybulletEnvironment:
         self.max_speed = max_speed
 
         self.mode = mode  # choose navigation mode, different decoders have different thresholds for e.g. arrival
-        self.arrival_threshold = getattr(PybulletEnvironment, self.mode + '_arrival_threshold')
+        try:
+            self.arrival_threshold = getattr(PybulletEnvironment, self.mode + '_arrival_threshold')
+        except AttributeError:
+            print("Warning: no arrival threshold defined for mode:", self.mode)
 
         self.buffer = 0  # buffer for checking if agent got stuck, discards timesteps spent turning towards the goal
 
-        # egocentric beams checking for object collision
-        self.num_ray_dir = 21  # number of direction to check for obstacles
-        self.tactile_cone = 120  # cone for beams centered on heading direction
-        self.ray_length = 1  # length of the beams
         self.mapping = 1.5  # see local_navigation experiments
         self.combine = 1.5
 
@@ -222,22 +259,22 @@ class PybulletEnvironment:
         p.changeVisualShape(multiBodyId, -1, textureUniqueId=textureId)
         return multiBodyId
 
-    def camera(self, agent_pos_orn=None):
+    def camera(self, agent_pos_orn : Optional[types.PositionAndOrientation] = None) -> types.Image:
         """ simulates a camera mounted on the robot, creating images """
         assert self.buildDataSet or self.visualize # why would we create images otherwise
 
         distance = 100000
         img_w, img_h = 64, 64
 
-        if agent_pos_orn:
+        if agent_pos_orn is not None:
             agent_pos, agent_orn = agent_pos_orn
             agent_pos = (agent_pos[0], agent_pos[1], 0.02)
             yaw = agent_orn
         else:
-            agent_pos, agent_orn = \
+            agent_pos, agent_orn_quaternion = \
                 p.getBasePositionAndOrientation(self.carID)
 
-            yaw = p.getEulerFromQuaternion(agent_orn)[-1]
+            yaw = p.getEulerFromQuaternion(agent_orn_quaternion)[-1]
 
         xA, yA, zA = agent_pos
         zA = zA + 0.3  # make the camera a little higher than the robot
@@ -260,16 +297,16 @@ class PybulletEnvironment:
         projection_matrix = p.computeProjectionMatrixFOV(
             fov=120, aspect=1.5, nearVal=0.02, farVal=3.5)
 
-        img = p.getCameraImage(img_w, img_h,
+        _height, _width, rgb_img, _data1, _data2 = p.getCameraImage(img_w, img_h,
                                view_matrix,
                                projection_matrix, shadow=True,
                                renderer=p.ER_BULLET_HARDWARE_OPENGL)
 
         if self.buildDataSet:
-            self.images.append(img)
+            self.images.append(rgb_img)
             self.images = self.images[-self.frame_limit:]
 
-        return img
+        return rgb_img
 
     def __keyboard_movement(self):
         """ simulates a timestep with keyboard controlled movement """
@@ -305,7 +342,14 @@ class PybulletEnvironment:
         self.camera()
         return True
 
-    def step(self, gains):
+    def step(self, gains : [float, float]):
+        # print("Gains:", gains)
+        #
+        # position, angle = p.getBasePositionAndOrientation(self.carID)
+        # linear_v, _ = p.getBaseVelocity(self.carID)
+        # print("  old position:", position)
+        # print("  old speed:", linear_v)
+
         # change speed
         p.setJointMotorControlArray(bodyUniqueId=self.carID,
                             jointIndices=[4, 6],
@@ -316,6 +360,11 @@ class PybulletEnvironment:
         self.save_position_and_speed()
         if self.visualize:
             time.sleep(self.dt / 5)
+
+        # position, angle = p.getBasePositionAndOrientation(self.carID)
+        # linear_v, _ = p.getBaseVelocity(self.carID)
+        # print("  new position:", position)
+        # print("  new speed:", linear_v)
 
     def keyboard_simulation(self):
         """ Control the agent with your keyboard. SPACE ends the simulation."""
@@ -341,7 +390,7 @@ class PybulletEnvironment:
             Calculate or update the goal vector.
             Calculate obstacle vector.
             Combine into movement vector and simulate movement.
-        
+
         arguments:
         gc          -- grid cell network for path integration and goal vector calculation 
         pod         -- phase offset decode network for goal vector calculation
@@ -428,8 +477,17 @@ class PybulletEnvironment:
         if self.visualize:
             p.addUserDebugLine(start, end, color, width)
 
-    def ray_detection_egocentric(self) -> (List[Any], List[float], List[Any]):
-        """ returns the egocentric distance to obstacles in numRays directions """
+    def lidar(
+        self,
+        agent_pos_orn : Optional[types.PositionAndOrientation] = None,
+        ray_length = WHISKER_LENGTH,
+        **angle_args
+    ) -> LidarReading:
+        """
+        returns the egocentric distance to obstacles in num_ray_dir directions
+
+        returns: (distances, angles, hitpoints)
+        """
 
         if self.visualize:
             p.removeAllUserDebugItems()  # removes raylines
@@ -437,59 +495,56 @@ class PybulletEnvironment:
         ray_return = []
         rayFrom = []
         rayTo = []
-        numRays = self.num_ray_dir  # number of directions to check (e.g. 16,51,71)
-        rayLen = self.ray_length  # length of the rays
         rayHitColor = [1, 0, 0]
         rayMissColor = [1, 1, 1]
 
-        ray_angles : List[float] = []
-
-        for i in range(numRays):
-            rayFromPoint = p.getLinkState(self.carID, 0)[0]  # linkWorldPosition
-            rayReference = p.getLinkState(self.carID, 0)[1]  # linkWorldOrientation
-            euler_angle = p.getEulerFromQuaternion(rayReference)  # in degree
+        if agent_pos_orn:
+            pos, euler_angle = agent_pos_orn
+            rayFromPoint = [pos[0], pos[1], 0.02]
+        else:
+            (
+                rayFromPoint, # linkWorldPosition
+                rayReference, # linkWorldOrientation
+                *_ignored_data
+            ) = p.getLinkState(self.carID, 0)
+            euler_angle = p.getEulerFromQuaternion(rayReference)[2]  # in radians
 
             rayFromPoint = list(rayFromPoint)
             rayFromPoint[2] = rayFromPoint[2] + 0.02  # see p3dx model
-            rayFrom.append(rayFromPoint)
 
-            # 1 pi rotation -> 180 degrees
-            sub = euler_angle[2] - 2 * math.pi * i / (numRays - 1) * self.tactile_cone / 360 + math.pi / (
-                    360.0 / self.tactile_cone)
+        ray_angles = list(LidarReading.angles(start_angle=euler_angle, **angle_args))
 
+        for angle in ray_angles:
             rayTo.append([
-                rayLen * math.cos(sub) +
-                rayFromPoint[0],
-                rayLen * math.sin(sub) +
-                rayFromPoint[1],
+                rayFromPoint[0] + ray_length * math.cos(angle),
+                rayFromPoint[1] + ray_length * math.sin(angle),
                 rayFromPoint[2]
             ])
-
-            ray_angles.append(sub)
+            rayFrom.append(rayFromPoint)
 
         results = p.rayTestBatch(rayFrom, rayTo, numThreads=0)  # get intersections with obstacles
-        for i in range(numRays):
-            hit_object_uid = results[i][0]
+        for start, end, hit in zip(rayFrom, rayTo, results):
+            hit_object_uid = hit[0]
 
             if hit_object_uid < 0:
-                self.add_debug_line(rayFrom[i], rayTo[i], rayMissColor)
-                if i == 0:
-                    self.add_debug_line(rayFrom[i], rayTo[i], (0, 0, 0))
-                self.add_debug_line(rayFrom[i], rayTo[i], rayMissColor)
+                self.add_debug_line(start, end, rayMissColor)
+                #if i == 0:
+                #    self.add_debug_line(start, end, (0, 0, 0))
                 ray_return.append(-1)
             else:
-                hitPosition = results[i][3]
-                self.add_debug_line(rayFrom[i], hitPosition, rayHitColor)
-                self.add_debug_line(rayFrom[i], rayTo[i], rayHitColor)
-                ray_return.append(
-                    math.sqrt((hitPosition[0] - rayFrom[i][0]) ** 2 + (hitPosition[1] - rayFrom[i][1]) ** 2))
+                hitPosition = hit[3]
+                self.add_debug_line(start, hitPosition, rayHitColor)
+                self.add_debug_line(start, end, rayHitColor)
+                distance = math.sqrt((hitPosition[0] - start[0]) ** 2 + (hitPosition[1] - start[1]) ** 2)
+                assert 0 <= distance and distance <= 1
+                ray_return.append(distance)
 
-        return ray_return, ray_angles, [it[3] for it in results]
+        return LidarReading(ray_return, ray_angles) #, [it[3] for it in results]
 
     ''' Calculates the obstacle_vector from the ray distances'''
 
     def calculate_obstacle_vector(self):
-        rays, angles, hit_points = self.ray_detection_egocentric()
+        rays, angles, hit_points = self.lidar(tactile_cone=120, num_ray_dir=21, blind_spot_cone=0)
         start_index, end_index = closest_subsegment(rays)
         hit_points = hit_points[start_index:end_index+1]
 
@@ -502,6 +557,7 @@ class PybulletEnvironment:
             direction_vector = np.array([-np.sin(angle), np.cos(angle)])
         else:
             try:
+                # TODO: isn't that overkill compared to e.g. just taking the slope of two points?
                 # Calculate the slope (m) of the line using linear regression
                 # Step 2: Calculate a straight line using linear regression that fits the best to these points
                 hit_points = np.array(hit_points)
@@ -531,7 +587,7 @@ class PybulletEnvironment:
         direction_vector = direction_vector * 1.5 / min(rays[start_index:end_index + 1])
         return hit_points[0], direction_vector
 
-    def calculate_goal_vector_analytically(self, goal=None) -> Vector2D:
+    def calculate_goal_vector_analytically(self, goal=None) -> types.Vector2D:
         """ Uses a precise goal vector. """
         goal_pos = goal if goal is not None else self.goal_pos
         rayFromPoint = p.getLinkState(self.carID, 0)[0]  # linkWorldPosition
@@ -544,7 +600,7 @@ class PybulletEnvironment:
         from system.controller.local_controller.local_navigation import compute_navigation_goal_vector
         return compute_navigation_goal_vector(gc_network, self.nr_ofsteps, self, model=self.mode, pod=pod_network)
 
-    def reached(self, goal_vector : Vector2D) -> bool:
+    def reached(self, goal_vector : types.Vector2D) -> bool:
         return abs(np.linalg.norm(goal_vector)) < self.arrival_threshold
 
     def get_status(self):
@@ -577,18 +633,8 @@ class PybulletEnvironment:
         # Still going
         return 0
 
-    def get_goal_vector(self, gc_network=None, pod_network=None, goal=None):
-        if self.mode == "analytical":
-            return self.calculate_goal_vector_analytically(goal)
-        elif pod_network:
-            return self.calculate_goal_vector_gc(gc_network, pod_network)  # recalculate goal_vector
-
-        return np.zeros((2))
-
-    def turn_to_goal(self, gc_network=None, pod_network=None):
+    def turn_to_goal(self):
         """ Agent turns to face in goal vector direction """
-        self.goal_vector = self.get_goal_vector(gc_network, pod_network)
-
         if np.linalg.norm(np.array(self.goal_vector)) == 0:
             return
 

@@ -8,7 +8,7 @@
 ***************************************************************************************
 """
 
-from random import random
+import random
 
 import networkx as nx
 import numpy as np
@@ -34,13 +34,14 @@ def get_path_top():
 class PlaceCell:
     """Class to keep track of an individual Place Cell"""
 
-    def __init__(self, gc_connections, observations, coordinates):
+    def __init__(self, gc_connections, observations, coordinates : Vector2D):
         self.gc_connections = gc_connections  # Connection matrix to grid cells of all modules; has form (n^2 x M)
         self.env_coordinates = coordinates  # Save x and y coordinate at moment of creation
 
         self.plotted_found = [False, False]  # Was used for debug plotting, of linear lookahead
 
         self.observations = observations
+        self.distances : Optional[np.ndarray] = None
 
     def compute_firing(self, s_vectors):
         """Computes firing value based on current grid cell spiking"""
@@ -106,9 +107,8 @@ class PlaceCell:
 
 class PlaceCellNetwork:
     """A PlaceCellNetwork holds information about all Place Cells"""
-    from system.controller.reachability_estimator.reachability_estimation import ReachabilityEstimator
 
-    def __init__(self, reach_estimator: ReachabilityEstimator, from_data=False):
+    def __init__(self, reach_estimator: 'ReachabilityEstimator', from_data=False):
         """ Place Cell Network  of the environment. 
         
         arguments:
@@ -214,11 +214,10 @@ if __name__ == '__main__':
     cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from="after_exploration.gpickle")
     gc_network = setup_gc_network(1e-2)
     pod = PhaseOffsetDetectorNetwork(16, 9, 40)
-    dt = 1e-2
 
-    fr = list(cognitive_map.node_network.nodes)[random.randint(0, len(list(cognitive_map.node_network.nodes)) - 1)]
-    to = list(cognitive_map.node_network.nodes)[random.randint(0, len(list(cognitive_map.node_network.nodes)) - 1)]
-    env = PybulletEnvironment(env_model, dt, visualize=False, mode="combo", build_data_set=True,
+    fr = random.choice(list(cognitive_map.node_network.nodes))
+    to = random.choice(list(cognitive_map.node_network.nodes))
+    env = PybulletEnvironment(env_model, visualize=False, mode="combo", build_data_set=True,
                               start=list(fr.env_coordinates))
     gc_network.set_as_current_state(fr.gc_connections)
     stop, pc = vector_navigation(env, list(to.env_coordinates), gc_network, to.gc_connections, model="combo",

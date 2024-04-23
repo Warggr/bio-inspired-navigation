@@ -56,7 +56,7 @@ class ViewOverlapReachabilityController:
         if delta_theta >= math.pi:
             delta_theta -= math.pi * 2
 
-        print(f"vis overlap {visual_overlap}, path {path_l}, in fov {dst_in_fov}, eu dist {math.sqrt(distance_squared)}, ∆Theta {delta_theta * 180 / math.pi}")
+        # print(f"vis overlap {visual_overlap}, path {path_l}, in fov {dst_in_fov}, eu dist {math.sqrt(distance_squared)}, ∆Theta {delta_theta * 180 / math.pi}")
         return visual_overlap >= self.L_min and \
             path_l <= self.R_max and \
             dst_in_fov and \

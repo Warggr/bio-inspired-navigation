@@ -108,25 +108,26 @@ def load_model(dir, filename, step=None, load_to_cpu=False):
     :return: the saved state dict
     '''
     import torch
-    import parse
     if not step:
         files = glob.glob(os.path.join(dir, '%s.*' % filename))
         parsed = []
         for fn in files:
-            r = parse.parse('{}.{:d}', fn)
-            if r:
-                parsed.append((r, fn))
+            try:
+                r = int(fn.split('.')[-1])
+            except Exception:
+                print('Ignoring file %s', fn)
+                continue
+            parsed.append(r)
+
         if not parsed:
-            return None
+            raise FileNotFoundError
+        step = max(parsed)
 
-        step, path = max(parsed, key=lambda x: x[0][1])
+    path = os.path.join(dir, '%s.%d' % (filename, step))
+
+    if not os.path.isfile(path):
+        raise ValueError(path + ' is not a valid path')
+    if load_to_cpu:
+        return torch.load(path, map_location=lambda storage, location: storage)
     else:
-        path = os.path.join(dir, '%s.%d' % (filename, step))
-
-    if os.path.isfile(path):
-        if load_to_cpu:
-            return torch.load(path, map_location=lambda storage, location: storage)
-        else:
-            return torch.load(path)
-
-    raise Exception('Failed to load model')
+        return torch.load(path)

@@ -31,39 +31,39 @@ class H5Dataset(torch.utils.data.Dataset):
         transformation  -- transformation between source position and goal position
     """
 
-    def __init__(self, path, external_link=False, with_grid_cell_spikings=False):
+    def __init__(self, path, external_link=False, with_grid_cell_spikings=False, with_lidar=False):
         self.file_path = path
         self.dataset = None
         self.externalLink = external_link
         self.dataset = h5py.File(self.file_path, 'r')
         self.with_grid_cell_spikings = with_grid_cell_spikings
+        self.with_lidar = with_lidar
 
         if external_link:
             self.dataset_len = 0
             self.cumsum = [0]
             self.keys = []
             for k in list(self.dataset.keys()):
-                self.dataset_len += len(self.dataset[k])
-                self.cumsum.append(len(self.dataset[k]) + self.cumsum[-1])
-                self.keys += list(self.dataset[k])
+                self.dataset_len += len(self.dataset[k]['positions'])
+                self.cumsum.append(len(self.dataset[k]['positions']) + self.cumsum[-1])
         else:
-            self.dataset_len = len(list(self.dataset))
-            self.keys = list(self.dataset)
+            self.dataset_len = len(list(self.dataset['positions']))
 
     def sample(self, index):
         if self.externalLink:
             return self.dataset[str(self._get_link_index(index))][self.keys[index]][()]
         else:
-            return self.dataset[self.keys[index]][()]
+            return self.dataset['positions'][index]
 
     def __getitem__(self, index):
         src_img, dst_img, \
             reachability, start_position, goal_position, \
-            start_orientation, goal_orientation = self.sample(index)[0]
+            start_orientation, goal_orientation, \
+            *maybe_other_values = self.sample(index)
         src_img = img_reshape(src_img)
         dst_img = img_reshape(dst_img)
         return src_img, dst_img, torch.tensor(reachability), \
-            torch.tensor(np.append(goal_position, goal_orientation) - np.append(start_position, start_orientation))
+            torch.tensor(np.append(goal_position, goal_orientation) - np.append(start_position, start_orientation)), *maybe_other_values
 
     def __len__(self):
         return self.dataset_len
@@ -93,7 +93,7 @@ class H5Dataset(torch.utils.data.Dataset):
 
             # hide y-axis
             ax.get_yaxis().set_visible(False)
-            plt.imshow(sample[1][i].transpose(1, 2, 0))
+            plt.imshow(sample[1].transpose(1, 2, 0))
         plt.show()
         print(sample[2])
         print(sample[3])
@@ -124,25 +124,6 @@ class H5Dataset(torch.utils.data.Dataset):
         print("failed", reach.count(0.0))
         print("percentage reached/failed", reach.count(1.0) / len(reach))
 
-
-class H5DatasetWithSpikings(H5Dataset):
-    def __init__(self, path, external_link=False):
-        super().__init__(path, external_link)
-
-    def __getitem__(self, index):
-        src_img, dst_img, \
-            reachability, start_position, goal_position, \
-            start_orientation, goal_orientation,\
-            src_spikings, dst_spikings = self.sample(index)[0]
-
-        src_spikings = spikings_reshape(src_spikings)
-        dst_spikings = spikings_reshape(dst_spikings)
-        src_img = img_reshape(src_img)
-        dst_img = img_reshape(dst_img)
-
-        return src_img, dst_img, torch.tensor(reachability), \
-            torch.tensor(np.append(goal_position, goal_orientation) - np.append(start_position, start_orientation)), \
-            src_spikings, dst_spikings
 
 def create_balanced_datasets(new_file, filename, filepath, length):
     """ Combine two hd5 files into one. Keys need to be different
