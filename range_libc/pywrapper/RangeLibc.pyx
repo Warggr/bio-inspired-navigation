@@ -1,4 +1,4 @@
-# cython: c_string_type=unicode, c_string_encoding=utf8
+# cython: c_string_type=unicode, c_string_encoding=utf8, language_level=2
 from libcpp cimport bool
 from libcpp.string cimport string
 from libcpp.vector cimport vector
