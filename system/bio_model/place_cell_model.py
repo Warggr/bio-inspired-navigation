@@ -18,10 +18,12 @@ import os
 
 from matplotlib import pyplot as plt
 
+if __name__ == "__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
+
 from system.plotting.plotHelper import add_environment, TUM_colors
-
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-
+from system.types import Vector2D
+from typing import Optional
 
 def get_path_top():
     """ returns path to topological data folder """

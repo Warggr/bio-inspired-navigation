@@ -17,12 +17,14 @@ from torch.utils.tensorboard import SummaryWriter
 
 import sys
 import os
+import numpy as np
+from typing import Type
 
-from system.controller.reachability_estimator.networks import initialize_network, get_prediction
+if __name__ == "__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
-
-from system.controller.reachability_estimator.training.H5Dataset import H5Dataset, H5DatasetWithSpikings
+from system.controller.reachability_estimator.networks import Model
+from system.controller.reachability_estimator.training.H5Dataset import H5Dataset
 from system.controller.reachability_estimator.training.utils import save_model, load_model
 
 

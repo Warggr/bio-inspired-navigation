@@ -13,11 +13,14 @@ import matplotlib.pyplot as plt
 
 import sys
 import os
+from abc import ABC, abstractmethod
+
+if __name__ == "__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from system.plotting.helper import plot_cognitive_map_path
 from system.plotting.plotThesis import plot_grid_cell
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 from system.bio_model.place_cell_model import PlaceCell, PlaceCellNetwork
 from system.controller.reachability_estimator.reachability_estimation import reachability_estimator_factory, \
     ReachabilityEstimator

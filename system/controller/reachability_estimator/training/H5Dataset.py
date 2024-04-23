@@ -10,10 +10,10 @@ import matplotlib.pyplot as plt
 import sys
 import os
 
+if __name__ == "__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
+
 from system.controller.reachability_estimator.training.utils import img_reshape, spikings_reshape
-
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
-
 from system.plotting.plotResults import plotStartGoalDataset
 
 

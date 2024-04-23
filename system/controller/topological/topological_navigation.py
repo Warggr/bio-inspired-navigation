@@ -12,10 +12,11 @@ import numpy as np
 import sys
 import os
 
+if __name__ == "__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+
 from system.bio_model.grid_cell_model import GridCellNetwork
 from system.controller.local_controller.decoder.phase_offset_detector import PhaseOffsetDetectorNetwork
-
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 from system.controller.simulation.pybullet_environment import PybulletEnvironment
 from system.bio_model.cognitive_map import LifelongCognitiveMap, CognitiveMapInterface

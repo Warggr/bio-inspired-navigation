@@ -1,8 +1,10 @@
 import numpy as np
 import math
 import sys
-sys.path.append("/Users/anna/Documents/TUM/Thesis/bio-inspired-navigation/system/controller/simulation/environment/map_occupancy_helpers")
-import math_utils_cpp
+import os
+
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+import map_occupancy_helpers.math_utils_cpp as math_utils_cpp
 
 
 def depth_to_xy(depth, pos=None, heading=0.0, fov=np.pi * 2.0):

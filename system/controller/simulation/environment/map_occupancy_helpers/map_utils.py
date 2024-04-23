@@ -4,8 +4,7 @@ import math
 import numpy as np
 import cv2
 import sys
-sys.path.append("/Users/anna/Documents/TUM/Thesis/bio-inspired-navigation/system/controller/simulation/environment/map_occupancy_helpers")
-from map_utils_cpp import dijkstra
+from .map_utils_cpp import dijkstra
 
 
 def a_star(obstacle_map, start_pos, goal_pos, soft_obstacle_scale=0.0):

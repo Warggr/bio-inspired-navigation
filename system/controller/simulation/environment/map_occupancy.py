@@ -29,13 +29,6 @@ import time
 import sys
 import os
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../.."))
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
-sys.path.append("/Users/anna/Documents/TUM/Thesis/bio-inspired-navigation/")
-sys.path.append("/Users/anna/Documents/TUM/Thesis/bio-inspired-navigation/range_libc/pywrapper")
-sys.path.append("/Users/anna/Documents/TUM/Thesis/bio-inspired-navigation/range_libc")
-sys.path.append("/Users/anna/Documents/TUM/Thesis/bio-inspired-navigation/system/controller/simulation/environment/map_occupancy_helpers")
-
 import range_libc
 
 from map_utils import a_star#, rasterize_line

@@ -14,20 +14,21 @@ import itertools
 import bisect
 import random
 import matplotlib.pyplot as plt
+from typing import Tuple, Generator, Dict
 
 import sys
 import os
 
-from system.controller.reachability_estimator.reachability_utils import ViewOverlapReachabilityController
+if __name__ == "__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
-sys.path.append("/home/tp2/Documents/Anna/bio-inspired-navigation/range_libc/pywrapper/common_msgs/geometry_msgs/")
+from system.controller.reachability_estimator.reachability_utils import ViewOverlapReachabilityController
 
 from system.controller.simulation.pybullet_environment import PybulletEnvironment
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.controller.simulation.environment.map_occupancy_helpers.map_utils import path_length
 from system.plotting.plotResults import plotStartGoalDataset
-
+from system.controller.simulation.pybullet_environment import types
 
 def get_path():
     """ returns path to data storage folder """
