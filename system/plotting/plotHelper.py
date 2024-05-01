@@ -10,6 +10,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+from typing import Tuple
+from system.controller.simulation.environment_config import environment_dimensions
 
 TUM_colors = {
                 'TUMBlue': '#0065BD',
@@ -27,18 +29,20 @@ TUM_colors = {
                 'TUMAccentBlue': '#64A0C8'
 }
 
-def add_environment(ax, env):
+def add_environment(ax, env_model : str):
 
     #load topview of maze
     dirname = os.path.dirname(__file__)
     dirname = os.path.join(dirname, "..")
-    filename = os.path.join(dirname, "controller/simulation/environment/"+env.env_model+"/maze_topview_binary.png")
+    filename = os.path.join(dirname, "controller/simulation/environment/"+env_model+"/maze_topview_binary.png")
     filename = os.path.realpath(filename)
 
-    if not env.env_model == "plane" and not "obstacle" in env.env_model:
+    dimensions = environment_dimensions(env_model)
+
+    if not env_model == "plane" and not "obstacle" in env_model:
         topview = plt.imread(filename)
-        ax.imshow(topview,cmap="gray",extent=env.dimensions,origin="upper")
-    elif env.env_model == "obstacle_map_2":
+        ax.imshow(topview,cmap="gray",extent=dimensions,origin="upper")
+    elif env_model == "obstacle_map_2":
         box1 = plt.Rectangle((-1.75, -1.5), 0.5, 3, color=TUM_colors['TUMDarkGray'])
         ax.add_artist(box1)
         box2 = plt.Rectangle((-2.5, -0.75), 1, 0.5, color=TUM_colors['TUMDarkGray'])
@@ -53,7 +57,7 @@ def add_environment(ax, env):
         ax.add_artist(wall) 
         ax.set_xlim(-4, 2.1)
         ax.set_ylim(-3, 3.1)
-    elif env.env_model == "obstacle_map_3":
+    elif env_model == "obstacle_map_3":
         box1 = plt.Rectangle((-0.75, -2.25), 0.5, 2.5, color=TUM_colors['TUMDarkGray'])
         ax.add_artist(box1)
         box2 = plt.Rectangle((-2.5, -0.75), 3, 0.5, color=TUM_colors['TUMDarkGray'])
@@ -68,7 +72,7 @@ def add_environment(ax, env):
         ax.add_artist(wall)
         ax.set_xlim(-4, 2.1)
         ax.set_ylim(-3, 3.1)
-    elif env.env_model == "obstacle_map_1":
+    elif env_model == "obstacle_map_1":
         box1 = plt.Rectangle((-1.75, -1.5), 0.5, 3, color=TUM_colors['TUMDarkGray'])
         ax.add_artist(box1)
         box2 = plt.Rectangle((-2.5, -0.75), 1, 0.5, color=TUM_colors['TUMDarkGray'])
@@ -85,7 +89,7 @@ def add_environment(ax, env):
         ax.add_artist(wall)   
         ax.set_xlim(-4, 2.1)
         ax.set_ylim(-3, 3.1)
-    elif env.env_model == "obstacle_map_0":
+    elif env_model == "obstacle_map_0":
         box1 = plt.Rectangle((-1.75, -1.5), 0.5, 4, color=TUM_colors['TUMDarkGray'])
         ax.add_artist(box1)
         box2 = plt.Rectangle((-2.5, -0.75), 1, 0.5, color=TUM_colors['TUMDarkGray'])
@@ -112,16 +116,13 @@ def add_environment(ax, env):
         ax.set_ylim(-5, 4)
 
 
-def add_robot(ax, env):
-    xy = env.xy_coordinates[-1]
+def add_robot(ax, xy : Tuple[float, float], angle : float):
     circle = plt.Circle((xy[0], xy[1]), 0.2, color=TUM_colors['TUMDarkGray'], alpha=1)
     ax.add_artist(circle)
 
-    angle = env.orientation_angle[-1]
     ax.quiver(xy[0], xy[1], np.cos(angle) * 0.4, np.sin(angle) * 0.4, color=TUM_colors['TUMDarkGray'], headwidth=7,
               angles='xy', scale_units='xy', scale=1)
 
-def add_goal(ax, env):
-    goal = env.goal_pos
-    circle = plt.Circle((goal[0], goal[1]), 0.2, color=TUM_colors['TUMAccentOrange'], alpha=1)
+def add_goal(ax, goal : Tuple[float, float]):
+    circle = plt.Circle(goal, 0.2, color=TUM_colors['TUMAccentOrange'], alpha=1)
     ax.add_artist(circle)

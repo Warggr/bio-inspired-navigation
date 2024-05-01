@@ -21,7 +21,7 @@ from system.controller.local_controller.decoder.linear_lookahead_no_rewards impo
 from system.controller.local_controller.decoder.phase_offset_detector import PhaseOffsetDetectorNetwork
 from system.controller.simulation.math_utils import Vector2D
 from system.bio_model.grid_cell_model import GridCellNetwork
-from system.controller.simulation.pybullet_environment import PybulletEnvironment
+from system.controller.simulation.pybullet_environment import PybulletEnvironment, Robot
 
 import system.plotting.plotResults as plot
 import numpy as np
@@ -39,10 +39,10 @@ def print_debug(*params):
 update_fraction = 0.5  # how often the goal vector is recalculated
 
 
-def compute_navigation_goal_vector(gc_network, nr_steps, env, model="pod", pod=None):
+def compute_navigation_goal_vector(gc_network, nr_steps, robot : Robot, model="pod", pod=None):
     """Computes the goal vector for the agent to travel to"""
-    distance_to_goal = np.linalg.norm(env.goal_vector)  # current length of goal vector
-    distance_to_goal_original = np.linalg.norm(env.goal_vector_original)  # length of goal vector at calculation
+    distance_to_goal = np.linalg.norm(robot.goal_vector)  # current length of goal vector
+    distance_to_goal_original = np.linalg.norm(robot.goal_vector_original)  # length of goal vector at calculation
 
     if (
             distance_to_goal_original > 0.3 and
@@ -50,50 +50,50 @@ def compute_navigation_goal_vector(gc_network, nr_steps, env, model="pod", pod=N
     ) or nr_steps == 0:
         # Vector-based navigation and agent has traversed a large portion of the goal vector, it is recalculated
         # or it is the first calculation
-        find_new_goal_vector(gc_network, env, model, pod=pod)
+        find_new_goal_vector(gc_network, robot, model, pod=pod)
 
         # adding a turn here could make the local controller more robust
-        # env.turn_to_goal()
+        # robot.turn_to_goal()
     else:
-        env.goal_vector = env.goal_vector - np.array(env.xy_speeds[-1]) * env.dt
+        robot.goal_vector = robot.goal_vector - np.array(robot.xy_speed) * robot.env.dt
 
-    return env.goal_vector
+    return robot.goal_vector
 
 
-def find_new_goal_vector(gc_network, env, model, pod=None):
+def find_new_goal_vector(gc_network, robot : Robot, model, pod=None):
     """For Vector-based navigation, computes goal vector with one grid cell decoder"""
 
     if model == "pod":
-        env.goal_vector = pod.compute_goal_vector(gc_network.gc_modules)
+        robot.goal_vector = pod.compute_goal_vector(gc_network.gc_modules)
     elif model == "linear_lookahead":
-        env.goal_vector = perform_look_ahead_2xnr(gc_network, env)
-    env.goal_vector_original = env.goal_vector
+        robot.goal_vector = perform_look_ahead_2xnr(gc_network, robot)
+    robot.goal_vector_original = robot.goal_vector
 
 
-def create_gc_spiking(start, goal):
+def create_gc_spiking(start : Vector2D, goal : Vector2D):
     """ 
     Agent navigates from start to goal accross a plane without any obstacles, using the analyticallly 
     calculated goal vector to genereate the grid cell spikings necessary for the decoders. During actual
     navigation this would have happened in the exploration phase.
     """
 
-    dt = 1e-2
-    env = PybulletEnvironment("plane", dt, mode="analytical", start=list(start))
-    env.goal_pos = goal
+    env = PybulletEnvironment("plane", mode="analytical", start=start)
+    robot = env.robot
+    robot.goal_pos = goal
 
     # Grid-Cell Initialization
     gc_network = setup_gc_network(env.dt)
 
-    env.goal_vector = env.calculate_goal_vector_analytically()
-    env.turn_to_goal()
+    robot.goal_vector = robot.calculate_goal_vector_analytically()
+    robot.turn_to_goal()
 
     i = 0
     while i < 5000:
         i += 1
         if i == 5000:
             raise ValueError("Agent should not get caught in a loop in an empty plane.")
-        env.navigation_step(gc_network, obstacles=False)
-        status = env.get_status()
+        robot.navigation_step(gc_network, obstacles=False)
+        status = robot.get_status()
         if status == -1:
             raise ValueError("Agent should not get stuck in an empty plane.")
         elif status == 1:
@@ -116,19 +116,13 @@ def setup_gc_network(dt):
     return gc_network
 
 
-def get_observations(env : 'PyBulletEnvironment'):
-    # observations with context length k=10 and delta T = 3
-    observations = env.images[::3][-1:]
-    return [np.transpose(observation[2], (2, 0, 1)) for observation in observations]
-
-
-def vector_navigation(env, goal : Vector2D, gc_network, target_gc_spiking=None, model="combo",
+def vector_navigation(env : PybulletEnvironment, goal : Vector2D, gc_network, target_gc_spiking=None, model="combo",
                       step_limit=float('inf'), plot_it=False, obstacles=True, pod=PhaseOffsetDetectorNetwork(16, 9, 40),
                       collect_data_freq=False, collect_data_reachable=False, exploration_phase=False,
                       pc_network: PlaceCellNetwork = None, cognitive_map: CognitiveMapInterface = None):
     """ 
     Agent navigates towards goal.
-    
+
     arguments:
     env                    --  running PybulletEnvironment
     goal                   --  coordinates of the goal
@@ -159,22 +153,23 @@ def vector_navigation(env, goal : Vector2D, gc_network, target_gc_spiking=None, 
         env.mode = "pod"
     else:
         env.mode = model
+    robot = env.robot
 
-    env.goal_pos = goal
+    robot.goal_pos = goal
 
     if model != "analytical":
         gc_network.set_as_target_state(target_gc_spiking)
 
-    env.nr_ofsteps = 0
+    robot.nr_ofsteps = 0
     if env.mode == "analytical":
-        env.goal_vector = env.calculate_goal_vector_analytically()
+        robot.goal_vector = robot.calculate_goal_vector_analytically()
     else:
-        env.goal_vector = compute_navigation_goal_vector(gc_network, env.nr_ofsteps, env, model=env.mode, pod=pod)
-    env.turn_to_goal()
+        robot.goal_vector = compute_navigation_goal_vector(gc_network, robot.nr_ofsteps, robot, model=env.mode, pod=pod)
+    robot.turn_to_goal()
 
     if collect_data_reachable:
-        sample_after_turn = (env.xy_coordinates[-1], env.orientation_angle[-1])
-        first_goal_vector = env.goal_vector
+        sample_after_turn = (robot.data_collector[-1][0], robot.data_collector[-1][1])
+        first_goal_vector = robot.goal_vector
 
     n = 0  # time steps
     stop = False  # stop signal received
@@ -182,12 +177,12 @@ def vector_navigation(env, goal : Vector2D, gc_network, target_gc_spiking=None, 
     end_state = ""  # for plotting
     last_pc = None
     while n < step_limit and not stop:
-        env.navigation_step(gc_network, pod, obstacles=obstacles)
+        robot.navigation_step(gc_network, pod, obstacles=obstacles)
 
         if pc_network is not None and cognitive_map is not None:
-            observations = get_observations(env)
+            observations = robot.data_collector.get_observations()
             [firing_values, created_new_pc] = pc_network.track_movement(gc_network, observations,
-                                                                        env.xy_coordinates[-1], exploration_phase)
+                                                                        robot.position, exploration_phase)
 
             mapped_pc = cognitive_map.track_vector_movement(
                 firing_values, created_new_pc, pc_network.place_cells[-1], lidar=env.lidar(),
@@ -195,7 +190,7 @@ def vector_navigation(env, goal : Vector2D, gc_network, target_gc_spiking=None, 
             if mapped_pc is not None:
                 last_pc = mapped_pc
 
-        status = env.get_status()
+        status = robot.get_status()
         if status == -1:
             # Agent got stuck
             end_state = "Agent got stuck"
@@ -203,14 +198,14 @@ def vector_navigation(env, goal : Vector2D, gc_network, target_gc_spiking=None, 
         elif status == 1:
             if model == "combo" and env.mode == "pod":
                 # In combined mode, switch from pod to linear lookahead
-                env.mode = "linear_lookahead"
-                env.nr_ofsteps = 0
-                env.goal_vector = compute_navigation_goal_vector(gc_network, env.nr_ofsteps, env, model=env.mode, pod=pod)
-                env.turn_to_goal()
+                robot.mode = "linear_lookahead"
+                robot.nr_ofsteps = 0
+                robot.goal_vector = compute_navigation_goal_vector(gc_network, robot.nr_ofsteps, robot, model=robot.mode, pod=pod)
+                robot.turn_to_goal()
             else:
                 # Agent reached the goal
                 end_state = "Agent reached the goal. Actual distance: " + str(
-                    np.linalg.norm(env.goal_pos - env.xy_coordinates[-1])) + "."
+                    np.linalg.norm(robot.goal_pos - robot.position)) + "."
                 stop = True
 
         # over == 0 -> agent is still moving
@@ -218,7 +213,7 @@ def vector_navigation(env, goal : Vector2D, gc_network, target_gc_spiking=None, 
         if collect_data_freq and n % collect_data_freq == 0:
             # collect grid cell spikings for trajectory generation
             spiking = gc_network.consolidate_gc_spiking().flatten()
-            data.append((env.xy_coordinates[-1], env.orientation_angle[-1], spiking))
+            data.append((*robot.position_and_angle, spiking))
 
         n += 1
 

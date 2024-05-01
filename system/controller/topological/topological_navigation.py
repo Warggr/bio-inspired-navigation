@@ -11,6 +11,7 @@ import numpy as np
 
 import sys
 import os
+from typing import Optional
 
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -18,7 +19,7 @@ if __name__ == "__main__":
 from system.bio_model.grid_cell_model import GridCellNetwork
 from system.controller.local_controller.decoder.phase_offset_detector import PhaseOffsetDetectorNetwork
 
-from system.controller.simulation.pybullet_environment import PybulletEnvironment
+from system.controller.simulation.pybullet_environment import PybulletEnvironment, Robot
 from system.bio_model.cognitive_map import LifelongCognitiveMap, CognitiveMapInterface
 from system.bio_model.place_cell_model import PlaceCellNetwork, PlaceCell
 from system.controller.local_controller.local_navigation import vector_navigation, setup_gc_network, compute_navigation_goal_vector
@@ -53,7 +54,7 @@ class TopologicalNavigation(object):
         self.path_length_limit = 30  # max number of topological navigation steps
         self.step_limit = 500  # max number of vector navigation steps
 
-    def navigate(self, start_ind: int = None, goal_ind: int = None, cognitive_map_filename: str = None):
+    def navigate(self, start_ind: int = None, goal_ind: int = None, cognitive_map_filename: str = None, env: Optional[PybulletEnvironment] = None):
         """ Navigates the agent through the environment with topological navigation.
 
         arguments:
@@ -99,9 +100,14 @@ class TopologicalNavigation(object):
 
         src_pos = list(path[0].env_coordinates)
 
-        dt = 1e-2
         simple_method = 'pod' if self.method == 'combo' else self.method
-        env = PybulletEnvironment(self.env_model, dt, simple_method, build_data_set=True, start=src_pos)
+        if env is None:
+            env = PybulletEnvironment(self.env_model, mode=simple_method, build_data_set=True, start=src_pos)
+        else:
+            assert env.env_model == self.env_model
+            env.robot.mode = simple_method
+            env.robot.delete()
+            env.robot = Robot(mode=simple_method, env=env, base_position=src_pos, build_data_set=True)
 
         if plotting:
             plot.plotTrajectoryInEnvironment(env, cognitive_map=self.cognitive_map, path=path)
@@ -190,17 +196,21 @@ if __name__ == "__main__":
     The exploration should be completed before running this script. 
     """
     from system.controller.reachability_estimator.reachability_estimation import reachability_estimator_factory
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--visualize', action='store_true')
+    args = parser.parse_args()
 
     re_type = "neural_network"
     re_weights_file = "re_mse_weights.50"
     map_file = "after_exploration.gpickle"
     map_file_after_lifelong_learning = "after_lifelong_learning.gpickle"
-    with_spikings = True
+    with_grid_cell_spikings = True
     env_model = "Savinov_val3"
     model = "combo"
 
     re = reachability_estimator_factory(re_type, weights_file=re_weights_file, env_model=env_model,
-                                        with_spikings=with_spikings)
+                                        with_grid_cell_spikings=with_grid_cell_spikings)
     pc_network = PlaceCellNetwork(from_data=True, reach_estimator=re)
     cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from=map_file, debug=True)
     gc_network = setup_gc_network(1e-2)
@@ -208,12 +218,12 @@ if __name__ == "__main__":
 
     tj = TopologicalNavigation(env_model, model, pc_network, cognitive_map, gc_network, pod)
 
-    env = PybulletEnvironment(env_model, mode="analytical", build_data_set=True)
+    env = PybulletEnvironment(env_model, mode="analytical", build_data_set=True, visualize=args.visualize)
     plot.plotTrajectoryInEnvironment(env, goal=False, cognitive_map=tj.cognitive_map, trajectory=False)
 
     successful = 0
     for navigation_i in range(100):
-        success, start, end = tj.navigate(cognitive_map_filename=map_file_after_lifelong_learning)
+        success, start, end = tj.navigate(cognitive_map_filename=map_file_after_lifelong_learning, env=env)
         if success:
             successful += 1
         tj.cognitive_map.draw()

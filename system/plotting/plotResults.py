@@ -92,25 +92,24 @@ def plotTrajectory(xy_coordinates):
     plt.show()
 
 
-def plotTrajectoryInEnvironment(env, title="", xy_coordinates=None, env_model=None, cognitive_map=None, path=None,
+def plotTrajectoryInEnvironment(env : 'PybulletEnvironment', title="", xy_coordinates=None, env_model=None, cognitive_map=None, path=None,
                                 goal=True, trajectory=True, start=None, end=None):
     if not xy_coordinates:
-        xy_coordinates = env.xy_coordinates
+        xy_coordinates = env.robot.data_collector.xy_coordinates
+        print(f"Extracted {xy_coordinates}")
 
     if env_model:
         # get the dimensions without having to adjust them here
         from system.controller.simulation.pybullet_environment import PybulletEnvironment
-        env = PybulletEnvironment(False, 1e-2, env_model, mode="analytical")
+        env = PybulletEnvironment(env_model, mode="analytical")
 
     fig, ax = plt.subplots()
-    add_environment(ax, env)
+    add_environment(ax, env.env_model)
 
     # plot goal vector
     if env and goal:
-        X = np.array((env.xy_coordinates[-1][0]))
-        Y = np.array((env.xy_coordinates[-1][1]))
-        U = np.array((env.goal_vector[0]))
-        V = np.array((env.goal_vector[1]))
+        X, Y = xy_coordinates[-1]
+        U, V = env.robot.data_collector[-1][4]
 
         q = ax.quiver(X, Y, U, V, units='xy', scale=1, color=TUM_colors["TUMAccentGreen"])
 
@@ -137,7 +136,7 @@ def plotTrajectoryInEnvironment(env, title="", xy_coordinates=None, env_model=No
         x, y = zip(*xy_coordinates)
         ax.scatter(x, y, color='#992225', s=10, linewidths=0.5)
 
-    add_environment(ax, env)
+    add_environment(ax, env.env_model)
 
     # add_robot(ax, env)
     # if env.goal_pos:
@@ -154,7 +153,7 @@ def plotStartGoalDataset(env_model, starts_goals):
     env = PybulletEnvironment(env_model, mode="analytical")
 
     fig, ax = plt.subplots()
-    add_environment(ax, env)
+    add_environment(ax, env.env_model)
     for i, e in enumerate(starts_goals):
         start, goal = e
         circle = plt.Circle((start[0], start[1]), 0.2, color=TUM_colors['TUMAccentBlue'], alpha=1)
@@ -170,7 +169,7 @@ def plotStartGoalPair(env_model, start_position, start_heading, target_position,
     env = PybulletEnvironment(env_model, mode="analytical")
 
     fig, ax = plt.subplots()
-    add_environment(ax, env)
+    add_environment(ax, env.env_model)
     circle = plt.Circle(start_position, 0.2, color=TUM_colors['TUMAccentBlue'], alpha=1)
     ax.add_artist(circle)
     arrow = plt.Arrow(start_position[0], start_position[1], math.cos(start_heading), math.sin(start_heading),
@@ -476,7 +475,7 @@ def plot_angles(real_trajectory, target, vec_array1=None, vec_array2=None, vec_a
     plt.show()
 
 
-def plot_current_state(env, gc_modules, f_gc, f_t, f_mon,
+def plot_current_state(env : 'PybulletEnvironment', gc_modules, f_gc, f_t, f_mon,
                        matches_array=None, vectors_array=None, pc_active_array=None,
                        pc_network=None, cognitive_map=None, exploration_phase=False, goal_vector=None):
     xy_coordinates = env.xy_coordinates
@@ -503,7 +502,7 @@ def plot_current_state(env, gc_modules, f_gc, f_t, f_mon,
 
     # Plot obstacles
     add_environment(f_t, env.env_model)
-    add_robot(f_t, env)
+    add_robot(f_t, env.robot.data_collector.data[-1].xy_coordinates, env.robot.data_collector.data[-1].angle) # TODO
 
     # Grid Cell Modules plot
     for m, gc in enumerate(gc_modules):
@@ -734,7 +733,7 @@ def plot_sub_goal_localization(env, cognitive_map, pc_network, goal_spiking,
     plt.scatter(x[0], y[0], color="red", s=1)
 
     # Plot robot
-    add_robot(ax, env)
+    add_robot(ax, env.robot.data_collector.xy_position, env.robot.data_collector.angle) # TODO
 
     plt.quiver(x[-1], y[-1], goal_vector[0], goal_vector[1], color='grey', angles='xy', scale_units='xy', scale=1)
 
