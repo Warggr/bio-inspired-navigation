@@ -255,9 +255,9 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
             batch_indices = slice(n - n_remaining, n - n_remaining + batch_size)
             results.append(
                 get_prediction(
-                    starts[slice], goals[slice],
-                    src_spikings[slice], goal_spikings[slice],
-                    src_distances[slice], goal_distances[slice],
+                    starts[batch_indices], goals[batch_indices],
+                    src_spikings[batch_indices], goal_spikings[batch_indices],
+                    src_distances[batch_indices], goal_distances[batch_indices],
                 )[0]
             )
             n_remaining -= batch_size
