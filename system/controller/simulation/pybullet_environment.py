@@ -276,7 +276,6 @@ class PybulletEnvironment:
 
     def camera(self, agent_pos_orn : Optional[types.PositionAndOrientation] = None) -> types.Image:
         """ simulates a camera mounted on the robot, creating images """
-        assert self.robot.buildDataSet or self.visualize # why would we create images otherwise
 
         distance = 100000
         img_w, img_h = 64, 64
@@ -319,40 +318,6 @@ class PybulletEnvironment:
 
         return rgb_img
 
-    def __keyboard_movement(self):
-        """ simulates a timestep with keyboard controlled movement """
-        keys = p.getKeyboardEvents()
-        for k, v in keys.items():
-
-            if k == p.B3G_RIGHT_ARROW and (v & p.KEY_WAS_TRIGGERED):
-                self.turn = -0.5
-            if k == p.B3G_RIGHT_ARROW and (v & p.KEY_WAS_RELEASED):
-                self.turn = 0
-            if k == p.B3G_LEFT_ARROW and (v & p.KEY_WAS_TRIGGERED):
-                self.turn = 0.5
-            if k == p.B3G_LEFT_ARROW and (v & p.KEY_WAS_RELEASED):
-                self.turn = 0
-
-            if k == p.B3G_UP_ARROW and (v & p.KEY_WAS_TRIGGERED):
-                self.forward = 1
-            if k == p.B3G_UP_ARROW and (v & p.KEY_WAS_RELEASED):
-                self.forward = 0
-            if k == p.B3G_DOWN_ARROW and (v & p.KEY_WAS_TRIGGERED):
-                self.forward = -1
-            if k == p.B3G_DOWN_ARROW and (v & p.KEY_WAS_RELEASED):
-                self.forward = 0
-            if k == p.B3G_SPACE and (v & p.KEY_WAS_TRIGGERED):
-                self.calculate_obstacle_vector()
-            if k == p.B3G_BACKSPACE and (v & p.KEY_WAS_TRIGGERED):
-                return False
-
-        v_left = (self.forward - self.turn) * self.max_speed
-        v_right = (self.forward + self.turn) * self.max_speed
-        gains = [v_left, v_right]
-        self.step(gains)
-        self.camera()
-        return True
-
     def step(self, gains : [float, float]):
         # print("Gains:", gains)
         #
@@ -375,14 +340,6 @@ class PybulletEnvironment:
         # linear_v, _ = p.getBaseVelocity(self.robot.ID)
         # print("  new position:", position)
         # print("  new speed:", linear_v)
-
-    def keyboard_simulation(self):
-        """ Control the agent with your keyboard. SPACE ends the simulation."""
-        self.forward = 0
-        self.turn = 0
-        flag = True
-        while flag:
-            flag = self.__keyboard_movement()
 
     def detect_maze_agent_contact(self):
         """ true, if the robot is in contact with the maze """
@@ -608,6 +565,42 @@ class Robot:
 
         return [v_left, v_right]
 
+    def keyboard_simulation(self):
+        """ Control the agent with your keyboard. SPACE ends the simulation."""
+        turn, forward = 0, 0
+        while True:
+            """ simulates a timestep with keyboard controlled movement """
+            keys = p.getKeyboardEvents()
+            for k, v in keys.items():
+
+                if k == p.B3G_RIGHT_ARROW and (v & p.KEY_WAS_TRIGGERED):
+                    turn = -0.5
+                if k == p.B3G_RIGHT_ARROW and (v & p.KEY_WAS_RELEASED):
+                    turn = 0
+                if k == p.B3G_LEFT_ARROW and (v & p.KEY_WAS_TRIGGERED):
+                    turn = 0.5
+                if k == p.B3G_LEFT_ARROW and (v & p.KEY_WAS_RELEASED):
+                    turn = 0
+
+                if k == p.B3G_UP_ARROW and (v & p.KEY_WAS_TRIGGERED):
+                    forward = 1
+                if k == p.B3G_UP_ARROW and (v & p.KEY_WAS_RELEASED):
+                    forward = 0
+                if k == p.B3G_DOWN_ARROW and (v & p.KEY_WAS_TRIGGERED):
+                    forward = -1
+                if k == p.B3G_DOWN_ARROW and (v & p.KEY_WAS_RELEASED):
+                    forward = 0
+                if k == p.B3G_SPACE and (v & p.KEY_WAS_TRIGGERED):
+                    self.calculate_obstacle_vector()
+                if k == p.B3G_BACKSPACE and (v & p.KEY_WAS_TRIGGERED):
+                    raise KeyboardInterrupt()
+
+            v_left = (forward - turn) * self.max_speed
+            v_right = (forward + turn) * self.max_speed
+            gains = [v_left, v_right]
+            self.step(gains)
+            self.env.camera()
+
     def step(self, gains : [float, float]):
         self.env.step(gains)
         self.nr_ofsteps += 1
@@ -791,6 +784,9 @@ class DatasetCollector:
     def __getitem__(self, index):
         return self.data[index]
 
+    def __len__(self):
+        return len(self.data)
+
     def get_observations(self, deltaT = 3) -> List[any]: # TODO: how is this different from a types.Image?
         # observations with context length k=10 and delta T = 3
         return self.images
@@ -818,9 +814,13 @@ if __name__ == "__main__":
     # env_model = "Savinov_val2"
     env_model = "Savinov_val3"
 
-    dt = 1e-2
-    env = PybulletEnvironment(env_model, dt, visualize=True, mode="keyboard", start=[-0.5, 0])
-    env.keyboard_simulation()
+    env = PybulletEnvironment(env_model, visualize=True, mode="keyboard", start=[-0.5, 0],
+        # wall_texture=[ resource_path("textures", filename) for filename in ["TUM_Background_Campus_Innenstadt_ThierschTurm.jpg", "yellow_wall.png", "green_floor.png"] ]
+    )
+    try:
+        env.robot.keyboard_simulation()
+    except KeyboardInterrupt:
+        pass
 
     # plot the agent's trajectory in the environment
     plot.plotTrajectoryInEnvironment(env)

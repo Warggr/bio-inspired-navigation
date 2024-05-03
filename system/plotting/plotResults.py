@@ -96,7 +96,6 @@ def plotTrajectoryInEnvironment(env : 'PybulletEnvironment', title="", xy_coordi
                                 goal=True, trajectory=True, start=None, end=None):
     if not xy_coordinates:
         xy_coordinates = env.robot.data_collector.xy_coordinates
-        print(f"Extracted {xy_coordinates}")
 
     if env_model:
         # get the dimensions without having to adjust them here
