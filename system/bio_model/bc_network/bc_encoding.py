@@ -41,7 +41,7 @@ class BoundaryCellNetwork:
     def save(self, filename : str = DEFAULT_FILENAME):
         np.savez(filename, ego2trans=self.ego2trans, heading2trans=self.heading2trans, trans2BVC=self.trans2BVC)
 
-    def calculateActivities(self, egocentricActivity : p.BoundaryCellActivity, heading : p.HeadingCellActivity):
+    def calculateActivities(self, egocentricActivity : p.BoundaryCellActivity, heading : p.HeadingCellActivity) -> Tuple[Any, p.BoundaryCellActivity]:
         '''
         calculates activity of all transformation layers and the BVC layer by multiplying with respective weight tensors
         :param egocentricActivity: egocentric activity which was previously calculated in @BCActivity

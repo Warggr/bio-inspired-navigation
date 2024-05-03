@@ -29,7 +29,7 @@ from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.controller.simulation.environment.map_occupancy_helpers.map_utils import path_length
 from system.plotting.plotResults import plotStartGoalDataset
 from system.controller.simulation.pybullet_environment import types
-from system.bio_model.bc_network import bcActivityForLidar, BoundaryCellNetwork, HDCActivity
+from system.bio_model.bc_network import bcActivityForLidar, BoundaryCellNetwork, HDCActivity, BoundaryCellActivity
 
 boundaryCellEncoder = BoundaryCellNetwork.load()
 
@@ -73,7 +73,7 @@ class Sample:
             lidar, _ = env.lidar([pos, angle])
             egocentric_bc = bcActivityForLidar(lidar)
             heading = HDCActivity.headingCellsActivityTraining(angle)
-            allocentric_bc = boundaryCellEncoder.calculateActivities(egocentric_bc, heading)
+            _, allocentric_bc = boundaryCellEncoder.calculateActivities(egocentric_bc, heading)
             return allocentric_bc
         self.src_boundary_cell_spikings = create_bc_spikings(self.src_pos, self.src_angle)
         self.dst_boundary_cell_spikings = create_bc_spikings(self.dst_pos, self.dst_angle)
@@ -102,10 +102,9 @@ class SampleConfig:
                 ('goal_spikings', (np.float32, 9600))  # 40 * 40 * 6
             ]
         if self.with_lidar:
-            NUMBER_OF_WHISKERS = 52
             fields += [
-                ('start_boundary_spikings', (np.float32, NUMBER_OF_WHISKERS)),
-                ('goal_boundary_spikings', (np.float32, NUMBER_OF_WHISKERS)),
+                ('start_boundary_spikings', (np.float32, BoundaryCellActivity.size)),
+                ('goal_boundary_spikings', (np.float32, BoundaryCellActivity.size)),
             ]
         dtype = np.dtype(fields)
         return dtype
@@ -378,6 +377,17 @@ class ReachabilityDataset(data.Dataset):
 
 DATASET_KEY = 'positions'
 
+def assert_conforms_to_type(data, dtype):
+    for dtyp, field in zip(dtype.fields.values(), data):
+        dtyp = dtyp[0]
+        if dtyp.char == '?':
+            assert isinstance(field, np.bool_) or isinstance(field, bool) # TODO: surely there's a more concise way
+        elif dtyp == np.dtype('float32'):
+            assert isinstance(field, np.float32)
+        else:
+            assert dtyp.shape[0] == len(field)
+
+
 def create_and_save_reachability_samples(
     rd : ReachabilityDataset, f : h5py.File,
     nr_samples=1000,
@@ -428,11 +438,15 @@ def create_and_save_reachability_samples(
         if (i+1) % flush_freq == 0 or i+1 == nr_samples:
             tqdm.write(f'Flushing at {i+1}')
             old_size = dset.size
-            dset.resize((i+1,))
-            print(f"Flush from {old_size} until {i+1}")
-            dset[old_size:] = np.array(buffer, dtype=dtype)
+            try:
+                dset.resize((i+1,))
+                assert_conforms_to_type(buffer[0], dtype)
+                dset[old_size:] = np.asarray(buffer, dtype=dtype)
+            except Exception: # roll back if anything happens - else the dataset will get saved with a bunch of empty fields
+                dset.resize((old_size,))
+                raise
             f.flush()
-            bar.set_description(f"percentage reachable: {sum_r / (i+1)}")
+            bar.set_description(f"percentage reachable: {sum_r / (i-start_index+1)}")
             buffer = []
     return f
 
