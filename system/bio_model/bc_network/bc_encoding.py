@@ -1,57 +1,135 @@
-''' Adapted from:
-***************************************************************************************
-*    Title: "Biologically Plausible Spatial Navigation Based on Border Cells"
-*    Author: "Camillo Heye"
-*    Date: 28.08.2021
-*    Availability: https://drive.google.com/file/d/1RvmLd5Ee8wzNFMbqK-7jG427M8KlG4R0/view
-*
-***************************************************************************************
-'''
-
+import math
 import numpy as np
-from system.controller.simulation.pybullet_environment import types
-from .parameters import angularDispersion
+from typing import Tuple, Any, Self, Optional
+import sys, os
+from tqdm import tqdm
 
-BoundaryCellActivity = np.ndarray
+if __name__ == "__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
-def radialDispersion(distance):    # linear function dependend of the distance a boundary object is encountered
-    return (distance + 8) * 0.08
+from system.types import Angle, Vector2D
+import system.bio_model.bc_network.parameters as p
+import system.bio_model.bc_network.HDCActivity as HDCActivity
+from system.bio_model.bc_network.bc_activity import bcForWall
+from system.bio_model.utils import DATA_PATH
 
-def boundaryCellCoordinates():
-    polar_distances = np.array([ i*(i+1) for i in range(16) ]) * 0.05 + 1 # use very slowly increasing sizes of grid cells
-    polar_angles = np.linspace(0, 2 * math.pi, 51) # - parametersBC.polarAngularResolution
-    grid_distance, grid_angle = np.meshgrid(polar_distances, polar_angles)
-    grid_distance, grid_angle = grid_distance.flatten(), grid_angle.flatten() # vector of distances from each neuron to the origin
-    grid_angles[grid_angles > math.pi] -= 2 * math.pi
-    return grid_distance, grid_angle
+DEFAULT_FILENAME = os.path.join(DATA_PATH, "bc_model", "transformations.npz")
 
-def boundaryCellActivitySimulation(lidar : types.LidarReading) -> BoundaryCellActivity:
-    '''
-    Calculates BC activity.
+class BoundaryCellNetwork:
+    def __init__(self,
+        ego2trans : np.ndarray,
+        heading2trans : np.ndarray,
+        trans2BVC : np.ndarray,
+    ):
+        self.ego2trans = ego2trans
+        self.heading2trans = heading2trans
+        self.trans2BVC = trans2BVC
 
-    :param thetaBndryPts: polar coordinate of boundary points representing angle
-    :param rBndryPts: polar coordinate of boundary points representing distance
-    :return: normalized activity vector containing each cell's activity
-    '''
-    distances, angles = boundaryCellCoordinates()
-    activity_vector = np.zeros_like(distances)
+        # clipping small weights makes activities sharper
+        #ego2trans = np.where(ego2trans >= np.max(ego2trans * 0.3), ego2trans, 0)
 
-    for angle, distance in zip(lidar.angles, lidar.distances):
-        angDiff = abs(grid_angle - theta)
-        angDiff = np.min( angDiff, 2 * math.pi - angDiff )
+        # rescaling as in BB-Model
+        #ego2trans = ego2trans * 50
+        #trans2BVC = trans2BVC * 35
+        #heading2trans = heading2trans * 15
 
-        sigmaP = 0.2236
-        # Heye's thesis code was equivalent to:
-        # sigmaR = radialDispersion(distance)
-        # But I believe that's an error
-        sigmaR = radialDispersion(grid_distance)
+    @staticmethod
+    def load(filename : str = DEFAULT_FILENAME) -> Self:
+        arrays = np.load(filename)
+        return BoundaryCellNetwork(**arrays)
 
-        # See Eqn. 4.1 in Heye's thesis
-        activity_vector += 1 / distance * np.multiply(
-            np.exp(-(angDiff / sigmaP) ** 2),
-            np.exp(-((grid_distance - r) / sigmaR) ** 2)
-        )
-    maximum = max(activity_vector)
-    if maximum > 0.0:
-        activity_vector = activity_vector / maximum
-    return activity_vector
+    def save(self, filename : str = DEFAULT_FILENAME):
+        np.savez(filename, ego2trans=self.ego2trans, heading2trans=self.heading2trans, trans2BVC=self.trans2BVC)
+
+    def calculateActivities(self, egocentricActivity : p.BoundaryCellActivity, heading : p.HeadingCellActivity):
+        '''
+        calculates activity of all transformation layers and the BVC layer by multiplying with respective weight tensors
+        :param egocentricActivity: egocentric activity which was previously calculated in @BCActivity
+        :param heading: HDC networks activity
+        :return: activity of all TR layers and BVC layer
+        '''
+        assert type(heading) == np.ndarray, f"Expected array, got {type(heading)}"
+
+        egocentricActivity = egocentricActivity.flatten()
+        transformationLayers = np.einsum('i,ijk -> jk', egocentricActivity, self.ego2trans)
+
+        maxTRLayers = np.amax(transformationLayers)
+        transformationLayers = transformationLayers / maxTRLayers
+        headingIntermediate = np.einsum('i,jik -> jk ', heading, self.heading2trans)
+        headingScaler = headingIntermediate[0, :]
+        scaledTransformationLayers = np.ones((816, 20))
+        for i in range(20):
+            scaledTransformationLayers[:, i] = transformationLayers[:, i] * headingScaler[i]
+        bvcActivity = np.sum(scaledTransformationLayers, 1)
+        maxBVC = np.amax(bvcActivity)
+        bvcActivity = bvcActivity/maxBVC
+
+        return transformationLayers, bvcActivity
+
+random = np.random.default_rng()
+
+def random_angle(n=None) -> Angle:
+    return 2 * math.pi * random.random(n)
+
+def to_cartesian(angle : Angle, distance : float) -> Vector2D:
+    x = distance * np.cos(angle)  # convert to cartesian x,y in allocentric reference frame
+    y = distance * np.sin(angle)
+    return np.array([x, y])
+
+def random_segment(maxSize = p.maxR, n=None) -> Tuple[Vector2D, Vector2D]:
+    angle_start = random_angle(n)
+    distance = p.maxR * random.random(n)
+
+    angle_end = random_angle(n)
+
+    return to_cartesian(angle_start, distance), to_cartesian(angle_end, angle_end)
+
+def transformation_matrix(heading : Angle):
+    return np.array([
+        [np.cos(heading), np.sin(heading)],
+        [-np.sin(heading), np.cos(heading)],
+    ])
+
+def train(
+    nrSteps = 10000,
+) -> BoundaryCellNetwork:
+    ego2TransformationWts = np.zeros((p.nrBVC, p.nrBVC, p.nrTransformationLayers,))
+    transformation2BVCWts = np.eye(p.nrBVC, p.nrTransformationLayers)
+    heading2TransformationWts = np.zeros((p.nrBVC, p.nrHDC, p.nrTransformationLayers))
+
+    for count in tqdm(range(nrSteps)):
+        start, end = random_segment()
+        BVCrate = bcForWall(start, end)
+
+        transformationLayer = random.integers(0, len(p.transformationAngles))
+        heading = p.transformationAngles[transformationLayer]
+        # create egocentric point of view from the allocentric point of view by rotating the edges
+        rotation = transformation_matrix(heading)
+        rstart, rend = start @ rotation, end @ rotation
+
+        egocentricRate = bcForWall(rstart, rend)
+        ego2TransformationWts[:, :, transformationLayer] += np.outer(egocentricRate, np.transpose(BVCrate))
+
+    for index in range(p.nrTransformationLayers):
+        heading = p.transformationAngles[index]
+        HDCrate = HDCActivity.headingCellsActivityTraining(heading)
+        HDCrate = np.where(HDCrate < 0.01, 0, HDCrate)
+        # HDCrate = sparse(HDCrate)     for better computational costs
+        heading2TransformationWts[:, :, index] = np.outer(np.ones(p.nrBVC), HDCrate)
+
+    #rescaling
+    divtmp = np.zeros((p.nrBVC, p.nrBVC))
+    for index in range(20):
+        ego2TransformationWts[:, :, index] = ego2TransformationWts[:, :, index] / np.amax(ego2TransformationWts[:, :, index])
+        divtmp = np.outer(np.sum(ego2TransformationWts[:, :, index], 1), np.ones(p.nrBVC))
+        ego2TransformationWts[:, :, index] = np.divide(ego2TransformationWts[:, :, index], divtmp)
+
+    return BoundaryCellNetwork(ego2TransformationWts, heading2TransformationWts, transformation2BVCWts)
+
+if __name__ == "__main__":
+    import sys
+    kwargs = {}
+    if len(sys.argv) > 1:
+       kwargs['nrSteps'] = int(sys.argv[1])
+    network = train(**kwargs)
+    network.save()

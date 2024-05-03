@@ -29,6 +29,9 @@ from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.controller.simulation.environment.map_occupancy_helpers.map_utils import path_length
 from system.plotting.plotResults import plotStartGoalDataset
 from system.controller.simulation.pybullet_environment import types
+from system.bio_model.bc_network import bcActivityForLidar, BoundaryCellNetwork, HDCActivity
+
+boundaryCellEncoder = BoundaryCellNetwork.load()
 
 def get_path():
     """ returns path to data storage folder """
@@ -66,9 +69,14 @@ class Sample:
 
         self.src_img = env.camera([self.src_pos, self.src_angle])
         self.dst_img = env.camera([self.dst_pos, self.dst_angle])
-        # TODO: src_img.flatten(), dst_img.flatten()
-        self.src_distances = env.lidar([self.src_pos, self.src_angle]).distances
-        self.dst_distances = env.lidar([self.dst_pos, self.dst_angle]).distances
+        def create_bc_spikings(pos, angle):
+            lidar, _ = env.lidar([pos, angle])
+            egocentric_bc = bcActivityForLidar(lidar)
+            heading = HDCActivity.headingCellsActivityTraining(angle)
+            allocentric_bc = boundaryCellEncoder.calculateActivities(egocentric_bc, heading)
+            return allocentric_bc
+        self.src_boundary_cell_spikings = create_bc_spikings(self.src_pos, self.src_angle)
+        self.dst_boundary_cell_spikings = create_bc_spikings(self.dst_pos, self.dst_angle)
 
 
 class SampleConfig:
