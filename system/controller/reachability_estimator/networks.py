@@ -46,11 +46,11 @@ class Model(ABC):
         ...
 
     @staticmethod
-    def create_from_config(backbone_classname : str, **model_kwargs) -> 'Model':
+    def create_from_config(backbone_classname : str, *model_args, **model_kwargs) -> 'Model':
         backbone_classes : Dict[str, Type[Model]] = {
             'convolutional': CNN, 'resnet': ResNet, 'siamese': Siamese
         }
-        return backbone_classes[backbone_classname](**model_kwargs)
+        return backbone_classes[backbone_classname](*model_args, **model_kwargs)
 
 
 class Siamese(Model):
@@ -386,26 +386,35 @@ class ImagePairEncoderV2(nn.Module):
         super(ImagePairEncoderV2, self).__init__()
 
         # Input: 12 x 64 x 64
+        self.layers = nn.Sequential(
         # img1, img2, img1 - img2 total 12 channels
-        self.conv1 = nn.Conv2d(12, 64, kernel_size=5, stride=2, bias=bias)
+            nn.Conv2d(12, 64, kernel_size=5, stride=2, bias=bias),
+            nn.ReLU(),
         # 64 x 30 x 30
-        self.conv2 = nn.Conv2d(64, 128, kernel_size=5, stride=2, bias=bias)
+            nn.Conv2d(64, 128, kernel_size=5, stride=2, bias=bias),
+            nn.ReLU(),
         # 128 x 13 x 13
-        self.conv3 = nn.Conv2d(128, 256, kernel_size=5, stride=2, bias=bias)
+            nn.Conv2d(128, 256, kernel_size=5, stride=2, bias=bias),
+            nn.ReLU(),
         # 256 x 5 x 5
-        self.conv4 = nn.Conv2d(256, 512, kernel_size=5, stride=1, bias=bias)
+            nn.Conv2d(256, 512, kernel_size=5, stride=1, bias=bias),
+            nn.ReLU(),
         # 512 x 1 x 1
+        )
 
         if not no_weight_init:
-            for layer in (self.conv1, self.conv2, self.conv3, self.conv4):
+            for layer in self.convs:
                 nn.init.orthogonal_(layer.weight, init_scale)
 
+    @property
+    def convs(self):
+        for layer in self.layers:
+                if isinstance(layer, nn.Conv2d):
+                    yield layer
+
     def forward(self, src_imgs, dst_imgs):
-        imgs = torch.cat([src_imgs, dst_imgs, src_imgs - dst_imgs], dim=1)
-        x = F.relu(self.conv1(imgs))
-        x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
-        x = F.relu(self.conv4(x))
+        x = torch.cat([src_imgs, dst_imgs, src_imgs - dst_imgs], dim=1)
+        x = self.layers(x)
         return x.view(x.size(0), -1)
 
 

@@ -39,7 +39,7 @@ if __name__ == "__main__":
 else:
     from .map_occupancy_helpers.map_utils import a_star#, rasterize_line
     from .map_occupancy_helpers.math_utils import depth_to_xy_plane, depth_to_xy, compute_normals
-    import map_occupancy_helpers.map_utils_cpp as map_cpp
+    from .map_occupancy_helpers import map_utils_cpp as map_cpp
 
 from typing import Tuple, List
 Vector2D = Tuple[float, float]

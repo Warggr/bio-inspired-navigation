@@ -132,9 +132,9 @@ class PlaceCellNetwork:
                 pc = PlaceCell(gc_connection, observations[idx], env_coordinates[idx])
                 self.place_cells.append(pc)
 
-    def create_new_pc(self, gc_connections, obs, coordinates):
+    def create_new_pc(self, *args, **kwargs):
         # Consolidate grid cell spiking vectors to matrix of size n^2 x M
-        pc = PlaceCell(gc_connections, obs, coordinates)
+        pc = PlaceCell(*args, **kwargs)
         self.place_cells.append(pc)
 
     def in_range(self, reach: [float]) -> bool:

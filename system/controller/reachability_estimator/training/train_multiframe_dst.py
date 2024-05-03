@@ -125,7 +125,7 @@ def run_test_model(dataset):
     writer.add_scalar("fscore/Testing", test_f1, 1)
 
 
-def tensor_log(title, loader, train_device, writer, epoch, net : Model, position_loss_weight = 0.6, angle_loss_weight = 0.3):
+def tensor_log(title: str, loader: DataLoader, train_device, writer, epoch, net: Model, position_loss_weight = 0.6, angle_loss_weight = 0.3):
     """ Log accuracy, precision, recall and f1score for dataset in loader."""
     with torch.no_grad():
         log_loss = 0
@@ -152,6 +152,7 @@ def tensor_log(title, loader, train_device, writer, epoch, net : Model, position
             src_img = batch_src_imgs.to(device=train_device, non_blocking=True)
             dst_imgs = batch_dst_imgs.to(device=train_device, non_blocking=True)
             r = batch_reachability.to(device=train_device, non_blocking=True)
+            r = torch.clamp(r, 0.0, 1.0) # to make it into a float (instead of bool)
             transformation = batch_transformation.to(device=train_device, non_blocking=True)
             position = transformation[:, 0:2]
             angle = transformation[:, -1]
@@ -291,7 +292,7 @@ def train_multiframedst(net : Model, dataset : H5Dataset, global_args):
             except AssertionError:
                 print(f'src_imgs with ids [{idx}] contained NaN - skipping')
             reachability = reachability.to(device=train_device, non_blocking=True)
-            reachability = torch.clamp(reachability, 0.0, 1.0)
+            reachability = torch.clamp(reachability, 0.0, 1.0) # mainly to make it a tensor of float
             transformation = transformation.to(device=train_device, non_blocking=True)
             position = transformation[:, 0:2]
             angle = transformation[:, -1]

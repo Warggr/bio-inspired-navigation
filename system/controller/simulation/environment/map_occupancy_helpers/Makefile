@@ -9,9 +9,9 @@ extension = $(shell python${PYTHONVER}-config --extension-suffix)
 all: map_utils_cpp$(extension) math_utils_cpp$(extension)
 
 map_utils_cpp$(extension): map_utils.cpp
-	g++ $(FLAGS) $< -o map_utils_cpp$(extension)
+	g++ $(FLAGS) $< -o $@
 
 math_utils_cpp$(extension): math_utils.cpp
-	g++ $(FLAGS) $< -o math_utils_cpp$(extension)
+	g++ $(FLAGS) $< -o $@
 
 .PHONY: all

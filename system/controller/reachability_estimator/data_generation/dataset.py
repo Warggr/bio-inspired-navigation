@@ -61,7 +61,7 @@ class Sample:
         try:
             env = Sample.envs[map_name]
         except KeyError:
-            env = PybulletEnvironment(map_name, mode="analytical", build_data_set=True)
+            env = PybulletEnvironment(map_name, mode="analytical", build_data_set=True, contains_robot=False)
             Sample.envs[map_name] = env
 
         self.src_img = env.camera([self.src_pos, self.src_angle])
@@ -96,8 +96,8 @@ class SampleConfig:
         if self.with_lidar:
             NUMBER_OF_WHISKERS = 52
             fields += [
-                ('start_lidar', (np.float32, NUMBER_OF_WHISKERS)),
-                ('goal_lidar', (np.float32, NUMBER_OF_WHISKERS)),
+                ('start_boundary_spikings', (np.float32, NUMBER_OF_WHISKERS)),
+                ('goal_boundary_spikings', (np.float32, NUMBER_OF_WHISKERS)),
             ]
         dtype = np.dtype(fields)
         return dtype
@@ -118,7 +118,7 @@ class SampleConfig:
         if self.with_grid_cell_spikings:
             tup += [ sample.src_spikings, sample.dst_spikings ]
         if self.with_lidar:
-            tup += [ sample.src_distances, sample.dst_distances ]
+            tup += [ sample.src_boundary_cell_spikings, sample.dst_boundary_cell_spikings ]
         return tuple(tup)
 
 
@@ -391,7 +391,7 @@ def create_and_save_reachability_samples(
     try:
         dset = f[DATASET_KEY]
         old_size = dset.size
-        start_index = old_size + 1
+        start_index = old_size
 
         if old_size < nr_samples:
             # Hint: this might fail if somehow the dtype changed from one dataset to the other
@@ -400,15 +400,14 @@ def create_and_save_reachability_samples(
             f.move('tmp', DATASET_KEY)
     except KeyError:
         dset = f.create_dataset(DATASET_KEY, data=np.array([], dtype=dtype), dtype=dtype, maxshape=(nr_samples,))
-        start_index = 1
+        start_index = 0
 
     from tqdm import tqdm
 
     sum_r = 0
     buffer = []
 
-    last_flush = start_index - 1
-    for i in (bar := tqdm(range(start_index, nr_samples+1), initial=start_index, total=nr_samples)):
+    for i in (bar := tqdm(range(start_index, nr_samples), initial=start_index, total=nr_samples)):
         item = None
         while item is None:
             random_index = random.randrange(rd.traj_len_cumsum[-1])
@@ -418,14 +417,15 @@ def create_and_save_reachability_samples(
         sum_r += int(reachable)
 
         buffer.append(config.to_tuple(sample, reachable))
-        if i % flush_freq == 0 or i == nr_samples - 1:
-            tqdm.write(f'Flushing at {i=}')
-            dset.resize((i,))
-            dset[last_flush:] = np.array(buffer, dtype=dtype)
+        if (i+1) % flush_freq == 0 or i+1 == nr_samples:
+            tqdm.write(f'Flushing at {i+1}')
+            old_size = dset.size
+            dset.resize((i+1,))
+            print(f"Flush from {old_size} until {i+1}")
+            dset[old_size:] = np.array(buffer, dtype=dtype)
             f.flush()
-            bar.set_description(f"percentage reachable: {sum_r / i}")
+            bar.set_description(f"percentage reachable: {sum_r / (i+1)}")
             buffer = []
-            last_flush = i
     return f
 
 
@@ -523,7 +523,6 @@ if __name__ == "__main__":
 
         filename = os.path.join(get_path(), "data", "reachability", dataset_name + args.extension)
         filename = os.path.realpath(filename)
-        print(filename)
         f = h5py.File(filename, 'a')
 
         create_and_save_reachability_samples(
