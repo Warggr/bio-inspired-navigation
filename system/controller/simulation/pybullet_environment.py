@@ -187,7 +187,7 @@ class PybulletEnvironment:
             # load the plane and maze with desired textures
             # self.mazeID = self.__load_obj(resource_path(self.env_model, "mesh.obj"), wall_texture)
             self.planeID = self.__load_obj(resource_path(self.env_model, "plane100.obj"), resource_path("textures", "green_floor.png"))
-            all_wall_kwargs = { 'texture': resource_path("textures", "yellow_wall.png") }
+            all_wall_kwargs = { 'texture': resource_path("textures", "walls", "yellow_wall.png") }
             all_wall_kwargs.update(wall_kwargs)
             self.mazeID = self.__load_walls(resource_path(self.env_model), **all_wall_kwargs)
 
@@ -213,7 +213,6 @@ class PybulletEnvironment:
         wall_files = map(lambda filename: os.path.join(wall_dir, filename), wall_files)
         wall_files = filter(lambda filepath : os.path.isfile(filepath) and filepath[-4:] == '.obj', wall_files)
         wall_files = list(wall_files)
-        print('Loaded', len(wall_files), 'walls')
         assert batch_size <= 16, "multibody doesn't work with more than 16 bodies"
 
         walls=[]
