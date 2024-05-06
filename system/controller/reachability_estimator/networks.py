@@ -7,6 +7,8 @@
 *
 ***************************************************************************************
 """
+from system.bio_model.bc_network.parameters import BoundaryCellActivity
+
 import math
 import numpy as np
 
@@ -92,7 +94,8 @@ class CNN(Model):
         if self.with_conv_layer:
             nets["conv_encoder"] = NNModuleWithOptimizer( ConvEncoder(init_scale=1.0, input_dim=512, no_weight_init=False))
         if self.with_lidar:
-            nets["lidar_encoder"] = NNModuleWithOptimizer( LidarEncoder(52, 10) )
+            input_dim = 52 if self.with_lidar == 'raw_lidar' else BoundaryCellActivity.size
+            nets["lidar_encoder"] = NNModuleWithOptimizer( LidarEncoder(input_dim, 10) )
         nets["fully_connected"] = NNModuleWithOptimizer( FCLayers(init_scale=1.0, input_dim=input_dim, no_weight_init=False))
 
         super().__init__(nets)

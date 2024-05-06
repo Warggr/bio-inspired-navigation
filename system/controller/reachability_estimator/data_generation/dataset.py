@@ -24,14 +24,12 @@ if __name__ == "__main__":
 
 from system.controller.reachability_estimator.reachability_utils import ViewOverlapReachabilityController
 
+from system.controller.reachability_estimator.ReachabilityDataset import SampleConfig
 from system.controller.simulation.pybullet_environment import PybulletEnvironment
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.controller.simulation.environment.map_occupancy_helpers.map_utils import path_length
 from system.plotting.plotResults import plotStartGoalDataset
 from system.controller.simulation.pybullet_environment import types
-from system.bio_model.bc_network import bcActivityForLidar, BoundaryCellNetwork, HDCActivity, BoundaryCellActivity
-
-boundaryCellEncoder = BoundaryCellNetwork.load()
 
 def get_path():
     """ returns path to data storage folder """
@@ -69,67 +67,13 @@ class Sample:
 
         self.src_img = env.camera([self.src_pos, self.src_angle])
         self.dst_img = env.camera([self.dst_pos, self.dst_angle])
-        def create_bc_spikings(pos, angle):
-            lidar, _ = env.lidar([pos, angle])
-            egocentric_bc = bcActivityForLidar(lidar)
-            heading = HDCActivity.headingCellsActivityTraining(angle)
-            _, allocentric_bc = boundaryCellEncoder.calculateActivities(egocentric_bc, heading)
-            return allocentric_bc
-        self.src_boundary_cell_spikings = create_bc_spikings(self.src_pos, self.src_angle)
-        self.dst_boundary_cell_spikings = create_bc_spikings(self.dst_pos, self.dst_angle)
+
+        self.src_lidar, _ = env.lidar([self.src_pos, self.src_angle])
+        self.dst_lidar, _ = env.lidar([self.dst_pos, self.dst_angle])
+        self.src_lidar, self.dst_lidar = self.src_lidar.distances, self.dst_lidar.distances # assuming default angle config
 
 
-class SampleConfig:
-    def __init__(self,
-        grid_cell_spikings=False,
-        lidar=False,
-    ):
-        self.with_grid_cell_spikings = grid_cell_spikings
-        self.with_lidar = lidar
-    def dtype(self):
-        fields = [
-            ('start_observation', (np.int32, 16384)), # 64 x 64 x 4
-            ('goal_observation', (np.int32, 16384)), # using (64, 64, 4) would be more elegant but H5py doesn't accept it
-            ('reached', bool),
-            ('start', (np.float32, 2)),  # x, y
-            ('goal', (np.float32, 2)),  # x, y
-            ('start_orientation', np.float32),  # theta
-            ('goal_orientation', np.float32)  # theta
-        ]
-        if self.with_grid_cell_spikings:
-            fields += [
-                ('start_spikings', (np.float32, 9600)),  # 40 * 40 * 6
-                ('goal_spikings', (np.float32, 9600))  # 40 * 40 * 6
-            ]
-        if self.with_lidar:
-            fields += [
-                ('start_boundary_spikings', (np.float32, BoundaryCellActivity.size)),
-                ('goal_boundary_spikings', (np.float32, BoundaryCellActivity.size)),
-            ]
-        dtype = np.dtype(fields)
-        return dtype
-    def suffix(self) -> str:
-        return (''
-            + ('+spikings' if self.with_grid_cell_spikings else '')
-            + ('+lidar' if self.with_lidar else '')
-        )
-
-    def to_tuple(self, sample : Sample, reachable : bool) -> Tuple:
-        """ Returns a tuple which can be put into a Numpy array of type self.dtype() """
-        tup = [
-            sample.src_img.flatten(), sample.dst_img.flatten(),
-            reachable,
-            sample.src_pos, sample.dst_pos,
-            sample.src_angle, sample.dst_angle,
-        ]
-        if self.with_grid_cell_spikings:
-            tup += [ sample.src_spikings, sample.dst_spikings ]
-        if self.with_lidar:
-            tup += [ sample.src_boundary_cell_spikings, sample.dst_boundary_cell_spikings ]
-        return tuple(tup)
-
-
-class ReachabilityDataset(data.Dataset):
+class TrajectoriesDataset(data.Dataset):
     '''
     Generate data for the reachability estimator training.
 
@@ -385,11 +329,11 @@ def assert_conforms_to_type(data, dtype):
         elif dtyp == np.dtype('float32'):
             assert isinstance(field, np.float32)
         else:
-            assert dtyp.shape[0] == len(field)
+            assert dtyp.shape[0] == len(field), f"{dtyp.shape} != {len(field)}"
 
 
 def create_and_save_reachability_samples(
-    rd : ReachabilityDataset, f : h5py.File,
+    rd : TrajectoriesDataset, f : h5py.File,
     nr_samples=1000,
     flush_freq=50,
     config = SampleConfig(),
@@ -519,7 +463,7 @@ if __name__ == "__main__":
     time_parser.add_argument('-n', '--num-samples', type=int, dest='num_samples', default=50)
     test_parser.add_argument('--flush-freq', type=int, dest='flush_freq', default=1000)
     test_parser.add_argument('--spikings', help='Grid cell spikings are included in the dataset', action='store_true')
-    test_parser.add_argument('--lidar', help='LIDAR distances are included in the dataset', action='store_true')
+    test_parser.add_argument('--lidar', help='LIDAR distances are included in the dataset', action='store')
     test_parser.add_argument('--extension', help='extension of the dataset file', default='.hd5')
     test_parser.add_argument('--image-plot', help='Show image of samples taken', action='store_true')
 
@@ -536,14 +480,12 @@ if __name__ == "__main__":
         # Input file
         filename = os.path.join(get_path(), "data", "trajectories", args.traj_file)
         filename = os.path.realpath(filename)
-        rd = ReachabilityDataset([filename])
+        rd = TrajectoriesDataset([filename])
 
         config = SampleConfig(grid_cell_spikings=args.spikings, lidar=args.lidar)
 
         # Output file
-        dataset_name = args.basename + config.suffix()
-
-        filename = os.path.join(get_path(), "data", "reachability", dataset_name + args.extension)
+        filename = os.path.join(get_path(), "data", "reachability", args.basename + args.extension)
         filename = os.path.realpath(filename)
         f = h5py.File(filename, 'a')
 

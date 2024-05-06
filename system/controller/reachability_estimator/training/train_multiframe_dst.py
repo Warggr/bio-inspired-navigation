@@ -24,7 +24,7 @@ if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
 from system.controller.reachability_estimator.networks import Model
-from system.controller.reachability_estimator.training.H5Dataset import H5Dataset
+from system.controller.reachability_estimator.ReachabilityDataset import ReachabilityDataset, SampleConfig
 from system.controller.reachability_estimator.training.utils import save_model, load_model
 
 
@@ -195,38 +195,24 @@ def tensor_log(title: str, loader: DataLoader, train_device, writer, epoch, net:
         writer.add_scalar("Fscore/" + title, log_f1, epoch)
 
 
-def train_multiframedst(net : Model, dataset : H5Dataset, global_args):
+def train_multiframedst(
+    nets : Model, dataset : ReachabilityDataset,
+    model_file,
+    resume : bool,
+    batch_size,
+    samples_per_epoch,
+    max_epochs,
+    lr_decay_epoch,
+    lr_decay_rate,
+    n_dataset_worker,
+    train_device,
+    log_interval,
+    save_interval,
+    position_loss_weight,
+    angle_loss_weight,
+    backbone,
+):
     """ Train the model on a multiframe dataset. """
-    (
-        model_file,
-        resume,
-        batch_size,
-        samples_per_epoch,
-        max_epochs,
-        lr_decay_epoch,
-        lr_decay_rate,
-        n_dataset_worker,
-        train_device,
-        log_interval,
-        save_interval,
-        position_loss_weight,
-        angle_loss_weight,
-        backbone,
-    ) = [global_args[_] for _ in ['model_file',
-                                  'resume',
-                                  'batch_size',
-                                  'samples_per_epoch',
-                                  'max_epochs',
-                                  'lr_decay_epoch',
-                                  'lr_decay_rate',
-                                  'n_dataset_worker',
-                                  'train_device',
-                                  'log_interval',
-                                  'save_interval',
-                                  'position_loss_weight',
-                                  'angle_loss_weight',
-                                  'backbone',
-    ]]
 
     # For Tensorboard: log the runs
     writer = SummaryWriter()
@@ -282,7 +268,8 @@ def train_multiframedst(net : Model, dataset : H5Dataset, global_args):
         last_log_time = time.time()
 
         for idx, item in enumerate(loader):
-            src_imgs, dst_imgs, reachability, transformation = item[:4]
+            item = [ data.to(device=train_device, non_blocking=True) for data in item ]
+            src_imgs, dst_imgs, reachability, transformation, *other_args = item
             src_imgs = src_imgs.to(device=train_device, non_blocking=True).float()
             dst_imgs = dst_imgs.to(device=train_device, non_blocking=True).float()
             try:
@@ -291,23 +278,9 @@ def train_multiframedst(net : Model, dataset : H5Dataset, global_args):
                 assert not torch.any(reachability.isnan())
             except AssertionError:
                 print(f'src_imgs with ids [{idx}] contained NaN - skipping')
-            reachability = reachability.to(device=train_device, non_blocking=True)
             reachability = torch.clamp(reachability, 0.0, 1.0) # mainly to make it a tensor of float
-            transformation = transformation.to(device=train_device, non_blocking=True)
             position = transformation[:, 0:2]
             angle = transformation[:, -1]
-
-            other_params = iter(item[4:])
-            other_args = []
-            if nets.with_grid_cell_spikings:
-                src_spikings, dst_spikings = next(other_params), next(other_params)
-                src_spikings = src_spikings.to(device=train_device, non_blocking=True).float()
-                dst_spikings = dst_spikings.to(device=train_device, non_blocking=True).float()
-                other_args += [ src_spikings, dst_spikings ]
-            if nets.with_lidar:
-                src_distances = next(other_params)
-                src_distances = src_distances.to(device=train_device, non_blocking=True).float()
-                other_args.append(src_distances)
 
             # Zeros optimizer gradient
             for _, opt in nets.optimizers.items():
@@ -407,23 +380,25 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('mode', choices=['train', 'test', 'validate'])
     parser.add_argument('--spikings', dest='with_grid_cell_spikings', help='Grid cell spikings are included in the dataset', action='store_true')
-    parser.add_argument('--lidar', dest='with_lidar', help='LIDAR distances are included in the dataset', action='store_true')
+    parser.add_argument('--lidar', help='LIDAR distances are included in the dataset', choices=['raw_lidar', 'ego_bc', 'allo_bc'])
     parser.add_argument('--pair-conv', dest='with_conv_layer', help='Pair-conv neural network', action='store_true', default=True)
     parser.add_argument('--with_dist', help='<TODO: I\'m not sure what that is>', action='store_true')
     parser.add_argument('--resume', action='store_true')
 
     args = parser.parse_args()
 
-    suffix = (''
-        + ('+spikings' if args.with_grid_cell_spikings else '')
-        + ('+lidar' if args.with_lidar else '')
+    config = SampleConfig(
+        grid_cell_spikings=args.with_grid_cell_spikings,
+        lidar=args.lidar,
     )
-    suffix_out = (suffix
+
+    suffix = config.suffix()
+    suffix = (suffix
         + ('+conv' if args.with_conv_layer else '')
     )
 
     global_args = {
-        'model_file': os.path.join(os.path.dirname(__file__), "..", "data", "models", "reachability_network" + suffix_out),
+        'model_file': os.path.join(os.path.dirname(__file__), "..", "data", "models", "reachability_network" + suffix),
         'resume': args.resume,
         'batch_size': 64,
         'samples_per_epoch': 10000,
@@ -433,49 +408,40 @@ if __name__ == '__main__':
         'n_dataset_worker': 0,
         'log_interval': 20,
         'save_interval': 5,
-        'model_kwargs': { key: getattr(args, key) for key in ['with_grid_cell_spikings', 'with_lidar', 'with_conv_layer', 'with_dist'] },
         'train_device': "cpu",
         'position_loss_weight': 0.006,
         'angle_loss_weight': 0.003,
         'backbone': 'convolutional',  # convolutional, res_net
-        'external_link': False
     }
+    model_kwargs = { key: getattr(args, key) for key in ['with_conv_layer', 'with_dist'] }
 
     # Defining the NN and optimizers
-    nets = Model.create_from_config(global_args['backbone'], **global_args['model_kwargs'])
+    nets = Model.create_from_config(global_args['backbone'], **model_kwargs)
 
     if args.mode == "validate":
-        hd5file = "trajectories.hd5"
-        directory = get_path()
-        directory = os.path.join(directory, "data/reachability")
-        filepath = os.path.join(directory, hd5file)
+        filepath = os.path.join(get_path(), "data", "reachability", "trajectories.hd5")
         filepath = os.path.realpath(filepath)
+        dataset = ReachabilityDataset(filepath)
+
         validate_func(global_args['model_file'],
                  nets,
-                 H5Dataset(filepath),
+                 dataset,
                  global_args['batch_size'],
                  global_args['train_device'],
                  global_args['position_loss_weight'],
                  global_args['angle_loss_weight'])
     elif args.mode == "test":
         # Testing
-        hd5file = "trajectories.hd5"
-        directory = get_path()
-        directory = os.path.join(directory, "data/reachability")
-        filepath = os.path.join(directory, hd5file)
+        filepath = os.path.join(get_path(), "data", "reachability", "trajectories.hd5")
         filepath = os.path.realpath(filepath)
-
-        dataset = H5Dataset(filepath)
-
+        dataset = ReachabilityDataset(filepath)
         run_test_model(dataset)
     elif args.mode == "train":
         # Training
-        filepath = os.path.join(get_path(), "data", "reachability", 'dataset' + suffix + '.hd5')
+        filepath = os.path.join(get_path(), "data", "reachability", 'dataset.hd5')
         filepath = os.path.realpath(filepath)
 
-        dataset = H5Dataset(filepath, global_args['external_link'])
+        dataset = ReachabilityDataset(filepath)
+        print("Training with dataset of length", len(dataset))
 
-        train_multiframedst(
-            nets,
-            dataset=dataset,
-            global_args=global_args)
+        train_multiframedst(nets, dataset=dataset, **global_args)

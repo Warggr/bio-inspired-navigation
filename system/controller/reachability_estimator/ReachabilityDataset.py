@@ -7,17 +7,71 @@ import numpy as np
 import bisect
 import matplotlib.pyplot as plt
 
-import sys
-import os
-
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
 from system.controller.reachability_estimator.training.utils import img_reshape, spikings_reshape
 from system.plotting.plotResults import plotStartGoalDataset
+from system.bio_model.bc_network import bcActivityForLidar, BoundaryCellNetwork, HDCActivity, BoundaryCellActivity
+
+import sys
+import os
+from typing import Tuple
+
+boundaryCellEncoder = BoundaryCellNetwork.load()
+
+DEFAULT_NUMBER_OF_ANGLES = 52 #len(list(types.LidarReading.angles(0)))
+
+class SampleConfig:
+    def __init__(self,
+        grid_cell_spikings=False,
+        lidar=None,
+    ):
+        self.with_grid_cell_spikings = grid_cell_spikings
+        self.lidar = lidar
+    def dtype(self):
+        fields = [
+            ('start_observation', (np.int32, 16384)), # 64 x 64 x 4
+            ('goal_observation', (np.int32, 16384)), # using (64, 64, 4) would be more elegant but H5py doesn't accept it
+            ('reached', bool),
+            ('start', (np.float32, 2)),  # x, y
+            ('goal', (np.float32, 2)),  # x, y
+            ('start_orientation', np.float32),  # theta
+            ('goal_orientation', np.float32)  # theta
+        ]
+        if self.with_grid_cell_spikings:
+            fields += [
+                ('start_spikings', (np.float32, 9600)),  # 40 * 40 * 6
+                ('goal_spikings', (np.float32, 9600))  # 40 * 40 * 6
+            ]
+        if self.lidar:
+            fields += [
+                ('start_lidar', (np.float32, DEFAULT_NUMBER_OF_ANGLES)),
+                ('goal_lidar', (np.float32, DEFAULT_NUMBER_OF_ANGLES)),
+            ]
+        dtype = np.dtype(fields)
+        return dtype
+    def suffix(self) -> str:
+        return (''
+            + ('+spikings' if self.with_grid_cell_spikings else '')
+            + ('+lidar' if self.lidar else '')
+        )
+    def to_tuple(self, sample : 'Sample', reachable : bool) -> Tuple:
+        """ Returns a tuple which can be put into a Numpy array of type self.dtype() """
+        tup = [
+            sample.src_img.flatten(), sample.dst_img.flatten(),
+            reachable,
+            sample.src_pos, sample.dst_pos,
+            sample.src_angle, sample.dst_angle,
+        ]
+        if self.with_grid_cell_spikings:
+            tup += [ sample.src_spikings, sample.dst_spikings ]
+        if self.lidar:
+            tup += [ sample.src_lidar, sample.dst_lidar ]
+        return tuple(tup)
 
 
-class H5Dataset(torch.utils.data.Dataset):
+class ReachabilityDataset(torch.utils.data.Dataset):
     """ create a pytorch compatible dataset from a reachability sample hd5 file
 
     arguments:
@@ -31,13 +85,12 @@ class H5Dataset(torch.utils.data.Dataset):
         transformation  -- transformation between source position and goal position
     """
 
-    def __init__(self, path, external_link=False, with_grid_cell_spikings=False, with_lidar=False):
+    def __init__(self, path, external_link=False, sample_config : SampleConfig = SampleConfig()):
         self.file_path = path
         self.dataset = None
         self.externalLink = external_link
         self.dataset = h5py.File(self.file_path, 'r')
-        self.with_grid_cell_spikings = with_grid_cell_spikings
-        self.with_lidar = with_lidar
+        self.config = sample_config
 
         if external_link:
             self.dataset_len = 0
@@ -59,11 +112,34 @@ class H5Dataset(torch.utils.data.Dataset):
         src_img, dst_img, \
             reachability, start_position, goal_position, \
             start_orientation, goal_orientation, \
-            *maybe_other_values = self.sample(index)
+            start_spikings, goal_spikings, \
+            start_lidar, goal_lidar = self.sample(index)
         src_img = img_reshape(src_img)
         dst_img = img_reshape(dst_img)
-        return src_img, dst_img, torch.tensor(reachability), \
-            torch.tensor(np.append(goal_position, goal_orientation) - np.append(start_position, start_orientation)), *maybe_other_values
+        reachability = torch.tensor(reachability).clamp(0.0, 1.0) # make it a tensor of float
+        transformation = torch.tensor( np.append(goal_position, goal_orientation) - np.append(start_position, start_orientation))
+
+        result = [src_img, dst_img, reachability, transformation]
+
+        if self.config.with_grid_cell_spikings:
+            result += [ start_spikings, goal_spikings ]
+
+        if self.config.lidar in ['allo_bc', 'ego_bc']:
+            start_lidar = bcActivityForLidar(start_lidar)
+            goal_lidar = bcActivityForLidar(goal_lidar)
+
+        if self.config.lidar == 'allo_bc':
+            def ego_to_allo(ego, angle):
+                heading = HDCActivity.headingCellsActivityTraining(angle)
+                _, allo = boundaryCellEncoder.calculateActivities(ego, heading)
+                return allo
+            start_lidar = ego_to_allo(start_lidar, start_orientation)
+            goal_lidar = ego_to_allo(goal_lidar, goal_orientation)
+
+        if self.config.lidar:
+            result += [ start_lidar, goal_lidar ]
+
+        return result
 
     def __len__(self):
         return self.dataset_len
