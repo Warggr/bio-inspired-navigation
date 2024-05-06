@@ -43,7 +43,7 @@ import pybullet_data
 import numpy as np
 import math
 from typing import List, Optional, Any, Tuple, Iterable, Callable
-from random import random
+from random import Random
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../.."))
 import system.plotting.plotResults as plot
@@ -121,7 +121,7 @@ class PybulletEnvironment:
         orientation : types.Angle = np.pi/2,
         frame_limit=5000,
         contains_robot=True,
-        wall_texture=resource_path("textures", "yellow_wall.png"),
+        wall_kwargs={},
     ):
         """ Create environment.
 
@@ -185,8 +185,11 @@ class PybulletEnvironment:
 
         if "Savinov" in env_model:
             # load the plane and maze with desired textures
-            self.mazeID = self.__load_obj(resource_path(self.env_model, "mesh.obj"), wall_texture)
+            # self.mazeID = self.__load_obj(resource_path(self.env_model, "mesh.obj"), wall_texture)
             self.planeID = self.__load_obj(resource_path(self.env_model, "plane100.obj"), resource_path("textures", "green_floor.png"))
+            all_wall_kwargs = { 'texture': resource_path("textures", "yellow_wall.png") }
+            all_wall_kwargs.update(wall_kwargs)
+            self.mazeID = self.__load_walls(resource_path(self.env_model), **all_wall_kwargs)
 
         p.setGravity(0, 0, -9.81)
 
@@ -204,47 +207,46 @@ class PybulletEnvironment:
     def dimensions(self):
         return environment_dimensions(self.env_model)
 
-    def __load_walls(self, model_folder, texture : str | Callable[int, str] | List[str]) -> int:
+    def __load_walls(self, model_folder, texture : str | Callable[int, str] | List[str], batch_size=16) -> int:
         wall_dir = os.path.join(model_folder, "walls")
         wall_files = os.listdir(wall_dir)
         wall_files = map(lambda filename: os.path.join(wall_dir, filename), wall_files)
-        wall_files = filter(lambda filepath : os.path.isfile(filepath), wall_files)
+        wall_files = filter(lambda filepath : os.path.isfile(filepath) and filepath[-4:] == '.obj', wall_files)
         wall_files = list(wall_files)
+        print('Loaded', len(wall_files), 'walls')
+        assert batch_size <= 16, "multibody doesn't work with more than 16 bodies"
+
+        walls=[]
+        for i in range(0, len(wall_files), batch_size):
+            end = min(i+batch_size, len(wall_files))
+            batch = wall_files[i:end]
+            visualShapeId = p.createVisualShapeArray(
+                shapeTypes=[p.GEOM_MESH for _ in batch],
+                fileNames=batch,
+            )
+            collisionShapeId = p.createCollisionShapeArray(
+                shapeTypes=[p.GEOM_MESH for _ in batch],
+                fileNames=batch,
+            )
+            multiBodyId = p.createMultiBody(
+                baseMass=0.0,
+                baseCollisionShapeIndex=collisionShapeId,
+                baseVisualShapeIndex=visualShapeId,
+                basePosition=[0, 0, 0],
+                baseOrientation=p.getQuaternionFromEuler([0, 0, 0]))
+            walls.append(multiBodyId)
 
         if callable(texture):
-            texture = [ texture(i) for i in range(len(wall_files)) ]
+            texture = [ texture(i) for i in range(len(walls)) ]
         elif isinstance(texture, str):
-            texture = [ texture ] * len(wall_files)
+            texture = [ texture ] * len(walls)
 
-        #loaded_textures = {}
-        #for i, (texture_name, wall_file) in enumerate(zip(texture, wall_files)):
-
-        #    if texture_name not in loaded_textures:
-        #        loaded_textures[texture_name] = p.loadTexture(texture_name)
-        #    textureId = loaded_textures[texture_name]
-        #    p.changeVisualShape(wallId, -1, textureUniqueId=textureId)
-
-        visualShapeId = p.createVisualShapeArray(
-            shapeTypes=[ p.GEOM_MESH for _ in wall_files ],
-            fileNames=wall_files,
-            #rgbaColors=[ None for _ in wall_files ],
-            meshScales=[ [1, 1, 1] for _ in wall_files ],
-        )
-
-        print("Creating collision shape array", end='...')
-        collisionShapeId = p.createCollisionShapeArray(
-            shapeTypes=[ p.GEOM_MESH for _ in wall_files ],
-            fileNames=wall_files,
-            meshScales=[ [1, 1, 1] for _ in wall_files ]
-        )
-        print('done')
-
-        multiBodyId = p.createMultiBody(
-            baseMass=0.0,
-            baseCollisionShapeIndex=collisionShapeId,
-            baseVisualShapeIndex=visualShapeId,
-            basePosition=[0, 0, 0],
-            baseOrientation=p.getQuaternionFromEuler([0, 0, 0]))
+        loaded_textures = {}
+        for i, (texture_name, wallId) in enumerate(zip(texture, walls)):
+            if texture_name not in loaded_textures:
+                loaded_textures[texture_name] = p.loadTexture(texture_name)
+            textureId = loaded_textures[texture_name]
+            p.changeVisualShape(wallId, -1, textureUniqueId=textureId)
 
         return multiBodyId
 
@@ -814,8 +816,14 @@ if __name__ == "__main__":
     # env_model = "Savinov_val2"
     env_model = "Savinov_val3"
 
+    random = Random(0)
+    texture_folder = resource_path("textures", "walls")
+    all_possible_textures = [ os.path.join(texture_folder, file) for file in os.listdir(texture_folder) ]
     env = PybulletEnvironment(env_model, visualize=True, mode="keyboard", start=[-0.5, 0],
-        # wall_texture=[ resource_path("textures", filename) for filename in ["TUM_Background_Campus_Innenstadt_ThierschTurm.jpg", "yellow_wall.png", "green_floor.png"] ]
+        wall_kwargs={
+            'batch_size': 2,
+            'texture': lambda i: random.choice(all_possible_textures)
+        }
     )
     try:
         env.robot.keyboard_simulation()
