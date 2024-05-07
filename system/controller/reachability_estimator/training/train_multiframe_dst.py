@@ -39,6 +39,11 @@ def _load_weights(model_file, nets : Model, **kwargs):
     epoch = int(state['epoch'])
 
     for name, net in nets.nets.items():
+        if name == "img_encoder" and 'conv1.weight' in state['nets'][name].keys(): # Backwards compatibility
+            for i in range(4):
+                for value_type in ['bias', 'weight']:
+                    state['nets'][name][f'layers.{2*i}.{value_type}'] = state['nets'][name][f'conv{i+1}.{value_type}']
+                    del state['nets'][name][f'conv{i+1}.{value_type}']
         net.load_state_dict(state['nets'][name])
 
     for name, opt in nets.optimizers.items():
