@@ -302,8 +302,8 @@ def train_multiframedst(
             if position_prediction is None:
                 loss = loss_reachability
             else:
-                loss_position = torch.sqrt(torch.sum(torch.nn.functional.mse_loss(position_prediction, position, reduction='none'), dim=1))
-                loss_angle = torch.sqrt(torch.nn.functional.mse_loss(angle_prediction, angle, reduction='none'))
+                loss_position = torch.sum(torch.nn.functional.mse_loss(position_prediction, position, reduction='none'), dim=1)
+                loss_angle = torch.nn.functional.mse_loss(angle_prediction, angle, reduction='none')
                 loss = loss_reachability + reachability @ (position_loss_weight * loss_position + angle_loss_weight * loss_angle)
 
             loss = loss.sum()
