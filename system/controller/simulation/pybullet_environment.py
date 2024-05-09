@@ -356,7 +356,10 @@ class PybulletEnvironment:
 
     def detect_maze_agent_contact(self):
         """ true, if the robot is in contact with the maze """
-        return bool(p.getContactPoints(self.robot.ID, self.mazeID))
+        return any(
+            bool(p.getContactPoints(self.robot.ID, wallId))
+            for wallId in self.mazeID
+        )
 
     def end_simulation(self):
         p.disconnect()
