@@ -20,8 +20,6 @@ from typing import Tuple
 
 boundaryCellEncoder = BoundaryCellNetwork.load()
 
-DEFAULT_NUMBER_OF_ANGLES = 52 #len(list(types.LidarReading.angles(0)))
-
 class SampleConfig:
     def __init__(self,
         grid_cell_spikings=False,
@@ -29,46 +27,11 @@ class SampleConfig:
     ):
         self.with_grid_cell_spikings = grid_cell_spikings
         self.lidar = lidar
-    def dtype(self):
-        fields = [
-            ('start_observation', (np.int32, 16384)), # 64 x 64 x 4
-            ('goal_observation', (np.int32, 16384)), # using (64, 64, 4) would be more elegant but H5py doesn't accept it
-            ('reached', bool),
-            ('start', (np.float32, 2)),  # x, y
-            ('goal', (np.float32, 2)),  # x, y
-            ('start_orientation', np.float32),  # theta
-            ('goal_orientation', np.float32)  # theta
-        ]
-        if self.with_grid_cell_spikings:
-            fields += [
-                ('start_spikings', (np.float32, 9600)),  # 40 * 40 * 6
-                ('goal_spikings', (np.float32, 9600))  # 40 * 40 * 6
-            ]
-        if self.lidar:
-            fields += [
-                ('start_lidar', (np.float32, DEFAULT_NUMBER_OF_ANGLES)),
-                ('goal_lidar', (np.float32, DEFAULT_NUMBER_OF_ANGLES)),
-            ]
-        dtype = np.dtype(fields)
-        return dtype
     def suffix(self) -> str:
         return (''
             + ('+spikings' if self.with_grid_cell_spikings else '')
             + ('+lidar' if self.lidar else '')
         )
-    def to_tuple(self, sample : 'Sample', reachable : bool) -> Tuple:
-        """ Returns a tuple which can be put into a Numpy array of type self.dtype() """
-        tup = [
-            sample.src_img.flatten(), sample.dst_img.flatten(),
-            reachable,
-            sample.src_pos, sample.dst_pos,
-            sample.src_angle, sample.dst_angle,
-        ]
-        if self.with_grid_cell_spikings:
-            tup += [ sample.src_spikings, sample.dst_spikings ]
-        if self.lidar:
-            tup += [ sample.src_lidar, sample.dst_lidar ]
-        return tuple(tup)
 
 
 class ReachabilityDataset(torch.utils.data.Dataset):

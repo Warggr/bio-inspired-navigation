@@ -42,6 +42,7 @@ import sys
 import pybullet_data
 import numpy as np
 import math
+import itertools
 from typing import List, Optional, Any, Tuple, Iterable, Callable
 from random import Random
 
@@ -187,7 +188,7 @@ class PybulletEnvironment:
             # load the plane and maze with desired textures
             # self.mazeID = self.__load_obj(resource_path(self.env_model, "mesh.obj"), wall_texture)
             self.planeID = self.__load_obj(resource_path(self.env_model, "plane100.obj"), resource_path("textures", "green_floor.png"))
-            all_wall_kwargs = { 'texture': resource_path("textures", "walls", "yellow_wall.png") }
+            all_wall_kwargs = { 'textures': resource_path("textures", "walls", "yellow_wall.png") }
             all_wall_kwargs.update(wall_kwargs)
             self.mazeID = self.__load_walls(resource_path(self.env_model), **all_wall_kwargs)
 
@@ -207,18 +208,40 @@ class PybulletEnvironment:
     def dimensions(self):
         return environment_dimensions(self.env_model)
 
-    def __load_walls(self, model_folder, texture : str | Callable[int, str] | List[str], batch_size=16) -> int:
+    def __load_walls(self, model_folder, textures : str | Callable[int, str] | List[str], nb_batches = None) -> int:
         wall_dir = os.path.join(model_folder, "walls")
         wall_files = os.listdir(wall_dir)
         wall_files = map(lambda filename: os.path.join(wall_dir, filename), wall_files)
         wall_files = filter(lambda filepath : os.path.isfile(filepath) and filepath[-4:] == '.obj', wall_files)
         wall_files = list(wall_files)
-        assert batch_size <= 16, "multibody doesn't work with more than 16 bodies"
+
+        if nb_batches is None:
+            if type(textures) is list:
+                nb_batches = len(textures)
+                batches = np.array_split(wall_files, nb_batches)
+                if len(batches[0]) > 16:
+                    batches : List[List[str]] = list(list(itertools.batched(big_batch, 16)) for big_batch in batches)
+                    textures = [ [ textures[i] ] * len(batches[i]) for i in range(len(batches)) ]
+                    batches, textures = itertools.chain.from_iterable(batches), itertools.chain.from_iterable(textures)
+            elif callable(textures): # assume the user wants to set each wall individually
+                batches = [ [wall] for wall in wall_files ]
+                textures = [ textures(i) for i in range(len(wall_files)) ]
+            elif type(textures) is str:
+                # bullet doesn't accept multibodies with >16 bodies
+                batches = list(itertools.batched(wall_files, n=16))
+                textures = [ textures for _ in batches ]
+
+        loaded_textures = {}
+        def load_texture(texture_name : str):
+            if texture_name not in loaded_textures:
+                loaded_textures[texture_name] = p.loadTexture(texture_name)
+            return loaded_textures[texture_name]
+
+        textures = map(load_texture, textures)
 
         walls=[]
-        for i in range(0, len(wall_files), batch_size):
-            end = min(i+batch_size, len(wall_files))
-            batch = wall_files[i:end]
+        for batch, textureId in zip(batches, textures):
+            batch = list(batch) # tuples cause a segfault in PyBullet
             visualShapeId = p.createVisualShapeArray(
                 shapeTypes=[p.GEOM_MESH for _ in batch],
                 fileNames=batch,
@@ -233,21 +256,10 @@ class PybulletEnvironment:
                 baseVisualShapeIndex=visualShapeId,
                 basePosition=[0, 0, 0],
                 baseOrientation=p.getQuaternionFromEuler([0, 0, 0]))
+            p.changeVisualShape(multiBodyId, -1, textureUniqueId=textureId)
             walls.append(multiBodyId)
 
-        if callable(texture):
-            texture = [ texture(i) for i in range(len(walls)) ]
-        elif isinstance(texture, str):
-            texture = [ texture ] * len(walls)
-
-        loaded_textures = {}
-        for i, (texture_name, wallId) in enumerate(zip(texture, walls)):
-            if texture_name not in loaded_textures:
-                loaded_textures[texture_name] = p.loadTexture(texture_name)
-            textureId = loaded_textures[texture_name]
-            p.changeVisualShape(wallId, -1, textureUniqueId=textureId)
-
-        return multiBodyId
+        return walls
 
 
     def __load_obj(self, objectFilename : str, texture : str) -> int:
@@ -794,6 +806,8 @@ class DatasetCollector:
         # observations = self.images[::3][-1:]
         # return [np.transpose(observation[2], (2, 0, 1)) for observation in observations]
 
+texture_folder = resource_path("textures", "walls")
+all_possible_textures = [ os.path.join(texture_folder, file) for file in sorted(os.listdir(texture_folder)) ]
 
 if __name__ == "__main__":
     """
@@ -816,11 +830,8 @@ if __name__ == "__main__":
     env_model = "Savinov_val3"
 
     random = Random(0)
-    texture_folder = resource_path("textures", "walls")
-    all_possible_textures = [ os.path.join(texture_folder, file) for file in os.listdir(texture_folder) ]
     env = PybulletEnvironment(env_model, visualize=True, mode="keyboard", start=[-0.5, 0],
         wall_kwargs={
-            'batch_size': 2,
             'texture': lambda i: random.choice(all_possible_textures)
         }
     )
