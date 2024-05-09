@@ -817,7 +817,7 @@ class DatasetCollector:
         # return [np.transpose(observation[2], (2, 0, 1)) for observation in observations]
 
 texture_folder = resource_path("textures", "walls")
-all_possible_textures = [ os.path.join(texture_folder, file) for file in sorted(os.listdir(texture_folder)) ]
+all_possible_textures = [ os.path.join(texture_folder, file) for file in sorted(os.listdir(texture_folder)) if file[-4:] == '.jpg' ]
 
 if __name__ == "__main__":
     """

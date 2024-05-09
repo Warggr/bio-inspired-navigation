@@ -1,0 +1,5 @@
+*.jpg
+*.png
+*.jpeg
+![0-9]-*.jpg
+!yellow_wall.png
