@@ -54,6 +54,12 @@ from system.controller.simulation.math_utils import vectors_in_one_direction, in
 from system.types import Vector2D, Angle
 from system.controller.simulation.environment_config import environment_dimensions
 
+try:
+    itertools.batched
+except AttributeError:
+    from system.polyfill import batched
+    itertools.batched = batched
+
 class LidarReading:
     def __init__(self, distances: List[float], angles: List[Angle]):
         self.distances = distances
