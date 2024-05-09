@@ -215,6 +215,8 @@ class PybulletEnvironment:
         return environment_dimensions(self.env_model)
 
     def __load_walls(self, model_folder, textures : str | Callable[int, str] | List[str], nb_batches = None) -> int:
+        MAXIMUM_BATCH_SIZE = 16 # bullet doesn't accept multibodies with >16 bodies
+
         wall_dir = os.path.join(model_folder, "walls")
         wall_files = os.listdir(wall_dir)
         wall_files = map(lambda filename: os.path.join(wall_dir, filename), wall_files)
@@ -225,16 +227,15 @@ class PybulletEnvironment:
             if type(textures) is list:
                 nb_batches = len(textures)
                 batches = np.array_split(wall_files, nb_batches)
-                if len(batches[0]) > 16:
-                    batches : List[List[str]] = list(list(itertools.batched(big_batch, 16)) for big_batch in batches)
+                if len(batches[0]) > MAXIMUM_BATCH_SIZE:
+                    batches : List[List[str]] = list(list(itertools.batched(big_batch, MAXIMUM_BATCH_SIZE)) for big_batch in batches)
                     textures = [ [ textures[i] ] * len(batches[i]) for i in range(len(batches)) ]
                     batches, textures = itertools.chain.from_iterable(batches), itertools.chain.from_iterable(textures)
             elif callable(textures): # assume the user wants to set each wall individually
                 batches = [ [wall] for wall in wall_files ]
                 textures = [ textures(i) for i in range(len(wall_files)) ]
             elif type(textures) is str:
-                # bullet doesn't accept multibodies with >16 bodies
-                batches = list(itertools.batched(wall_files, n=16))
+                batches = list(itertools.batched(wall_files, n=MAXIMUM_BATCH_SIZE))
                 textures = [ textures for _ in batches ]
 
         loaded_textures = {}
