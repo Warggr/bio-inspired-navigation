@@ -383,7 +383,8 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('mode', choices=['train', 'test', 'validate'])
+    parser.add_argument('mode', choices=['train', 'test', 'validate'], help='mode')
+    parser.add_argument('--dataset-features', nargs='+')
     parser.add_argument('--spikings', dest='with_grid_cell_spikings', help='Grid cell spikings are included in the dataset', action='store_true')
     parser.add_argument('--lidar', help='LIDAR distances are included in the dataset', choices=['raw_lidar', 'ego_bc', 'allo_bc'])
     parser.add_argument('--pair-conv', dest='with_conv_layer', help='Pair-conv neural network', action='store_true', default=True)
@@ -397,13 +398,13 @@ if __name__ == '__main__':
         lidar=args.lidar,
     )
 
-    suffix = config.suffix()
-    suffix = (suffix
-        + ('+conv' if args.with_conv_layer else '')
-    )
+    args.dataset_features = ''.join([ f'-{feature}' for feature in args.dataset_features ])
+    suffix = args.dataset_features + config.suffix()
+    if args.with_conv_layer:
+        suffix += '+conv'
 
     global_args = {
-        'model_file': os.path.join(os.path.dirname(__file__), "..", "data", "models", "reachability_network" + suffix),
+        'model_file': os.path.join(get_path(), "data", "models", "reachability_network" + suffix),
         'resume': args.resume,
         'batch_size': 64,
         'samples_per_epoch': 10000,
@@ -443,9 +444,9 @@ if __name__ == '__main__':
         run_test_model(dataset)
     elif args.mode == "train":
         # Training
-        filepath = os.path.join(get_path(), "data", "reachability", 'dataset.hd5')
+        filename = "dataset" + args.dataset_features + ".hd5"
+        filepath = os.path.join(get_path(), "data", "reachability", filename)
         filepath = os.path.realpath(filepath)
-
         dataset = ReachabilityDataset(filepath)
         print("Training with dataset of length", len(dataset))
 

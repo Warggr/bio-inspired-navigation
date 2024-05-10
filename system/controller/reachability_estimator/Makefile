@@ -26,3 +26,6 @@ data/reachability/trajectories.hd5: data/trajectories/trajectories.hd5
 
 data/models/reachability_network${FEATURES_FILE_FLAGS}.hd5: data/reachability/dataset.hd5
 	python training/train_multiframe_dst.py train ${FEATURES} --resume
+
+data/models/reachability_network-3colors${FEATURES_FILE_FLAGS}.hd5: data/reachability/dataset-3colors.hd5
+	python training/train_multiframe_dst.py train ${FEATURES} --resume --dataset-features 3colors
