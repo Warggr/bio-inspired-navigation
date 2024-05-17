@@ -117,6 +117,7 @@ class PybulletEnvironment:
     """This class deals with everything pybullet or environment (obstacles) related"""
 
     WHISKER_LENGTH = 0.2
+    ROBOT_Z_POS = 0.02 # see p3dx model
 
     def __init__(self,
         env_model : str,
@@ -303,7 +304,7 @@ class PybulletEnvironment:
 
         if agent_pos_orn is not None:
             agent_pos, agent_orn = agent_pos_orn
-            agent_pos = (agent_pos[0], agent_pos[1], 0.02)
+            agent_pos = (agent_pos[0], agent_pos[1], PybulletEnvironment.ROBOT_Z_POS)
             yaw = agent_orn
         else:
             agent_pos, agent_orn_quaternion = \
@@ -386,18 +387,9 @@ class PybulletEnvironment:
         rayMissColor = [1, 1, 1]
 
         if agent_pos_orn:
-            pos, euler_angle = agent_pos_orn
-            rayFromPoint = [pos[0], pos[1], 0.02]
+            rayFromPoint, euler_angle = agent_pos_orn
         else:
-            (
-                rayFromPoint, # linkWorldPosition
-                rayReference, # linkWorldOrientation
-                *_ignored_data
-            ) = p.getLinkState(self.robot.ID, 0)
-            euler_angle = p.getEulerFromQuaternion(rayReference)[2]  # in radians
-
-            rayFromPoint = list(rayFromPoint)
-            rayFromPoint[2] = rayFromPoint[2] + 0.02  # see p3dx model
+            rayFromPoint, euler_angle = self.robot.lidar_sensor_position
 
         ray_angles = list(LidarReading.angles(start_angle=euler_angle, **angle_args))
 
@@ -448,7 +440,7 @@ class Robot:
             max_speed - determines speed at which agent travels: max_speed = 5.5 -> actual speed of ~0.5 m/s
             build_data_set - when true create camera images
         """
-        base_position = [ base_position[0], base_position[1], 0.02 ]
+        base_position = [ base_position[0], base_position[1], PybulletEnvironment.ROBOT_Z_POS ]
         base_orientation = p.getQuaternionFromEuler([0, 0, base_orientation])
         filename = os.path.join(DIRNAME,"p3dx","urdf","pioneer3dx.urdf")
         self.ID = p.loadURDF(filename, basePosition=base_position, baseOrientation=base_orientation)
@@ -507,7 +499,8 @@ class Robot:
     def position_and_angle(self):
         # Possible improvement: check if retrieving last value from data_collector is faster
         position, angle = p.getBasePositionAndOrientation(self.ID)
-        position = [position[0], position[1]]
+        assert position[2] > -10 #== PybulletEnvironment.ROBOT_Z_POS
+        position = np.array([position[0], position[1]])
         angle = p.getEulerFromQuaternion(angle)[2]
         return position, angle
 
@@ -520,17 +513,20 @@ class Robot:
         linear_v, _ = p.getBaseVelocity(self.ID)
         return linear_v[0], linear_v[1]
 
-    def save_position_and_speed(self):
+    @property
+    def lidar_sensor_position(self) -> types.PositionAndOrientation:
+        linkWorldPosition, linkWorldOrientation, *_ignored_data = p.getLinkState(self.ID, 0) # position of chassis compared to base
+        linkWorldPosition = list(linkWorldPosition)
+        linkWorldPosition[2] += PybulletEnvironment.ROBOT_Z_POS # ROBOT_Z_POS is position of base
+        linkWorldPosition[2] += 0.1 # safety margin; TODO this could be removed once we put the correct 3D orientation
+        # TODO maybe the orientation needs to be turned?
+        angle = p.getEulerFromQuaternion(linkWorldOrientation)[2]
+        return linkWorldPosition, angle
+
+    def save_position_and_speed(self, goal_vector : Vector2D):
         position, angle = self.position_and_angle
         linear_v = self.xy_speed
-        self.data_collector.append(position, angle, linear_v, self.goal_vector)
-
-    def compute_movement(self, goal_vector):
-        """Compute and set motor gains of agents. Simulate the movement with py-bullet"""
-
-        gains = self.compute_gains(goal_vector)
-
-        self.step(gains)
+        self.data_collector.append(position, angle, linear_v, goal_vector)
 
     def compute_gains(self, goal_vector) -> Tuple[float, float]:
         """ computes the motor gains resulting from (inhibited) goal vector"""
@@ -611,9 +607,10 @@ class Robot:
 
         self.save_position_and_speed(current_goal_vector)
 
+    ''' Calculates the obstacle_vector from the ray distances'''
     def calculate_obstacle_vector(self, lidar_data : Optional[Tuple[LidarReading, List[Vector2D]]] = None):
         if lidar_data is None:
-            lidar_data = self.env.lidar(tactile_cone=120, num_ray_dir=21, blind_spot_cone=0)
+            lidar_data = self.env.lidar(tactile_cone=120, num_ray_dir=21, blind_spot_cone=0, agent_pos_orn=self.lidar_sensor_position)
         lidar, hit_points = lidar_data
         start_index, end_index = closest_subsegment(lidar.distances)
         hit_points = hit_points[start_index:end_index+1]
