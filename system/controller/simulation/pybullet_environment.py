@@ -623,7 +623,7 @@ class Robot:
 
         if end_index - start_index + 1 < 5:
             middle_index = (end_index + start_index) // 2
-            angle = angles[middle_index]
+            angle = lidar.angles[middle_index]
             direction_vector = np.array([-np.sin(angle), np.cos(angle)])
         else:
             try:
@@ -778,7 +778,7 @@ if __name__ == "__main__":
     random = Random(0)
     env = PybulletEnvironment(env_model, visualize=True, realtime=True, start=[-0.5, 0],
         wall_kwargs={
-            'texture': lambda i: random.choice(all_possible_textures)
+            'textures': lambda i: random.choice(all_possible_textures)
         }
     )
     try:
