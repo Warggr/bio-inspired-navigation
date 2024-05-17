@@ -26,7 +26,7 @@ def compute_angle(vec_1 : Vector2D, vec_2 : Vector2D):
     length_vector_1 = np.linalg.norm(vec_1)
     length_vector_2 = np.linalg.norm(vec_2)
     if length_vector_1 == 0 or length_vector_2 == 0:
-        return 0
+        raise ValueError(f"Angle with the 0 vector is not defined: <{vec_1}, {vec_2}>")
     unit_vector_1 = vec_1 / length_vector_1
     unit_vector_2 = vec_2 / length_vector_2
     dot_product = np.dot(unit_vector_1, unit_vector_2)

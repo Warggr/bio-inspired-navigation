@@ -30,7 +30,7 @@ from abc import abstractmethod
 from typing import Optional
 
 plotting = True  # if True: plot everything
-debug = True  # if True: print debug output
+debug = os.getenv('DEBUG', False)  # if True: print debug output
 
 
 def print_debug(*params):
@@ -176,7 +176,7 @@ def create_gc_spiking(start : Vector2D, goal : Vector2D):
     robot.turn_to_goal(compass.calculate_goal_vector(robot.position))
 
     i = 0
-    while i < 5000:
+    while True:
         i += 1
         if i == 5000:
             raise AssertionError("Agent should not get caught in a loop in an empty plane.")
@@ -194,7 +194,7 @@ def create_gc_spiking(start : Vector2D, goal : Vector2D):
             return gc_network.consolidate_gc_spiking()
 
 
-def setup_gc_network(dt):
+def setup_gc_network(dt) -> GridCellNetwork:
     """ Initialize the grid cell newtork """
     # Grid-Cell Initialization
     M = 6  # 6 for default, number of modules

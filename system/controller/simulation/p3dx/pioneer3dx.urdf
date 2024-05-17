@@ -140,7 +140,7 @@ work original in ucs-ros-pkg.
     <visual>
       <origin rpy="0 0 0" xyz="-0.045 0 0.148"/>
       <geometry name="pioneer_geom">
-        <mesh filename="package://p3dx_description/meshes/chassis.stl"/>
+        <mesh filename="meshes/chassis.stl"/>
       </geometry>
       <material name="ChassisRed">
         <color rgba="0.851 0.0 0.0 1.0"/>
@@ -163,7 +163,7 @@ work original in ucs-ros-pkg.
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry name="top_geom">
-        <mesh filename="package://p3dx_description/meshes/top.stl"/>
+        <mesh filename="meshes/top.stl"/>
       </geometry>
       <material name="TopBlack">
         <color rgba="0.038 0.038 0.038 1.0"/>
@@ -191,7 +191,7 @@ work original in ucs-ros-pkg.
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry name="pioneer_geom">
-        <mesh filename="package://p3dx_description/meshes/swivel.stl"/>
+        <mesh filename="meshes/swivel.stl"/>
       </geometry>
       <material name="swivel">
         <color rgba="0.5 0.5 0.5 1"/>
@@ -223,7 +223,7 @@ work original in ucs-ros-pkg.
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry name="pioneer_geom">
-        <mesh filename="package://p3dx_description/meshes/center_hubcap.stl"/>
+        <mesh filename="meshes/center_hubcap.stl"/>
       </geometry>
       <material name="swivel">
         <color rgba="0.5 0.5 0.5 1"/>
@@ -255,7 +255,7 @@ work original in ucs-ros-pkg.
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry name="pioneer_geom">
-        <mesh filename="package://p3dx_description/meshes/center_wheel.stl"/>
+        <mesh filename="meshes/center_wheel.stl"/>
       </geometry>
       <material name="WheelBlack">
         <color rgba="0.117 0.117 0.117 1"/>
@@ -283,7 +283,7 @@ work original in ucs-ros-pkg.
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry name="pioneer_geom">
-        <mesh filename="package://p3dx_description/meshes/left_wheel.stl"/>
+        <mesh filename="meshes/left_wheel.stl"/>
       </geometry>
       <material name="WheelBlack">
         <color rgba="0.117 0.117 0.117 1"/>
@@ -292,7 +292,7 @@ work original in ucs-ros-pkg.
     <collision>
       <origin rpy="-1.57079635 0 0" xyz="0 0 0"/>
       <geometry>
-        <!--<mesh filename="package://p3dx_description/meshes/${suffix}_wheel.stl"/> -->
+        <!--<mesh filename="meshes/${suffix}_wheel.stl"/> -->
         <cylinder length="0.01" radius="0.09"/>
       </geometry>
     </collision>
@@ -312,7 +312,7 @@ work original in ucs-ros-pkg.
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry name="pioneer_geom">
-        <mesh filename="package://p3dx_description/meshes/left_hubcap.stl"/>
+        <mesh filename="meshes/left_hubcap.stl"/>
       </geometry>
       <material name="HubcapYellow">
         <color rgba="1.0 0.811 0.151 1.0"/>
@@ -363,7 +363,7 @@ work original in ucs-ros-pkg.
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry name="pioneer_geom">
-        <mesh filename="package://p3dx_description/meshes/right_wheel.stl"/>
+        <mesh filename="meshes/right_wheel.stl"/>
       </geometry>
       <material name="WheelBlack">
         <color rgba="0.117 0.117 0.117 1"/>
@@ -372,7 +372,7 @@ work original in ucs-ros-pkg.
     <collision>
       <origin rpy="-1.57079635 0 0" xyz="0 0 0"/>
       <geometry>
-        <!--<mesh filename="package://p3dx_description/meshes/${suffix}_wheel.stl"/> -->
+        <!--<mesh filename="meshes/${suffix}_wheel.stl"/> -->
         <cylinder length="0.01" radius="0.09"/>
       </geometry>
     </collision>
@@ -392,7 +392,7 @@ work original in ucs-ros-pkg.
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry name="pioneer_geom">
-        <mesh filename="package://p3dx_description/meshes/right_hubcap.stl"/>
+        <mesh filename="meshes/right_hubcap.stl"/>
       </geometry>
       <material name="HubcapYellow">
         <color rgba="1.0 0.811 0.151 1.0"/>
@@ -443,7 +443,7 @@ work original in ucs-ros-pkg.
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry name="pioneer_geom">
-        <mesh filename="package://p3dx_description/meshes/front_sonar.stl"/>
+        <mesh filename="meshes/front_sonar.stl"/>
       </geometry>
       <material name="SonarYellow">
         <color rgba="0.715 0.583 0.210 1.0"/>
@@ -471,7 +471,7 @@ work original in ucs-ros-pkg.
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://p3dx_description/meshes/lms100.dae"/>
+        <mesh filename="meshes/lms100.dae"/>
       </geometry>
     </visual>
     <collision>
