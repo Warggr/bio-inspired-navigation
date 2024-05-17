@@ -30,7 +30,7 @@ class SampleConfig:
     def suffix(self) -> str:
         return (''
             + ('+spikings' if self.with_grid_cell_spikings else '')
-            + ('+lidar' if self.lidar else '')
+            + (f'+lidar--{self.lidar}' if self.lidar else '')
         )
 
 
