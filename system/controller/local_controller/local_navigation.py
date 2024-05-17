@@ -304,7 +304,11 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network, t
 if __name__ == "__main__":
     """ Test the local controller's ability of vector navigation with obstacle avoidance. """
 
-    experiment = None
+    from argparse import ArgumentParser
+    main_parser = ArgumentParser()
+    experiments = main_parser.add_subparsers(dest='experiment', required=True)
+
+    none_parser = experiments.add_parser('none')
     """
     Available decoders:
     - pod: phase-offset decoder
@@ -316,8 +320,12 @@ if __name__ == "__main__":
 
     Change the start and goal position and environment model, as needed.
     """
+    none_parser.add_argument('decoder', choices=['pod', 'linear_lookahead', 'analytical', 'combo'])
+    parse_vector = lambda st: [float(i) for i in st.split(',')]
+    none_parser.add_argument('start', type=parse_vector, nargs='?', default=[-6, -0.5], help='Start position in the form x,y')
+    none_parser.add_argument('goal', type=parse_vector, nargs='?', default=[-8, -0.5], help='Goal position in the form x,y')
 
-    experiment = "vector_navigation"
+    vector_nav_parser = experiments.add_parser('vector_navigation')
     """
     Test the local controller with different decoders
 
@@ -331,7 +339,7 @@ if __name__ == "__main__":
 
     """
 
-    experiment = "obstacle_avoidance"
+    obstacle_avoidance_parser = experiments.add_parser('obstacle_avoidance')
     """ 
     Test the obstacle avoidance system
 
@@ -341,36 +349,28 @@ if __name__ == "__main__":
         2A) test a range of parameter values in different combinations              
         2B) choose a few combinations to test
     """
+    main_parser.add_argument('--visualize', action='store_true')
+    args = main_parser.parse_args()
 
-    if not experiment:
+    if args.experiment == 'none':
         env_model = "Savinov_val3"
 
-        # Adjust start and goal
-        start = [-6, -0.5]
-        goal = [-8, -0.5]
-
         dt = 1e-2
-
         # initialize grid cell network and create target spiking
         gc_network = setup_gc_network(dt)
-        target_spiking = create_gc_spiking(start, goal)
+        target_spiking = create_gc_spiking(args.start, args.goal)
 
-        # model = "pod"
-        # model = "linear_lookahead"
-        # model = "analytical"
-        model = "combo"
+        env = PybulletEnvironment(env_model, dt=dt, start=args.start, visualize=args.visualize)
+        compass = Compass.factory(mode=args.decoder, gc_network=gc_network, goal_pos=args.goal)
 
-        env = PybulletEnvironment(env_model, dt, "analytical", start=start)
+        vector_navigation(env, compass, gc_network, target_gc_spiking=target_spiking, step_limit=float('inf'),
+                          plot_it=False, exploration_phase=False)
 
-        vector_navigation(env, goal, gc_network, target_gc_spiking=target_spiking, model=model, step_limit=float('inf'),
-                          plot_it=True, exploration_phase=False)
-
-    elif experiment == "vector_navigation":
+    elif args.experiment == "vector_navigation":
         import time
 
         nr_trials = 1
         env_model = "plane"
-        dt = 1e-2
 
         error_array = []
         actual_error_array = []
@@ -386,7 +386,7 @@ if __name__ == "__main__":
             # model = "linear_lookahead"
             # model = "combo"
 
-            env = PybulletEnvironment(env_model, dt, model, start=[0, 0])
+            env = PybulletEnvironment(env_model, model, start=[0, 0])
 
             # changes the update fraction and arrival threshold according to the chosen model
             if model == "pod":
@@ -420,7 +420,7 @@ if __name__ == "__main__":
                 """ alternatively: generate spiking at goal then navigate there before returning to the start """
                 start_spiking = gc_network.consolidate_gc_spiking()
                 target_spiking = create_gc_spiking(start, goal)
-                env = PybulletEnvironment(env_model, dt, model, start=list(start))
+                env = PybulletEnvironment(env_model, model, start=list(start))
 
                 if model == "pod":
                     env.pod_arrival_threshold = 0.2
@@ -478,7 +478,7 @@ if __name__ == "__main__":
         # Time Cost
         np.save("experiments/" + name + "/time_array", time_array)
 
-    elif experiment == "obstacle_avoidance":
+    elif args.experiment == "obstacle_avoidance":
 
         def three_trials(model, working_combinations, num_ray_dir, cone, mapping, combine):
             nr_steps = 0
@@ -502,7 +502,7 @@ if __name__ == "__main__":
                     gc_network = None
                     target_spiking = None
 
-                env = PybulletEnvironment(env_model, 1e-2, "analytical", start=start)
+                env = PybulletEnvironment(env_model, "analytical", start=start)
 
                 env.mapping = mapping
                 env.combine = combine
