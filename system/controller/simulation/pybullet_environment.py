@@ -121,8 +121,8 @@ class PybulletEnvironment:
     def __init__(self,
         env_model : str,
         dt : float = 1e-2,
-        mode=None,
         visualize=False,
+        realtime=False,
         build_data_set=False,
         start : Optional[Vector2D] = None,
         orientation : types.Angle = np.pi/2,
@@ -152,11 +152,12 @@ class PybulletEnvironment:
 
         if self.visualize:
             p.connect(p.GUI)
-
-            if mode == "keyboard":
-                p.setRealTimeSimulation(1)
         else:
             p.connect(p.DIRECT)
+
+        if realtime:
+            assert self.visualize, "realtime without visualization does not make sense"
+            p.setRealTimeSimulation(1)
 
         self.env_model = env_model
         self.arena_size = 15
@@ -205,7 +206,7 @@ class PybulletEnvironment:
 
         # load agent
         if contains_robot:
-            self.robot = Robot(mode, self, base_position, orientation, frame_limit=frame_limit, build_data_set=build_data_set)
+            self.robot = Robot(self, base_position, orientation, frame_limit=frame_limit, build_data_set=build_data_set)
             # check if agent touches maze -> invalid start position
             if not env_model == "plane" and not "obstacle" in env_model and self.detect_maze_agent_contact():
                 raise ValueError("Invalid start position. Agent and maze overlap.")
@@ -338,20 +339,7 @@ class PybulletEnvironment:
 
         return rgb_img
 
-    def step(self, gains : [float, float]):
-        # print("Gains:", gains)
-        #
-        # position, angle = p.getBasePositionAndOrientation(self.robot.ID)
-        # linear_v, _ = p.getBaseVelocity(self.robot.ID)
-        # print("  old position:", position)
-        # print("  old speed:", linear_v)
-
-        # change speed
-        p.setJointMotorControlArray(bodyUniqueId=self.robot.ID,
-                            jointIndices=[4, 6],
-                            controlMode=p.VELOCITY_CONTROL,
-                            targetVelocities=gains,
-                            forces=[10, 10])
+    def step(self):
         p.stepSimulation()
         if self.visualize:
             time.sleep(self.dt / 5)
@@ -442,20 +430,18 @@ class PybulletEnvironment:
 
 
 class Robot:
-    # threshold for goal_vector length that signals arrival at goal
-    pod_arrival_threshold = 0.5
-    linear_lookahead_arrival_threshold = 0.2
-    analytical_arrival_threshold = 0.1
+    class Stuck(Exception):
+        pass
 
     def __init__(
         self,
-        mode,
         env: PybulletEnvironment,
         base_position : types.Vector2D,
         base_orientation : types.Angle = np.pi/2,
         max_speed=5.5,
         frame_limit=5000,
-        build_data_set : bool = True
+        build_data_set : bool = True,
+        compass : Optional['Compass'] = None,
     ):
         """
         arguments:
@@ -469,54 +455,34 @@ class Robot:
         self.env = env
         self.buildDataSet = build_data_set
 
-        self.goal_vector_original = np.array([1, 1])  # egocentric goal vector after last recalculation
-        self.goal_vector = np.array([0, 0])  # egocentric goal vector after last update
-        self.goal_pos = None  # used for analytical goal vector calculation and plotting
-
-        self.nr_ofsteps = 0  # keeps track of number of steps taken with current decoder (used for switching between pod and linlook decoder)
-
         self.max_speed = max_speed
 
         self.buffer = 0  # buffer for checking if agent got stuck, discards timesteps spent turning towards the goal
         self.data_collector = DatasetCollector(frame_limit=frame_limit, collectImages=build_data_set)
 
-        self.save_position_and_speed()  # save initial configuration
-
-        self.mode = mode  # choose navigation mode, different decoders have different thresholds for e.g. arrival
-        if self.mode is not None:
-            try:
-                self.arrival_threshold = getattr(Robot, self.mode + '_arrival_threshold')
-            except AttributeError:
-                print("Warning: no arrival threshold defined for mode:", self.mode)
+        goal_vector=compass.calculate_goal_vector() if compass else np.array([0, 0])
+        self.save_position_and_speed(goal_vector=goal_vector)  # save initial configuration
 
         self.mapping = 1.5  # see local_navigation experiments
-        self.combine = 1.5
 
-    def navigation_step(self, gc: Optional[GridCellNetwork] = None, pod=None, obstacles=True):
-        """ One navigation step for the agent. 
-            Calculate or update the goal vector.
+    def navigation_step(self, goal_vector : Vector2D, obstacles=True, combine=1.5):
+        """ One navigation step for the agent.
             Calculate obstacle vector.
             Combine into movement vector and simulate movement.
 
         arguments:
-        gc          -- grid cell network for path integration and goal vector calculation 
-        pod         -- phase offset decode network for goal vector calculation
         obstacles   -- if true use obstacle avoidance
+        combine     -- factor for combining obstacle avoidance and goal vector. See local_navigation experiments
         """
-        obstacle_vector=None
-        point=None
-        multiple=1
-        if self.mode == "analytical":
-            self.goal_vector = self.calculate_goal_vector_analytically()
-        else:
-            self.goal_vector = self.calculate_goal_vector_gc(gc, pod)
+        #rayFromPoint = self.position
+
+        #goal_vector = self.compass.calculate_goal_vector(rayFromPoint)
 
         if obstacles:
             point, obstacle_vector = self.calculate_obstacle_vector()
 
-            if np.linalg.norm(np.array(self.goal_vector)) > 0:
-                normed_goal_vector = np.array(self.goal_vector) / np.linalg.norm(
-                    np.array(self.goal_vector))  # normalize goal_vector to a standard length of 1
+            if np.linalg.norm(np.array(goal_vector)) > 0:
+                normed_goal_vector = np.array(goal_vector) / np.linalg.norm(np.array(goal_vector))  # normalize goal_vector to a standard length of 1
             else:
                 normed_goal_vector = np.array([0.0, 0.0])
 
@@ -524,17 +490,18 @@ class Robot:
             multiple = 1 if vectors_in_one_direction(normed_goal_vector, obstacle_vector) else -1
             if not intersect(self.position, normed_goal_vector, point, obstacle_vector * multiple):
                 multiple = 0
-            movement = list(normed_goal_vector * self.combine + obstacle_vector * multiple)
-        else:
-            movement = self.goal_vector
-        self.compute_movement(movement)
+            goal_vector = normed_goal_vector * combine + obstacle_vector * multiple
+            print("add obstacles:", goal_vector, end=',')
 
-        # grid cell network track movement
-        if gc:
-            gc.track_movement(self.xy_speed)
+        gains = self.compute_gains(goal_vector)
+        print("gains:", gains)
+
+        #print(f'Step({gains=})', end='\t')
+        self._step(gains, goal_vector)
+        #print(f'{self.position=}')
+
         if self.buildDataSet:
             self.data_collector.images.append(self.env.camera())
-        return point, obstacle_vector, movement
 
     @property
     def position_and_angle(self):
@@ -621,15 +588,28 @@ class Robot:
             v_left = (forward - turn) * self.max_speed
             v_right = (forward + turn) * self.max_speed
             gains = [v_left, v_right]
-            self.step(gains)
+            self._step(gains, None)
             self.env.camera()
 
-    def step(self, gains : [float, float]):
-        self.env.step(gains)
-        self.nr_ofsteps += 1
-        self.save_position_and_speed()
+    def _step(self, gains : [float, float], current_goal_vector : Vector2D):
 
-    ''' Calculates the obstacle_vector from the ray distances'''
+        # print("Gains:", gains)
+        #
+        #print("  old position:", self.position)
+        #print("  old speed:", self.xy_speed)
+
+        # change speed
+        p.setJointMotorControlArray(bodyUniqueId=self.ID,
+                            jointIndices=[4, 6],
+                            controlMode=p.VELOCITY_CONTROL,
+                            targetVelocities=gains,
+                            forces=[10, 10])
+        self.env.step()
+
+        #print("  new position:", self.position)
+        #print("  new speed:", self.xy_speed)
+
+        self.save_position_and_speed(current_goal_vector)
 
     def calculate_obstacle_vector(self, lidar_data : Optional[Tuple[LidarReading, List[Vector2D]]] = None):
         if lidar_data is None:
@@ -667,71 +647,26 @@ class Robot:
             except (IndexError, ValueError, np.linalg.LinAlgError):
                 return np.array([0.0, 0.0]), np.array([0.0, 0.0])
 
-        if rays[end_index] > 0:
+        if lidar[end_index] > 0:
             self_point = p.getLinkState(self.ID, 0)[0]
             start_point = self_point + np.array(
-                [np.cos(angles[end_index]), np.sin(angles[end_index]), self_point[-1]]) * rays[end_index]
+                [np.cos(lidar.angles[end_index]), np.sin(lidar.angles[end_index]), self_point[-1]]) * lidar[end_index]
             end_point = start_point - np.array([direction_vector[0], direction_vector[1], 0])
             self.env.add_debug_line(start_point, end_point, (0, 0, 0))
 
-        direction_vector = direction_vector * 1.5 / min(rays[start_index:end_index + 1])
+        assert min(lidar[start_index:end_index + 1]) != 0, lidar[start_index:end_index + 1]
+        direction_vector = direction_vector * 1.5 / min(lidar[start_index:end_index + 1])
         return hit_points[0], direction_vector
 
-    def calculate_goal_vector_analytically(self, goal=None) -> types.Vector2D:
-        """ Uses a precise goal vector. """
-        goal_pos = goal if goal is not None else self.goal_pos
-        rayFromPoint = p.getLinkState(self.ID, 0)[0]  # linkWorldPosition
-        goal_vector = [-rayFromPoint[0] + goal_pos[0], -rayFromPoint[1] + goal_pos[1]]
-
-        return goal_vector
-
-    def calculate_goal_vector_gc(self, gc_network, pod_network):
-        """ Uses decoded grid cell spikings as a goal vector. """
-        from system.controller.local_controller.local_navigation import compute_navigation_goal_vector
-        return compute_navigation_goal_vector(gc_network, self.nr_ofsteps, self, model=self.mode, pod=pod_network)
-
-    def reached(self, goal_vector : types.Vector2D) -> bool:
-        return abs(np.linalg.norm(goal_vector)) < self.arrival_threshold
-
-    def get_status(self):
-        ''' Returns robot status during navigation
-
-        returns:
-        0   -- robot still moving
-        1   -- robot arrived at goal
-        -1  -- robot stuck
-        '''
-
-        if self.mode == "analytical":
-            goal_vector = self.calculate_goal_vector_analytically()
-        else:
-            goal_vector = self.goal_vector
-
-        if self.reached(goal_vector):
-            return 1
-
-        # threshold for considering the agent as stuck
-        if self.mode == "analytical":
-            stop = 100
-        else:
-            stop = 200
-
-        if self.buffer + stop < len(self.data_collector.data) and stop < len(self.data_collector.data):
-            if np.linalg.norm(self.position - self.data_collector.data[-stop][0]) < 0.1:
-                return -1
-
-        # Still going
-        return 0
-
-    def turn_to_goal(self):
+    def turn_to_goal(self, goal_vector : Vector2D):
         """ Agent turns to face in goal vector direction """
-        if np.linalg.norm(np.array(self.goal_vector)) == 0:
-            return
+        print("Turning to goal...")
 
         i = 0
-        while i == 0 or (abs(diff_angle) > 0.05 and i < 5000):
+        MAX_ITERATIONS = 10
+        while i == 0 or (abs(diff_angle) > 0.05 and i < MAX_ITERATIONS):
             i += 1
-            normed_goal_vector = np.array(self.goal_vector) / np.linalg.norm(np.array(self.goal_vector))
+            normed_goal_vector = np.array(goal_vector) / np.linalg.norm(np.array(goal_vector))
 
             _, current_angle = self.position_and_angle
             current_heading = [np.cos(current_angle), np.sin(current_angle)]
@@ -741,7 +676,7 @@ class Robot:
 
             # If close to the goal do not move
             if gain < 0.5:
-                gain = 0
+                break
 
             # If large difference in heading, do an actual turn
             if abs(diff_angle) > 0.05 and gain > 0:
@@ -756,7 +691,8 @@ class Robot:
 
             gains = [v_left, -v_left]
 
-            self.step(gains)
+            print(f"Step with {gains=}")
+            self._step(gains, goal_vector)
 
         # turning in place does not mean the agent is stuck
         self.buffer = len(self.data_collector.xy_coordinates)
@@ -840,7 +776,7 @@ if __name__ == "__main__":
     env_model = "Savinov_val3"
 
     random = Random(0)
-    env = PybulletEnvironment(env_model, visualize=True, mode="keyboard", start=[-0.5, 0],
+    env = PybulletEnvironment(env_model, visualize=True, realtime=True, start=[-0.5, 0],
         wall_kwargs={
             'texture': lambda i: random.choice(all_possible_textures)
         }

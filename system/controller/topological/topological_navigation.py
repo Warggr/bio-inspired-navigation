@@ -22,7 +22,8 @@ from system.controller.local_controller.decoder.phase_offset_detector import Pha
 from system.controller.simulation.pybullet_environment import PybulletEnvironment, Robot
 from system.bio_model.cognitive_map import LifelongCognitiveMap, CognitiveMapInterface
 from system.bio_model.place_cell_model import PlaceCellNetwork, PlaceCell
-from system.controller.local_controller.local_navigation import vector_navigation, setup_gc_network, compute_navigation_goal_vector
+from system.controller.local_controller.compass import Compass, AnalyticalCompass
+from system.controller.local_controller.local_navigation import vector_navigation, setup_gc_network, PodGcCompass, LinearLookaheadGcCompass
 import system.plotting.plotResults as plot
 
 # if True plot results
@@ -100,14 +101,17 @@ class TopologicalNavigation(object):
 
         src_pos = list(path[0].env_coordinates)
 
-        simple_method = 'pod' if self.method == 'combo' else self.method
+        compass = Compass.factory(self.method, gc_network=self.gc_network, pod_network=self.pod)
+
         if env is None:
-            env = PybulletEnvironment(self.env_model, mode=simple_method, build_data_set=True, start=src_pos)
+            env = PybulletEnvironment(self.env_model, build_data_set=True, start=src_pos)
         else:
             assert env.env_model == self.env_model
-            env.robot.mode = simple_method
-            env.robot.delete()
-            env.robot = Robot(mode=simple_method, env=env, base_position=src_pos, build_data_set=True)
+            try:
+                env.robot.delete()
+            except AttributeError:
+                pass
+            env.robot = Robot(env=env, base_position=src_pos, build_data_set=True)
 
         if plotting:
             plot.plotTrajectoryInEnvironment(env, cognitive_map=self.cognitive_map, path=path)
@@ -118,10 +122,11 @@ class TopologicalNavigation(object):
         curr_path_length = 0
         while i + 1 < len(path) and curr_path_length < self.path_length_limit:
             goal_pos = list(path[i + 1].env_coordinates)
+            compass.goal_pos = goal_pos
             goal_spiking = path[i + 1].gc_connections
-            stop, pc = vector_navigation(env, goal_pos, self.gc_network, goal_spiking, model=self.method,
+            stop, pc = vector_navigation(env, compass, self.gc_network, goal_spiking,
                                          obstacles=True, exploration_phase=False, pc_network=self.pc_network,
-                                         pod=self.pod, cognitive_map=self.cognitive_map, plot_it=False,
+                                         cognitive_map=self.cognitive_map, plot_it=False,
                                          step_limit=self.step_limit)
             self.cognitive_map.postprocess_vector_navigation(node_p=path[i], node_q=path[i + 1],
                                                              observation_p=last_pc, observation_q=pc, success=stop == 1)
@@ -164,15 +169,15 @@ class TopologicalNavigation(object):
             self.cognitive_map.save(filename=cognitive_map_filename)
         return curr_path_length < self.path_length_limit, start_ind, goal_ind
 
-    def locate_node(self, env: PybulletEnvironment, pc: PlaceCell, goal: PlaceCell):
+    def locate_node(self, compass : Compass, pc: PlaceCell, goal: PlaceCell):
         """
         Maps a location of the given place cell to the node in the graph.
         Among multiple close nodes prioritize the one that has a valid path to the goal.
 
         arguments:
-        env: PybulletEnvironment -- current environment of the agent
-        pc: PlaceCell            -- a place cell to be located
-        goal: PlaceCell          -- goal node
+        compass: Compass   -- current environment of the agent
+        pc: PlaceCell      -- a place cell to be located
+        goal: PlaceCell    -- goal node
 
         returns:
         PlaceCell          -- mapped node in the graph or the given place cell if no node was found
@@ -180,9 +185,9 @@ class TopologicalNavigation(object):
         """
         closest_node = None
         for node in self.cognitive_map.node_network.nodes:
-            goal_vector = compute_navigation_goal_vector(self.gc_network, env.nr_ofsteps, env, model=env.mode, pod=self.pod)
-            env.goal_vector = goal_vector
-            if env.reached(goal_vector):
+            #compass = compass.reset()
+            compass.calculate_goal_vector(pc.env_coordinates)
+            if compass.reached_goal():
                 closest_node = node
                 new_path = self.cognitive_map.find_path(node, goal)
                 if new_path:

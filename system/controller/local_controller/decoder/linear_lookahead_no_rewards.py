@@ -14,7 +14,7 @@ from system.bio_model.grid_cell_model import GridCellNetwork
 
 active_threshold = 0.85
 
-def perform_look_ahead_2xnr(gc_network: GridCellNetwork, robot : 'Robot'):
+def perform_look_ahead_2xnr(gc_network: GridCellNetwork, arena_size):
     """Performs a linear lookahead to find an offset in grid cell spiking in either x or y direction."""
     gc_network.reset_s_virtual()  # Resets virtual gc spiking to actual spiking
 
@@ -23,7 +23,7 @@ def perform_look_ahead_2xnr(gc_network: GridCellNetwork, robot : 'Robot'):
     xy_speeds = np.array(([1, 0], [-1, 0], [0, 1], [0, -1])) * speed # define the four look-ahead velocity vectors
     goal_spiking = {}  # "axis": {"reward_value", "idx_place_cell", "distance", "step"}
 
-    max_distance = 1.1 * robot.env.arena_size  # after this distance lookahead is aborted
+    max_distance = 1.1 * arena_size  # after this distance lookahead is aborted
 
     max_nr_steps = int(max_distance / (speed * dt))
 
@@ -74,16 +74,12 @@ def perform_look_ahead_2xnr(gc_network: GridCellNetwork, robot : 'Robot'):
 
     goal_vector = np.array([axis["distance"] for axis in goal_spiking.values()])  # consolidate goal vector from dict
 
-    print("------ Goal localization at time-step: ", len(robot.data_collector) - 1)
     if len(goal_vector) != 2:
         # Something went wrong and no goal vector was found
-        goal_vector = np.random.rand(2) * 0.5
         print("Unable to find a goal_vector", goal_spiking)
         raise ValueError("No goal vector found.")
-    else:
-        print("Found goal vector", goal_vector, goal_spiking)
 
-    return goal_vector
+    return goal_vector, goal_spiking
 
 #TODO Johanna: this can be directly connected to the place cell network but we wanted to make the local controller independent
 def compute_firing_2x(gc_connections, s_vectors, axis, plot=False):

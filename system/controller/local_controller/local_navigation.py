@@ -22,9 +22,12 @@ from system.controller.local_controller.decoder.phase_offset_detector import Pha
 from system.controller.simulation.math_utils import Vector2D
 from system.bio_model.grid_cell_model import GridCellNetwork
 from system.controller.simulation.pybullet_environment import PybulletEnvironment, Robot
+from system.controller.local_controller.compass import Compass, AnalyticalCompass
 
 import system.plotting.plotResults as plot
 import numpy as np
+from abc import abstractmethod
+from typing import Optional
 
 plotting = True  # if True: plot everything
 debug = True  # if True: print debug output
@@ -36,38 +39,124 @@ def print_debug(*params):
         print(*params)
 
 
-update_fraction = 0.5  # how often the goal vector is recalculated
+class GoalVectorCache(Compass):
+    @property
+    def arrival_threshold(self):
+        return self.impl.arrival_threshold
+
+    @property
+    def goal_pos(self):
+        return self.impl.goal_pos
+
+    def __init__(self, impl : Compass, update_fraction = 0.5):
+        # intentionally don't call super().__init__() because we don't really need it
+        self.impl = impl
+        self.update_fraction = update_fraction # how often the goal vector is recalculated
+        self.goal_vector = None  # egocentric goal vector after last update
+        self.distance_to_goal_original = None # distance to goal after last recalculation
+
+    def calculate_goal_vector(self, currentPosition : Vector2D) -> Vector2D:
+        if self.goal_vector is None:
+            self.goal_vector = self.impl.calculate_goal_vector(currentPosition)
+            self.distance_to_goal_original = np.linalg.norm(self.goal_vector)
+
+        return self.goal_vector
+
+    def update(self, robot : Robot):
+        distance_to_goal = np.linalg.norm(self.goal_vector)  # current length of goal vector
+
+        if (
+                self.distance_to_goal_original > 0.3 and
+                distance_to_goal / self.distance_to_goal_original < self.update_fraction
+        ):
+            # Vector-based navigation and agent has traversed a large portion of the goal vector
+            # Discarding current (now inaccurate) goal vector so it gets recomputed next time calculate_goal_vector() is called
+            self.goal_vector = None
+
+            # adding a turn here could make the local controller more robust
+            # robot.turn_to_goal()
+        else:
+            self.goal_vector = self.goal_vector - np.array(robot.xy_speed) * robot.env.dt
+
+class GcCompass(Compass):
+    """ Uses decoded grid cell spikings as a goal vector. """
+
+    def __init__(self, gc_network : GridCellNetwork, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.gc_network = gc_network
+
+    def update(self, robot : Robot) -> bool:
+        self.gc_network.track_movement(robot.xy_speed)
+        return super().update(robot)
+
+    @staticmethod
+    def factory(mode, gc_network : GridCellNetwork, *args,
+        pod_network : Optional[PhaseOffsetDetectorNetwork] = None,
+        arena_size: Optional[float] = None,
+        **kwargs
+    ):
+        if mode == "pod":
+            return GoalVectorCache( PodGcCompass(pod_network, gc_network, *args, **kwargs) )
+        if mode == "linear_lookahead":
+            return GoalVectorCache( LinearLookaheadGcCompass(arena_size, gc_network, *args, **kwargs) )
+        elif mode == "combo":
+            return ComboGcCompass(pod_network, gc_network, *args, **kwargs)
+        else:
+            return ValueError(f"Unknown mode: {mode}. Expected one of: analytical, pod, linear_lookahead, combo")
 
 
-def compute_navigation_goal_vector(gc_network, nr_steps, robot : Robot, model="pod", pod=None):
-    """Computes the goal vector for the agent to travel to"""
-    distance_to_goal = np.linalg.norm(robot.goal_vector)  # current length of goal vector
-    distance_to_goal_original = np.linalg.norm(robot.goal_vector_original)  # length of goal vector at calculation
+class PodGcCompass(GcCompass):
+    arrival_threshold = 0.5
 
-    if (
-            distance_to_goal_original > 0.3 and
-            distance_to_goal / distance_to_goal_original < update_fraction
-    ) or nr_steps == 0:
-        # Vector-based navigation and agent has traversed a large portion of the goal vector, it is recalculated
-        # or it is the first calculation
-        find_new_goal_vector(gc_network, robot, model, pod=pod)
+    def __init__(self, pod_network : 'PhaseOffsetDetectorNetwork', *args, **kwargs):
+        if pod_network is None: # TODO Pierre this is ugly
+            pod_network = PhaseOffsetDetectorNetwork(16, 9, 40)
+        super().__init__(*args, **kwargs)
+        self.pod_network = pod_network
 
-        # adding a turn here could make the local controller more robust
-        # robot.turn_to_goal()
-    else:
-        robot.goal_vector = robot.goal_vector - np.array(robot.xy_speed) * robot.env.dt
-
-    return robot.goal_vector
+    def calculate_goal_vector(self, robotPosition):
+        """For Vector-based navigation, computes goal vector with one grid cell decoder"""
+        return self.pod_network.compute_goal_vector(self.gc_network.gc_modules)    
 
 
-def find_new_goal_vector(gc_network, robot : Robot, model, pod=None):
-    """For Vector-based navigation, computes goal vector with one grid cell decoder"""
+class LinearLookaheadGcCompass(GcCompass):
+    arrival_threshold = 0.2
+    def __init__(self, arena_size, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.arena_size = arena_size
 
-    if model == "pod":
-        robot.goal_vector = pod.compute_goal_vector(gc_network.gc_modules)
-    elif model == "linear_lookahead":
-        robot.goal_vector = perform_look_ahead_2xnr(gc_network, robot)
-    robot.goal_vector_original = robot.goal_vector
+    def calculate_goal_vector(self, robotPosition):
+        return perform_look_ahead_2xnr(self.gc_network, self.arena_size)
+
+
+class ComboGcCompass(GcCompass):
+    def __init__(self, pod_network : 'PhaseOffsetDetectorNetwork', gc_network : GridCellNetwork, *args, **kwargs):
+        super().__init__(gc_network, *args, **kwargs)
+        # self.gc_network = gc_network # already done by the super().__init__
+        self.gc_network = gc_network
+
+        compass = PodGcCompass(pod_network, gc_network, *args, **kwargs)
+        compass = GoalVectorCache(compass)
+        self.impl = compass
+
+    def calculate_goal_vector(self, *args, **kwargs):
+        return self.impl.calculate_goal_vector(*args, **kwargs)
+
+    @property
+    def arrival_threshold(self):
+        return self.impl.arrival_threshold
+
+    def update(self, robot : Robot):
+        goal_reached = super().update(robot)
+        if goal_reached and type(self.impl) == PodGcCompass:
+            # switch from pod to linear lookahead
+            self.impl = LinearLookaheadGcCompass(gc_network=self.gc_network, goal_pos=self.impl.goal_pos)
+            self.impl = GoalVectorCache(self.impl)
+            goal_vector = self.impl.calculate_goal_vector(robot.position)
+            robot.env.step_forever(4)
+            robot.turn_to_goal(goal_vector)
+            return False # Continue with the LL
+        return goal_reached
 
 
 def create_gc_spiking(start : Vector2D, goal : Vector2D):
@@ -77,26 +166,29 @@ def create_gc_spiking(start : Vector2D, goal : Vector2D):
     navigation this would have happened in the exploration phase.
     """
 
-    env = PybulletEnvironment("plane", mode="analytical", start=start)
+    env = PybulletEnvironment("plane", start=start)
     robot = env.robot
-    robot.goal_pos = goal
 
     # Grid-Cell Initialization
     gc_network = setup_gc_network(env.dt)
 
-    robot.goal_vector = robot.calculate_goal_vector_analytically()
-    robot.turn_to_goal()
+    compass = AnalyticalCompass(goal_pos=goal)
+    robot.turn_to_goal(compass.calculate_goal_vector(robot.position))
 
     i = 0
     while i < 5000:
         i += 1
         if i == 5000:
-            raise ValueError("Agent should not get caught in a loop in an empty plane.")
-        robot.navigation_step(gc_network, obstacles=False)
-        status = robot.get_status()
-        if status == -1:
-            raise ValueError("Agent should not get stuck in an empty plane.")
-        elif status == 1:
+            raise AssertionError("Agent should not get caught in a loop in an empty plane.")
+
+        goal_vector = compass.calculate_goal_vector(robot.position)
+        if np.linalg.norm(goal_vector) == 0:
+            break
+        robot.navigation_step(goal_vector, obstacles=False)
+        reached_goal = compass.update(robot)
+        gc_network.track_movement(robot.xy_speed)
+
+        if reached_goal:
             if plotting: plot.plotTrajectoryInEnvironment(env)
             env.end_simulation()
             return gc_network.consolidate_gc_spiking()
@@ -116,28 +208,22 @@ def setup_gc_network(dt):
     return gc_network
 
 
-def vector_navigation(env : PybulletEnvironment, goal : Vector2D, gc_network, target_gc_spiking=None, model="combo",
-                      step_limit=float('inf'), plot_it=False, obstacles=True, pod=PhaseOffsetDetectorNetwork(16, 9, 40),
+def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network, target_gc_spiking=None,
+                      step_limit=float('inf'), plot_it=False, obstacles=True,
                       collect_data_freq=False, collect_data_reachable=False, exploration_phase=False,
                       pc_network: PlaceCellNetwork = None, cognitive_map: CognitiveMapInterface = None):
-    """ 
+    """
     Agent navigates towards goal.
 
     arguments:
     env                    --  running PybulletEnvironment
-    goal                   --  coordinates of the goal
+    compass                --  A Compass pointing to the goal
     gc_network             --  grid cell network used for navigation (pod, linear_lookahead, combo)
                                or grid cell spiking generation (analytical)
     gc_spiking             --  grid cell spikings at the goal (pod, linear_lookahead, combo)
-    model                  --  pod: agent uses the phase-offset decoder for goal vector calculation
-                               linear_lookahead: agent uses linear lookahead decoder for goal vector calculation
-                               combo: agent uses pod until arrival, than switches to linear lookahead
-                               analytical: agent calculates precise goal vector using coordinates, collects spikings
-                               (default combo)
     step_limit             --  navigation stops after step_limit amount of steps (default infinity)
     plot_it                --  if true: plot the navigation (default false)
     obstacles              --  if true: movement vector is a combination of goal and obstacle vector (default true)
-    pod                    -- phase offset detector
     collect_data_freq      -- return necessary data for trajectory generation
     collect_data_reachable -- return necessary data for reachability dataset generation
     exploration_phase      -- track movement for cognitive map and place cell model (this is a misnomer and also used in the navigation phase)
@@ -149,27 +235,18 @@ def vector_navigation(env : PybulletEnvironment, goal : Vector2D, gc_network, ta
     assert len(goal) == 2 and isinstance(goal[0], Number) and isinstance(goal[1], Number), goal
 
     data = []
-    if model == "combo":
-        env.mode = "pod"
-    else:
-        env.mode = model
     robot = env.robot
 
-    robot.goal_pos = goal
-
-    if model != "analytical":
+    if gc_network:
         gc_network.set_as_target_state(target_gc_spiking)
 
     robot.nr_ofsteps = 0
-    if env.mode == "analytical":
-        robot.goal_vector = robot.calculate_goal_vector_analytically()
-    else:
-        robot.goal_vector = compute_navigation_goal_vector(gc_network, robot.nr_ofsteps, robot, model=env.mode, pod=pod)
-    robot.turn_to_goal()
+    goal_vector = compass.calculate_goal_vector(robot.position)
+    robot.turn_to_goal(goal_vector)
 
     if collect_data_reachable:
         sample_after_turn = (robot.data_collector[-1][0], robot.data_collector[-1][1])
-        first_goal_vector = robot.goal_vector
+        first_goal_vector = goal_vector
 
     n = 0  # time steps
     stop = False  # stop signal received
@@ -177,7 +254,11 @@ def vector_navigation(env : PybulletEnvironment, goal : Vector2D, gc_network, ta
     end_state = ""  # for plotting
     last_pc = None
     while n < step_limit and not stop:
-        robot.navigation_step(gc_network, pod, obstacles=obstacles)
+        try:
+            goal_reached = compass.step(robot, obstacles=obstacles)
+        except Robot.Stuck:
+            end_state = "Agent got stuck"
+            break
 
         if pc_network is not None and cognitive_map is not None:
             observations = robot.data_collector.get_observations()
@@ -190,25 +271,14 @@ def vector_navigation(env : PybulletEnvironment, goal : Vector2D, gc_network, ta
             if mapped_pc is not None:
                 last_pc = mapped_pc
 
-        status = robot.get_status()
-        if status == -1:
-            # Agent got stuck
-            end_state = "Agent got stuck"
+        if goal_reached:
+            print("Reached goal")
+            # Agent reached the goal
+            end_state = "Agent reached the goal. Actual distance: " + str(
+                np.linalg.norm(np.array(compass.goal_pos) - robot.position)) + "."
             stop = True
-        elif status == 1:
-            if model == "combo" and env.mode == "pod":
-                # In combined mode, switch from pod to linear lookahead
-                robot.mode = "linear_lookahead"
-                robot.nr_ofsteps = 0
-                robot.goal_vector = compute_navigation_goal_vector(gc_network, robot.nr_ofsteps, robot, model=robot.mode, pod=pod)
-                robot.turn_to_goal()
-            else:
-                # Agent reached the goal
-                end_state = "Agent reached the goal. Actual distance: " + str(
-                    np.linalg.norm(robot.goal_pos - robot.position)) + "."
-                stop = True
 
-        # over == 0 -> agent is still moving
+        # not goal_reached -> agent is still moving
 
         if collect_data_freq and n % collect_data_freq == 0:
             # collect grid cell spikings for trajectory generation

@@ -97,16 +97,11 @@ def plotTrajectoryInEnvironment(env : 'PybulletEnvironment', title="", xy_coordi
     if not xy_coordinates:
         xy_coordinates = env.robot.data_collector.xy_coordinates
 
-    if env_model:
-        # get the dimensions without having to adjust them here
-        from system.controller.simulation.pybullet_environment import PybulletEnvironment
-        env = PybulletEnvironment(env_model, mode="analytical")
-
     fig, ax = plt.subplots()
     add_environment(ax, env.env_model)
 
     # plot goal vector
-    if env and goal:
+    if goal:
         X, Y = xy_coordinates[-1]
         U, V = env.robot.data_collector[-1][4]
 
