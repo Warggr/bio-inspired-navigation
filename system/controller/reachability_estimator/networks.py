@@ -11,6 +11,7 @@ from system.bio_model.bc_network.parameters import BoundaryCellActivity
 
 import math
 import numpy as np
+import os
 
 import torch
 import torchvision
@@ -53,6 +54,22 @@ class Model(ABC):
             'convolutional': CNN, 'resnet': ResNet, 'siamese': Siamese
         }
         return backbone_classes[backbone_classname](*model_args, **model_kwargs)
+
+    def save(self, epoch, global_args, model_file):
+        """ save current state of the model """
+        state = {
+            'epoch': epoch,
+            'global_args': global_args,
+            'optims': {
+                name: opt.state_dict() for name, opt in self.optimizers.items()
+            },
+            'nets': {
+                name: net.state_dict() for name, net in self.nets.items()
+            }
+        }
+
+        path = os.path.join('', '%s.%d' % (model_file, epoch))
+        torch.save(state, path)
 
 
 class Siamese(Model):

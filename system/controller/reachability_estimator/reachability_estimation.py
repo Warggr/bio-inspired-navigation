@@ -260,12 +260,12 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         batch_size = min(self.batch_size, len(starts))
         while n_remaining > 0:
             batch_indices = slice(n - n_remaining, n - n_remaining + batch_size)
+            batch_args = [
+                batch[batch_indices] if batch is not None else None
+                for batch in [starts, goals, src_spikings, goal_spikings, src_distances]
+            ] # TODO Pierre: this is ugly
             results.append(
-                get_prediction(
-                    starts[batch_indices], goals[batch_indices],
-                    src_spikings[batch_indices], goal_spikings[batch_indices],
-                    src_distances[batch_indices], goal_distances[batch_indices],
-                )[0]
+                get_prediction(*batch_args)[0]
             )
             n_remaining -= batch_size
         return torch.cat(results, dim=0).data.cpu().numpy()

@@ -92,24 +92,15 @@ def module_weights_stats(module):
     ]
     return tabulate.tabulate(data, headers, tablefmt='psql')
 
-
-def save_model(state, step, dir, filename):
-    import torch
-    path = os.path.join(dir, '%s.%d' % (filename, step))
-    torch.save(state, path)
-
-
-def load_model(dir, filename, step=None, load_to_cpu=False):
+def load_model(filepath, step=None, load_to_cpu=False):
     '''
-    :param model:
-    :param dir:
-    :param filename:
+    :param filepath: The path to the model file, without .{epoch} extension
     :param step: if None. Load the latest.
     :return: the saved state dict
     '''
     import torch
     if not step:
-        files = glob.glob(os.path.join(dir, '%s.*' % filename))
+        files = glob.glob(filepath + '.*')
         parsed = []
         for fn in files:
             try:
@@ -120,10 +111,10 @@ def load_model(dir, filename, step=None, load_to_cpu=False):
             parsed.append(r)
 
         if not parsed:
-            raise FileNotFoundError
+            raise FileNotFoundError(f"Could not find any iteration of {os.path.basename(filepath)} in {os.path.dirname(filepath)}")
         step = max(parsed)
 
-    path = os.path.join(dir, '%s.%d' % (filename, step))
+    path = filepath + '.' + str(step)
 
     if not os.path.isfile(path):
         raise ValueError(path + ' is not a valid path')

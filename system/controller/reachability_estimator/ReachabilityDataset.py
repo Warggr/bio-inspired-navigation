@@ -33,6 +33,7 @@ class SampleConfig:
             + (f'+lidar--{self.lidar}' if self.lidar else '')
         )
 
+DATA_STORAGE_FOLDER = os.path.join(os.path.dirname(__file__), "data", "reachability")
 
 class ReachabilityDataset(torch.utils.data.Dataset):
     """ create a pytorch compatible dataset from a reachability sample hd5 file
@@ -48,8 +49,8 @@ class ReachabilityDataset(torch.utils.data.Dataset):
         transformation  -- transformation between source position and goal position
     """
 
-    def __init__(self, path, external_link=False, sample_config : SampleConfig = SampleConfig()):
-        self.file_path = path
+    def __init__(self, filename, external_link=False, sample_config : SampleConfig = SampleConfig(), dirname = DATA_STORAGE_FOLDER):
+        self.file_path = os.path.join(dirname, filename)
         self.dataset = None
         self.externalLink = external_link
         self.dataset = h5py.File(self.file_path, 'r')
@@ -222,16 +223,9 @@ def combine_datasets(new_file, filenames, filepath):
         myfile[str(i)] = h5py.ExternalLink(fn, filepath)
 
 
-def get_path():
-    """ returns path to data storage folder """
-    dirname = os.path.join(os.path.dirname(__file__), "..")
-    return dirname
-
-
 if __name__ == '__main__':
     """Test H5 reachability datasets by displaying their content."""
-    path = get_path()
-    path = os.path.join(path, "data/reachability")
+    path = DATA_STORAGE_FOLDER
     new_file = os.path.join(path, "reachability_combined_dataset.hd5")
 
     # Combine multiple datasets in case you have multiple

@@ -18,24 +18,19 @@ from torch.utils.tensorboard import SummaryWriter
 import sys
 import os
 import numpy as np
-from typing import Type
+from typing import Type, Literal, Callable
 
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
 from system.controller.reachability_estimator.networks import Model
 from system.controller.reachability_estimator.ReachabilityDataset import ReachabilityDataset, SampleConfig
-from system.controller.reachability_estimator.training.utils import save_model, load_model
+from system.controller.reachability_estimator.training.utils import load_model
 
+DATA_STORAGE_FOLDER = os.path.join(os.path.dirname(__file__), "..", "data", "models")
 
-def get_path():
-    """ returns path to data storage folder """
-    dirname = os.path.join(os.path.dirname(__file__), "..")
-    return dirname
-
-
-def _load_weights(model_file, nets : Model, **kwargs):
-    state = load_model( os.path.dirname(model_file), os.path.basename(model_file), load_to_cpu=True, **kwargs)
+def _load_weights(model_file, nets : Model, **kwargs) -> int:
+    state = load_model( model_file, load_to_cpu=True, **kwargs)
     epoch = int(state['epoch'])
 
     for name, net in nets.nets.items():
@@ -56,27 +51,11 @@ def _load_weights(model_file, nets : Model, **kwargs):
     return epoch
 
 
-def _save_model(nets : Model, epoch, global_args, model_file):
-    """ save current state of the model """
-    state = {
-        'epoch': epoch,
-        'global_args': global_args,
-        'optims': {
-            name: opt.state_dict() for name, opt in nets.optimizers.items()
-        },
-        'nets': {
-            name: net.state_dict() for name, net in nets.nets.items()
-        }
-    }
-    save_model(state, epoch, '', model_file)
-
-
-def run_test_model(dataset):
+def run_test_model(dataset, filename = "trained_model_new.50"):
     """ Test model on dataset. Logs accuracy, precision, recall and f1score. """
 
     from system.controller.reachability_estimator.reachability_estimation import NetworkReachabilityEstimator
-    filename = "trained_model_new.50"
-    filepath = os.path.join(os.path.join(os.path.dirname(__file__), "../data/models"), filename)
+    filepath = os.path.join(DATA_STORAGE_FOLDER, filename)
     reach_estimator = NetworkReachabilityEstimator(weights_file=filepath)
 
     n_samples = 6400
@@ -129,101 +108,116 @@ def run_test_model(dataset):
     writer.add_scalar("Recall/Testing", test_recall, 1)
     writer.add_scalar("fscore/Testing", test_f1, 1)
 
+Batch = any
+TrainDevice = Literal['cpu', 'gpu'] # TODO (Pierre): not sure about how exactly 'gpu' is called
 
-def tensor_log(title: str, loader: DataLoader, train_device, writer, epoch, net: Model, position_loss_weight = 0.6, angle_loss_weight = 0.3):
+def process_batch(item : Batch, train_device : TrainDevice):
+    item = [ data.to(device=train_device, non_blocking=True) for data in item ]
+    src_imgs, dst_imgs, reachability, transformation, *other_args = item
+    src_imgs = src_imgs.to(device=train_device, non_blocking=True).float()
+    dst_imgs = dst_imgs.to(device=train_device, non_blocking=True).float()
+    assert not torch.any(src_imgs.isnan())
+    assert not torch.any(dst_imgs.isnan())
+    assert not torch.any(reachability.isnan())
+
+    reachability = torch.clamp(reachability, 0.0, 1.0) # mainly to make it a tensor of float
+    position = transformation[:, 0:2]
+    angle = transformation[:, -1]
+    model_args = (src_imgs, dst_imgs, transformation, *other_args)
+    ground_truth = (reachability, position, angle)
+    return ground_truth, model_args
+
+Result = (float, float, float)
+LossFunction = Callable[(Result, Result), torch.Tensor]
+
+def make_loss_function(position_loss_weight = 0.6, angle_loss_weight = 0.3) -> LossFunction:
+    def loss_function(prediction : Result, truth : Result, return_details = False) -> torch.Tensor:
+        reachability_prediction, position_prediction, angle_prediction = prediction
+        reachability, position, angle = truth
+
+        loss_reachability = torch.nn.functional.binary_cross_entropy(reachability_prediction, reachability, reduction='none')
+        if position_prediction is None:
+            loss = loss_reachability
+        else:
+            loss_position = torch.sum(torch.nn.functional.mse_loss(position_prediction, position, reduction='none'), dim=1)
+            loss_angle = torch.nn.functional.mse_loss(angle_prediction, angle, reduction='none')
+            loss = loss_reachability + reachability @ (position_loss_weight * loss_position + angle_loss_weight * loss_angle)
+
+        # Loss
+        loss = loss.sum()
+        assert not loss.isnan()
+        if return_details:
+            return loss, (loss_reachability, loss_position, loss_angle)
+        else:
+            return loss
+    return loss_function
+
+def tensor_log(
+    loader : DataLoader,
+    train_device,
+    writer : SummaryWriter,
+    epoch : int,
+    net: Model,
+    loss_function: LossFunction,
+):
     """ Log accuracy, precision, recall and f1score for dataset in loader."""
     with torch.no_grad():
         log_loss = 0
-        log_precision = 0
-        log_recall = 0
-        log_accuracy = 0
-        log_f1 = 0
-        accuracy = BinaryAccuracy()
-        precision = BinaryPrecision()
-        recall = BinaryRecall()
-        f1 = BinaryF1Score()
+
+        metrics = {
+            'Metrics/Accuracy': BinaryAccuracy(),
+            'Metrics/Precision': BinaryPrecision(),
+            'Metrics/Recall': BinaryRecall(),
+            'Metrics/Fscore': BinaryF1Score(),
+        }
+        loss_detail_names = ['Loss/Reachability', 'Loss/Position', 'Loss/Angle']
+        log_scores = { key: 0 for key in list(metrics.keys()) + loss_detail_names }
+
         for idx, item in enumerate(loader):
-            batch_src_imgs, batch_dst_imgs, batch_reachability, batch_transformation, *other_data = item
-            batch_src_spikings, batch_dst_spikings, batch_src_distances = None, None, None
-            other_data = iter(other_data)
-            if net.with_grid_cell_spikings:
-                batch_src_spikings, batch_dst_spikings = next(other_data), next(other_data)
-                batch_src_spikings = batch_src_spikings.to(device=train_device, non_blocking=True).float()
-                batch_dst_spikings = batch_dst_spikings.to(device=train_device, non_blocking=True).float()
-            if net.with_lidar:
-                batch_src_distances = next(other_data)
-                batch_src_distances = batch_src_distances.to(device=train_device, non_blocking=True).float()
-            # Get predictions
-            src_img = batch_src_imgs.to(device=train_device, non_blocking=True)
-            dst_imgs = batch_dst_imgs.to(device=train_device, non_blocking=True)
-            r = batch_reachability.to(device=train_device, non_blocking=True)
-            r = torch.clamp(r, 0.0, 1.0) # to make it into a float (instead of bool)
-            transformation = batch_transformation.to(device=train_device, non_blocking=True)
-            position = transformation[:, 0:2]
-            angle = transformation[:, -1]
+            ground_truth, model_args = process_batch(item, train_device=train_device)
+            prediction = nets.get_prediction(*model_args)
+            loss, loss_details = loss_function(prediction, ground_truth, return_details=True)
 
-            src_batch = src_img.float()
-            dst_batch = dst_imgs.float()
-            prediction = net.get_prediction(src_batch, dst_batch, batch_transformation, batch_src_spikings, batch_dst_spikings, batch_src_distances)
+            loss_reachability, loss_position, loss_angle = loss_details
             reachability_prediction, position_prediction, angle_prediction = prediction
+            reachability, position, angle = ground_truth
 
-            loss_reachability = torch.nn.functional.binary_cross_entropy(reachability_prediction, r,
-                                                                         reduction='none')
-            if position_prediction is None:
-                new_loss = loss_reachability
-            else:
-                loss_position = torch.sqrt(torch.sum(
-                    torch.nn.functional.mse_loss(position_prediction, position, reduction='none'), dim=1))
-                loss_angle = torch.sqrt(torch.nn.functional.mse_loss(angle_prediction, angle, reduction='none'))
+            log_loss += loss.item()
+            for key, metric in metrics.items():
+                log_scores[key] += metric(reachability_prediction, reachability.int())
+            for key, loss_detail in zip(loss_detail_names, loss_details):
+                log_scores[key] += loss_detail.sum().item()
 
-                # backwards gradient
-                new_loss = loss_reachability + r @ (position_loss_weight * loss_position + angle_loss_weight * loss_angle)
-
-            log_loss += new_loss.sum().item()
-            log_precision += precision(reachability_prediction, r.int())
-            log_recall += recall(reachability_prediction, r.int())
-            accuracy = Accuracy(task="binary")
-            log_accuracy += accuracy(reachability_prediction, r.int())
-            f1 = F1Score(task="binary")
-            log_f1 += f1(reachability_prediction, r.int())
-
-        log_loss /= len(loader)
-        log_precision /= len(loader)
-        log_recall /= len(loader)
-        log_accuracy /= len(loader)
-        log_f1 /= len(loader)
-
-        writer.add_scalar("Accuracy/" + title, log_accuracy, epoch)
-        writer.add_scalar("Precision/" + title, log_precision, epoch)
-        writer.add_scalar("Recall/" + title, log_recall, epoch)
-        writer.add_scalar("Loss/" + title, log_loss, epoch)
-        writer.add_scalar("Fscore/" + title, log_f1, epoch)
-
+        writer.add_scalar("Loss/Validation", log_loss / len(loader), epoch)
+        for key, value in log_scores.items():
+            writer.add_scalar(key, value / len(loader), epoch)
 
 def train_multiframedst(
     nets : Model, dataset : ReachabilityDataset,
-    model_file,
-    resume : bool,
-    batch_size,
-    samples_per_epoch,
-    max_epochs,
-    lr_decay_epoch,
-    lr_decay_rate,
-    n_dataset_worker,
-    train_device,
-    log_interval,
-    save_interval,
-    position_loss_weight,
-    angle_loss_weight,
-    backbone,
+    train_device : TrainDevice,
+    resume : bool = False,
+    batch_size = 64,
+    samples_per_epoch = 10000,
+    max_epochs = 50,
+    lr_decay_epoch = 1,
+    lr_decay_rate = 0.7,
+    n_dataset_worker = 0,
+    log_interval = 20,
+    save_interval = 5,
+    model_suffix : str = '',
+    model_filename = "reachability_network",
+    model_dir = DATA_STORAGE_FOLDER,
+    loss_function : LossFunction = make_loss_function(),
 ):
     """ Train the model on a multiframe dataset. """
 
     # For Tensorboard: log the runs
-    writer = SummaryWriter()
+    writer = SummaryWriter(comment=model_suffix)
 
     epoch = 0
 
+    model_filename = model_filename + model_suffix
+    model_file = os.path.join(model_dir, model_filename)
     # Resume: load weights and continue training
     if resume:
         try:
@@ -273,41 +267,14 @@ def train_multiframedst(
         last_log_time = time.time()
 
         for idx, item in enumerate(loader):
-            item = [ data.to(device=train_device, non_blocking=True) for data in item ]
-            src_imgs, dst_imgs, reachability, transformation, *other_args = item
-            src_imgs = src_imgs.to(device=train_device, non_blocking=True).float()
-            dst_imgs = dst_imgs.to(device=train_device, non_blocking=True).float()
-            try:
-                assert not torch.any(src_imgs.isnan())
-                assert not torch.any(dst_imgs.isnan())
-                assert not torch.any(reachability.isnan())
-            except AssertionError:
-                print(f'src_imgs with ids [{idx}] contained NaN - skipping')
-            reachability = torch.clamp(reachability, 0.0, 1.0) # mainly to make it a tensor of float
-            position = transformation[:, 0:2]
-            angle = transformation[:, -1]
-
             # Zeros optimizer gradient
             for _, opt in nets.optimizers.items():
                 opt.zero_grad()
 
-            # Get predictions
-            prediction = nets.get_prediction(src_imgs, dst_imgs, transformation, *other_args)
+            ground_truth, model_args = process_batch(item, train_device=train_device)
+            prediction = nets.get_prediction(*model_args)
+            loss = loss_function(prediction, ground_truth)
 
-            reachability_prediction, position_prediction, angle_prediction = prediction
-            assert not np.isnan(sum(reachability_prediction.detach().numpy()))
-
-            # Loss
-            loss_reachability = torch.nn.functional.binary_cross_entropy(reachability_prediction, reachability, reduction='none')
-            if position_prediction is None:
-                loss = loss_reachability
-            else:
-                loss_position = torch.sum(torch.nn.functional.mse_loss(position_prediction, position, reduction='none'), dim=1)
-                loss_angle = torch.nn.functional.mse_loss(angle_prediction, angle, reduction='none')
-                loss = loss_reachability + reachability @ (position_loss_weight * loss_position + angle_loss_weight * loss_angle)
-
-            loss = loss.sum()
-            assert not loss.isnan()
             # backwards gradient
             loss.backward()
 
@@ -337,7 +304,7 @@ def train_multiframedst(
         if epoch % save_interval == 0:
             print('saving model...')
             writer.flush()
-            _save_model(nets, epoch, global_args, model_file)
+            nets.save(epoch, global_args, model_file)
 
         # Validation
         valid_loader = DataLoader(valid_dataset,
@@ -345,19 +312,23 @@ def train_multiframedst(
                                   num_workers=n_dataset_worker)
 
         # log performance on the validation set
-        try:
-            tensor_log("Validation", valid_loader, train_device, writer, epoch, nets, position_loss_weight, angle_loss_weight)
-        except AssertionError:
-            print('Could not compute val error due to NaN :(')
+        tensor_log(valid_loader, train_device, writer, epoch, nets, loss_function)
 
 
-def validate_func(model_file, net : Model, dataset, batch_size, train_device, position_loss_weight, angle_loss_weight):
+def validate_func(net : Model, dataset : ReachabilityDataset, batch_size, train_device,
+    loss_function : LossFunction,
+    model_suffix : str,
+    model_filename = "reachability_network",
+    model_dir = DATA_STORAGE_FOLDER,
+):
+    model_filename = model_filename + model_suffix
+    model_file = os.path.join(model_dir, model_filename)
     epoch = _load_weights(model_file, nets)
     print('loaded saved state. epoch: %d' % epoch)
     train_size = int(0.8 * len(dataset))
     valid_size = len(dataset) - train_size
     train_dataset, valid_dataset = torch.utils.data.random_split(dataset, [train_size, valid_size])
-    writer = SummaryWriter()
+    writer = SummaryWriter(comment=model_suffix)
 
     # Validation
     valid_loader = DataLoader(valid_dataset,
@@ -365,9 +336,9 @@ def validate_func(model_file, net : Model, dataset, batch_size, train_device, po
                               num_workers=0)
 
     # log performance on the validation set
-    tensor_log("Validation", valid_loader, train_device, writer, epoch, net, position_loss_weight, angle_loss_weight)
+    tensor_log(valid_loader, train_device, writer, epoch, net, loss_function)
     writer.flush()
-
+    print("Run info written to", writer.log_dir)
 
 if __name__ == '__main__':
 
@@ -384,7 +355,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('mode', choices=['train', 'test', 'validate'], help='mode')
-    parser.add_argument('--dataset-features', nargs='+')
+    parser.add_argument('--dataset-features', nargs='+', default=[])
     parser.add_argument('--spikings', dest='with_grid_cell_spikings', help='Grid cell spikings are included in the dataset', action='store_true')
     parser.add_argument('--lidar', help='LIDAR distances are included in the dataset', choices=['raw_lidar', 'ego_bc', 'allo_bc'])
     parser.add_argument('--pair-conv', dest='with_conv_layer', help='Pair-conv neural network', action='store_true', default=True)
@@ -403,51 +374,27 @@ if __name__ == '__main__':
     if args.with_conv_layer:
         suffix += '+conv'
 
-    global_args = {
-        'model_file': os.path.join(get_path(), "data", "models", "reachability_network" + suffix),
-        'resume': args.resume,
-        'batch_size': 64,
-        'samples_per_epoch': 10000,
-        'max_epochs': 50,
-        'lr_decay_epoch': 1,
-        'lr_decay_rate': 0.7,
-        'n_dataset_worker': 0,
-        'log_interval': 20,
-        'save_interval': 5,
-        'train_device': "cpu",
-        'position_loss_weight': 0.006,
-        'angle_loss_weight': 0.003,
-        'backbone': 'convolutional',  # convolutional, res_net
-    }
-    model_kwargs = { key: getattr(args, key) for key in ['with_conv_layer', 'with_dist'] }
+    filename = "dataset" + args.dataset_features + ".hd5"
+    dataset = ReachabilityDataset(filename)
+
+    backbone = 'convolutional' # convolutional, res_net
 
     # Defining the NN and optimizers
-    nets = Model.create_from_config(global_args['backbone'], **model_kwargs)
+    model_kwargs = { key: getattr(args, key) for key in ['with_conv_layer', 'with_dist'] }
+    nets = Model.create_from_config(backbone, **model_kwargs)
+
+    loss_function = make_loss_function(position_loss_weight=0.006, angle_loss_weight=0.003)
+    global_args = {
+        'batch_size': 64,
+        'train_device': "cpu",
+        'loss_function': loss_function,
+        'model_suffix': suffix,
+    }
 
     if args.mode == "validate":
-        filepath = os.path.join(get_path(), "data", "reachability", "trajectories.hd5")
-        filepath = os.path.realpath(filepath)
-        dataset = ReachabilityDataset(filepath)
-
-        validate_func(global_args['model_file'],
-                 nets,
-                 dataset,
-                 global_args['batch_size'],
-                 global_args['train_device'],
-                 global_args['position_loss_weight'],
-                 global_args['angle_loss_weight'])
+        validate_func(nets, dataset, **global_args)
     elif args.mode == "test":
-        # Testing
-        filepath = os.path.join(get_path(), "data", "reachability", "trajectories.hd5")
-        filepath = os.path.realpath(filepath)
-        dataset = ReachabilityDataset(filepath)
         run_test_model(dataset)
     elif args.mode == "train":
-        # Training
-        filename = "dataset" + args.dataset_features + ".hd5"
-        filepath = os.path.join(get_path(), "data", "reachability", filename)
-        filepath = os.path.realpath(filepath)
-        dataset = ReachabilityDataset(filepath)
         print("Training with dataset of length", len(dataset))
-
-        train_multiframedst(nets, dataset=dataset, **global_args)
+        train_multiframedst(nets, dataset, resume=args.resume, **global_args)
