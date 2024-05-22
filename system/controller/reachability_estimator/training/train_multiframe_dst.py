@@ -192,15 +192,21 @@ def tensor_log(
         for key, value in log_scores.items():
             writer.add_scalar(key, value / len(loader), epoch)
 
+from dataclasses import dataclass
+
+@dataclass
+class Hyperparameters:
+    batch_size : int = 64
+    samples_per_epoch : int = 10000
+    max_epochs : int = 50
+    lr_decay_epoch : int = 1
+    lr_decay_rate : float = 0.7
+
 def train_multiframedst(
     nets : Model, dataset : ReachabilityDataset,
     train_device : TrainDevice,
     resume : bool = False,
-    batch_size = 64,
-    samples_per_epoch = 10000,
-    max_epochs = 50,
-    lr_decay_epoch = 1,
-    lr_decay_rate = 0.7,
+    hyperparams : Hyperparameters = Hyperparameters(),
     n_dataset_worker = 0,
     log_interval = 20,
     save_interval = 5,
@@ -239,13 +245,13 @@ def train_multiframedst(
     net_scheds = {
         name: torch.optim.lr_scheduler.StepLR(
             opt,
-            step_size=lr_decay_epoch,
-            gamma=lr_decay_rate,
+            step_size=hyperparams.lr_decay_epoch,
+            gamma=hyperparams.lr_decay_rate,
             last_epoch=last_epoch)
         for name, opt in nets.optimizers.items()
     }
 
-    n_samples = samples_per_epoch
+    n_samples = hyperparams.samples_per_epoch
 
     # Splitting the Dataset into Train/Validation:
     train_size = int(0.8 * len(dataset))
@@ -258,7 +264,7 @@ def train_multiframedst(
         sampler = RandomSampler(train_dataset, True, n_samples)
 
         loader = DataLoader(train_dataset,
-                            batch_size=batch_size,
+                            batch_size=hyperparams.batch_size,
                             sampler=sampler,
                             num_workers=n_dataset_worker,
                             pin_memory=True,
@@ -289,7 +295,7 @@ def train_multiframedst(
                 # for name, net in nets.items():
                 #     print(f'{name} grad:\n{module_grad_stats(net)}')
 
-                writer.add_scalar("Loss/train",loss, epoch*n_samples+idx*batch_size)
+                writer.add_scalar("Loss/train",loss, epoch*n_samples+idx*hyperparams.batch_size)
                 last_log_time = time.time()
 
         # learning rate decay
@@ -297,18 +303,18 @@ def train_multiframedst(
             sched.step()
 
         epoch += 1
-        if epoch > max_epochs:
+        if epoch > hyperparams.max_epochs:
             writer.flush()
             break
 
         if epoch % save_interval == 0:
             print('saving model...')
             writer.flush()
-            nets.save(epoch, global_args, model_file)
+            nets.save(epoch, hyperparams, model_file)
 
         # Validation
         valid_loader = DataLoader(valid_dataset,
-                                  batch_size=batch_size,
+                                  batch_size=hyperparams.batch_size,
                                   num_workers=n_dataset_worker)
 
         # log performance on the validation set
@@ -385,16 +391,15 @@ if __name__ == '__main__':
 
     loss_function = make_loss_function(position_loss_weight=0.006, angle_loss_weight=0.003)
     global_args = {
-        'batch_size': 64,
         'train_device': "cpu",
         'loss_function': loss_function,
         'model_suffix': suffix,
     }
 
     if args.mode == "validate":
-        validate_func(nets, dataset, **global_args)
+        validate_func(nets, dataset, batch_size=64, **global_args)
     elif args.mode == "test":
         run_test_model(dataset)
     elif args.mode == "train":
         print("Training with dataset of length", len(dataset))
-        train_multiframedst(nets, dataset, resume=args.resume, **global_args)
+        train_multiframedst(nets, dataset, resume=args.resume, hyperparams=Hyperparameters(batch_size=64), **global_args)
