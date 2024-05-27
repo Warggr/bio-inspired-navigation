@@ -49,7 +49,7 @@ class Compass(ABC):
     def step(self, robot : 'Robot', *args, **kwargs) -> bool:
         goal_vector = self.calculate_goal_vector(robot.position)
         if np.linalg.norm(goal_vector) == 0:
-            return False
+            return True
         robot.navigation_step(goal_vector, *args, **kwargs)
         return self.update(robot)
 

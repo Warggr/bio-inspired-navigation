@@ -388,6 +388,8 @@ class PybulletEnvironment:
 
         if agent_pos_orn:
             rayFromPoint, euler_angle = agent_pos_orn
+            if len(rayFromPoint) == 2:
+                rayFromPoint = list(rayFromPoint) + [ PybulletEnvironment.ROBOT_Z_POS + 0.1 ] # TODO: make sure this is high enough not to hit the robot, if there is one
         else:
             rayFromPoint, euler_angle = self.robot.lidar_sensor_position
 
@@ -505,7 +507,7 @@ class Robot:
         return position, angle
 
     @property
-    def position(self):
+    def position(self) -> types.Vector2D:
         return self.position_and_angle[0]
 
     @property

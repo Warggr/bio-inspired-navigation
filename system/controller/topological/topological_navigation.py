@@ -133,7 +133,7 @@ class TopologicalNavigation(object):
 
             curr_path_length += 1
             if stop != 1:
-                last_pc, new_path = self.locate_node(env, pc, goal)
+                last_pc, new_path = self.locate_node(compass, pc, goal)
                 if not last_pc:
                     last_pc = path[i]
 

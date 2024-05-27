@@ -515,13 +515,14 @@ class LifelongCognitiveMap(CognitiveMapInterface):
             return
 
         self.update_edge_parameters(node_p, node_q, observation_p, success)
-        if not success and self.remove_edges:
-            if self.node_network[node_q][node_p]['connectivity_probability'] < self.threshold_edge_removal:
-                self.remove_bidirectional_edge(node_p, node_q)
 
         self.print_debug(
             f"edge [{list(self.node_network.nodes).index(node_p)}-{list(self.node_network.nodes).index(node_q)}]: " +
             f"success {success} conn {self.node_network[node_q][node_p]['connectivity_probability']}")
+
+        if not success and self.remove_edges:
+            if self.node_network[node_q][node_p]['connectivity_probability'] < self.threshold_edge_removal:
+                self.remove_bidirectional_edge(node_p, node_q)
 
     def update_edge_parameters(self, node_p: PlaceCell, node_q: PlaceCell, observation_p: PlaceCell, success: bool):
         """ Helper function. Performs map processing after one full vector navigation.
@@ -569,12 +570,12 @@ class LifelongCognitiveMap(CognitiveMapInterface):
 
     def remove_bidirectional_edge(self, node_p: PlaceCell, node_q: PlaceCell):
         """ Helper function, removes bidirectional edge between two nodes """
-        self.node_network.remove_edge(node_p, node_q)
-        self.node_network.remove_edge(node_q, node_p)
         nodelist = list(self.node_network.nodes)
         self.print_debug(
             f"deleting edge [{nodelist.index(node_p)}-{nodelist.index(node_q)}]: " +
             f"conn {self.node_network[node_q][node_p]['connectivity_probability']}")
+        self.node_network.remove_edge(node_p, node_q)
+        self.node_network.remove_edge(node_q, node_p)
 
     def deduplicate_nodes(self):
         """ Helper function, performs node cleanup. If nodes have too many common neighbors,

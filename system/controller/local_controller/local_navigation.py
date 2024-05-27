@@ -133,7 +133,6 @@ class ComboGcCompass(GcCompass):
     def __init__(self, pod_network : 'PhaseOffsetDetectorNetwork', gc_network : GridCellNetwork, *args, **kwargs):
         super().__init__(gc_network, *args, **kwargs)
         # self.gc_network = gc_network # already done by the super().__init__
-        self.gc_network = gc_network
 
         compass = PodGcCompass(pod_network, gc_network, *args, **kwargs)
         compass = GoalVectorCache(compass)
@@ -296,7 +295,7 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network, t
         return status, [sample_after_turn, first_goal_vector]
 
     if not last_pc and not exploration_phase and pc_network:
-        pc_network.create_new_pc(gc_network.consolidate_gc_spiking(), get_observations(env), env.xy_coordinates[-1])
+        pc_network.create_new_pc(gc_network.consolidate_gc_spiking(), observations, env.xy_coordinates[-1])
         last_pc = pc_network.place_cells[-1]
     return status, last_pc
 

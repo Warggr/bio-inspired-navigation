@@ -43,8 +43,8 @@ def reachability_estimator_factory(type: str = 'distance', /, device: str = 'cpu
         return SimulationReachabilityEstimator(device=device, debug=debug, env_model=env_model)
     elif type == 'view_overlap':
         return ViewOverlapReachabilityEstimator(device=device, debug=debug)
-    print("Reachability estimator type not defined: " + type)
-    return None
+    else:
+        raise ValueError("Reachability estimator type not defined: " + type)
 
 
 class ReachabilityEstimator(ABC):

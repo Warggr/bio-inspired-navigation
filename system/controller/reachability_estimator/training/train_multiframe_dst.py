@@ -18,7 +18,7 @@ from torch.utils.tensorboard import SummaryWriter
 import sys
 import os
 import numpy as np
-from typing import Type, Literal, Callable
+from typing import Type, Literal, Callable, Any
 
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
@@ -108,7 +108,7 @@ def run_test_model(dataset, filename = "trained_model_new.50"):
     writer.add_scalar("Recall/Testing", test_recall, 1)
     writer.add_scalar("fscore/Testing", test_f1, 1)
 
-Batch = any
+Batch = Any
 TrainDevice = Literal['cpu', 'gpu'] # TODO (Pierre): not sure about how exactly 'gpu' is called
 
 def process_batch(item : Batch, train_device : TrainDevice):
@@ -258,7 +258,7 @@ def train_multiframedst(
     valid_size = len(dataset) - train_size
     train_dataset, valid_dataset = torch.utils.data.random_split(dataset, [train_size, valid_size])
 
-    while True:
+    for epoch in range(epoch + 1, hyperparams.max_epochs + 1):
         print('===== epoch %d =====' % epoch)
 
         sampler = RandomSampler(train_dataset, True, n_samples)
@@ -302,12 +302,7 @@ def train_multiframedst(
         for _, sched in net_scheds.items():
             sched.step()
 
-        epoch += 1
-        if epoch > hyperparams.max_epochs:
-            writer.flush()
-            break
-
-        if epoch % save_interval == 0:
+        if epoch % save_interval == 0 or epoch == hyperparams.max_epochs:
             print('saving model...')
             writer.flush()
             nets.save(epoch, hyperparams, model_file)
