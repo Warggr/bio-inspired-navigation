@@ -91,28 +91,27 @@ class Siamese(Model):
 
 
 class CNN(Model):
-    def __init__(self, with_conv_layer=True, with_dist=False, with_grid_cell_spikings=False, with_lidar=False):
+    def __init__(self, config : 'SampleConfig', with_conv_layer=True, with_dist=False):
         self.with_conv_layer = with_conv_layer
         self.with_dist = with_dist
-        self.with_grid_cell_spikings = with_grid_cell_spikings
-        self.with_lidar = with_lidar
+        self.with_grid_cell_spikings = config.with_grid_cell_spikings
+        self.lidar = config.lidar
         # Defining the NN and optimizers
 
-        input_dim = 512 # if self.with_conv_layer else 5120
-        if with_dist:
+        input_dim = 512
+        if self.with_dist:
             input_dim += 3
-        if with_grid_cell_spikings:
+        if self.with_grid_cell_spikings:
             input_dim += 1
-        if with_lidar:
-            input_dim += 10
 
         nets = initialize_regressors({})
         nets["img_encoder"] = NNModuleWithOptimizer( ImagePairEncoderV2(init_scale=1.0))
         if self.with_conv_layer:
             nets["conv_encoder"] = NNModuleWithOptimizer( ConvEncoder(init_scale=1.0, input_dim=512, no_weight_init=False))
-        if self.with_lidar:
-            input_dim = 52 if self.with_lidar == 'raw_lidar' else BoundaryCellActivity.size
-            nets["lidar_encoder"] = NNModuleWithOptimizer( LidarEncoder(input_dim, 10) )
+        if self.lidar:
+            one_lidar_input_dim = 52 if self.lidar == 'raw_lidar' else BoundaryCellActivity.size
+            nets["lidar_encoder"] = NNModuleWithOptimizer( LidarEncoder(2*one_lidar_input_dim, 10) )
+            input_dim += 10
         nets["fully_connected"] = NNModuleWithOptimizer( FCLayers(init_scale=1.0, input_dim=input_dim, no_weight_init=False))
 
         super().__init__(nets)
@@ -121,7 +120,7 @@ class CNN(Model):
         src_batch, dst_batch,
         batch_transformation=None,
         batch_src_spikings=None, batch_dst_spikings=None,
-        batch_src_distances=None,
+        batch_src_distances=None, batch_dst_distances=None,
     ) -> (float, float, float):
         batch_size, c, h, w = dst_batch.size()
         # Extract features
@@ -142,8 +141,8 @@ class CNN(Model):
             x = torch.cat((batch_transformation, x), 1)
             assert not torch.any(x.isnan())
 
-        if self.with_lidar:
-            lidar_features = self.nets['lidar_encoder'](batch_src_distances)
+        if self.lidar:
+            lidar_features = self.nets['lidar_encoder'](batch_src_distances, batch_dst_distances)
             x = torch.cat((x, lidar_features), 1)
             assert not torch.any(x.isnan())
 
@@ -369,11 +368,12 @@ class FcWithDropout(nn.Module):
 
 
 class LidarEncoder(nn.Module):
-    def __init__(self, input_dim=52, output_dim=10):
+    def __init__(self, input_dim=2*52, output_dim=10):
         super().__init__()
         self.fc = nn.Linear(input_dim, output_dim)
 
-    def forward(self, x):
+    def forward(self, x_src, x_dst):
+        x = torch.cat([x_src, x_dst], dim=1)
         x = self.fc(x)
         return x
 

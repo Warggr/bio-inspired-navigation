@@ -381,13 +381,13 @@ if __name__ == '__main__':
         suffix += '+conv'
 
     filename = "dataset" + args.dataset_features + ".hd5"
-    dataset = ReachabilityDataset(filename)
+    dataset = ReachabilityDataset(filename, sample_config=config)
 
     backbone = 'convolutional' # convolutional, res_net
 
     # Defining the NN and optimizers
     model_kwargs = { key: getattr(args, key) for key in ['with_conv_layer', 'with_dist'] }
-    nets = Model.create_from_config(backbone, **model_kwargs)
+    nets = Model.create_from_config(backbone, config, **model_kwargs)
 
     loss_function = make_loss_function(position_loss_weight=0.006, angle_loss_weight=0.003)
     global_args = {
