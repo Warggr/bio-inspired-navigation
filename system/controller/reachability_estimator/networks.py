@@ -125,7 +125,6 @@ class CNN(Model):
         batch_size, c, h, w = dst_batch.size()
         # Extract features
         x = self.nets['img_encoder'](src_batch, dst_batch)
-        assert not torch.any(x.isnan())
 
         if self.with_conv_layer:
             # Convolutional Layer

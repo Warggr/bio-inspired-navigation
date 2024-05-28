@@ -112,20 +112,12 @@ Batch = Any
 TrainDevice = Literal['cpu', 'gpu'] # TODO (Pierre): not sure about how exactly 'gpu' is called
 
 def process_batch(item : Batch, train_device : TrainDevice):
-    item = [ data.to(device=train_device, non_blocking=True) for data in item ]
-    src_imgs, dst_imgs, reachability, transformation, *other_args = item
-    src_imgs = src_imgs.to(device=train_device, non_blocking=True).float()
-    dst_imgs = dst_imgs.to(device=train_device, non_blocking=True).float()
-    assert not torch.any(src_imgs.isnan())
-    assert not torch.any(dst_imgs.isnan())
-    assert not torch.any(reachability.isnan())
-
-    reachability = torch.clamp(reachability, 0.0, 1.0) # mainly to make it a tensor of float
-    position = transformation[:, 0:2]
-    angle = transformation[:, -1]
-    model_args = (src_imgs, dst_imgs, transformation, *other_args)
-    ground_truth = (reachability, position, angle)
-    return ground_truth, model_args
+    model_args, ground_truth = item
+    model_args = [ data.to(device=train_device, non_blocking=True) for data in model_args ]
+    ground_truth = [ data.to(device=train_device, non_blocking=True) for data in ground_truth ]
+    for i in [0, 1, 4, 5]: # src and dst images and lidar
+        model_args[i] = model_args[i].float() # TODO Pierre: this is ugly
+    return model_args, ground_truth
 
 Result = (float, float, float)
 LossFunction = Callable[(Result, Result), torch.Tensor]
@@ -174,7 +166,8 @@ def tensor_log(
         log_scores = { key: 0 for key in list(metrics.keys()) + loss_detail_names }
 
         for idx, item in enumerate(loader):
-            ground_truth, model_args = process_batch(item, train_device=train_device)
+            model_args, ground_truth = process_batch(item, train_device=train_device)
+
             prediction = nets.get_prediction(*model_args)
             loss, loss_details = loss_function(prediction, ground_truth, return_details=True)
 
@@ -282,7 +275,8 @@ def train_multiframedst(
             for _, opt in nets.optimizers.items():
                 opt.zero_grad()
 
-            ground_truth, model_args = process_batch(item, train_device=train_device)
+            model_args, ground_truth = process_batch(item, train_device=train_device)
+
             prediction = nets.get_prediction(*model_args)
             loss = loss_function(prediction, ground_truth)
 

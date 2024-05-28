@@ -29,6 +29,7 @@ from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.controller.simulation.environment.map_occupancy_helpers.map_utils import path_length
 from system.plotting.plotResults import plotStartGoalDataset
 from system.controller.simulation.pybullet_environment import types
+from system.controller.reachability_estimator.ReachabilityDataset import Sample, HalfSample
 
 def get_path():
     """ returns path to data storage folder """
@@ -46,48 +47,14 @@ def print_debug(*params):
         print(*params)
 
 
-DEFAULT_NUMBER_OF_ANGLES = 52 #len(list(types.LidarReading.angles(0)))
-
-class Sample:
-    def __init__(
-        self,
-        src: Tuple[types.Vector2D, types.Angle, types.Spikings],
-        dst: Tuple[types.Vector2D, types.Angle, types.Spikings],
-        env: PybulletEnvironment,
-    ):
-        self.src_pos, self.src_angle, self.src_spikings = src
-        self.dst_pos, self.dst_angle, self.dst_spikings = dst
-
-        self.src_img = env.camera([self.src_pos, self.src_angle])
-        self.dst_img = env.camera([self.dst_pos, self.dst_angle])
-
-        self.src_lidar, _ = env.lidar([self.src_pos, self.src_angle])
-        self.dst_lidar, _ = env.lidar([self.dst_pos, self.dst_angle])
-
-    def to_tuple(self, reachable : bool) -> Tuple:
-        """ Returns a tuple which can be put into a Numpy array of type Sample.dtype """
-        return (
-            self.src_img.flatten(), self.dst_img.flatten(),
-            reachable,
-            self.src_pos, self.dst_pos,
-            self.src_angle, self.dst_angle,
-            self.src_spikings, self.dst_spikings,
-            self.src_lidar.distances, self.dst_lidar.distances, # assuming default angle config
-        )
-
-    dtype = np.dtype([
-            ('start_observation', (np.int32, 16384)), # 64 x 64 x 4
-            ('goal_observation', (np.int32, 16384)), # using (64, 64, 4) would be more elegant but H5py doesn't accept it
-            ('reached', bool),
-            ('start', (np.float32, 2)),  # x, y
-            ('goal', (np.float32, 2)),  # x, y
-            ('start_orientation', np.float32),  # theta
-            ('goal_orientation', np.float32),  # theta
-            ('start_spikings', (np.float32, 9600)),  # 40 * 40 * 6
-            ('goal_spikings', (np.float32, 9600)),  # 40 * 40 * 6
-            ('start_lidar', (np.float32, DEFAULT_NUMBER_OF_ANGLES)),
-            ('goal_lidar', (np.float32, DEFAULT_NUMBER_OF_ANGLES)),
-        ])
+def create_HalfSample(
+    data: Tuple[types.Vector2D, types.Angle, types.Spikings],
+    env: PybulletEnvironment,
+) -> HalfSample:
+    pos, angle, spikings = src
+    img = env.camera([pos, angle])
+    lidar, _ = env.lidar([pos, angle])
+    return HalfSample(pos, angle, spikings, img, lidar)
 
 
 class TrajectoriesDataset(data.Dataset):
@@ -332,7 +299,7 @@ class TrajectoriesDataset(data.Dataset):
 
         env = self.envs[map_name]
 
-        sample = Sample(src_sample, dst_sample, env=env)
+        sample = Sample(HalfSample.create_from_placecell(src_sample, env), HalfSample.create_from_placecell(dst_sample, env))
 
         #print(f"Computing reachability for {sample.src_pos}, {sample.dst_pos}")
         try:
