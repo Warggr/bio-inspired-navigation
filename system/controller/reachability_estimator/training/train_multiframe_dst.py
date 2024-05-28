@@ -18,7 +18,7 @@ from torch.utils.tensorboard import SummaryWriter
 import sys
 import os
 import numpy as np
-from typing import Type, Literal, Callable, Any
+from typing import Type, Literal, Callable, Dict, Any
 
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
@@ -188,9 +188,14 @@ def tensor_log(
             for key, loss_detail in zip(loss_detail_names, loss_details):
                 log_scores[key] += loss_detail.sum().item()
 
-        writer.add_scalar("Loss/Validation", log_loss / len(loader), epoch)
-        for key, value in log_scores.items():
-            writer.add_scalar(key, value / len(loader), epoch)
+    metrics : Dict[str, Any] = {}
+    metrics["Loss/Validation"] = log_loss / len(loader)
+    for key, value in log_scores.items():
+        metrics[key] = value / len(loader)
+
+    for key, value in metrics.items():
+        writer.add_scalar(key, value, epoch)
+    return metrics
 
 from dataclasses import dataclass
 
@@ -198,7 +203,7 @@ from dataclasses import dataclass
 class Hyperparameters:
     batch_size : int = 64
     samples_per_epoch : int = 10000
-    max_epochs : int = 50
+    max_epochs : int = 25
     lr_decay_epoch : int = 1
     lr_decay_rate : float = 0.7
 
@@ -313,7 +318,11 @@ def train_multiframedst(
                                   num_workers=n_dataset_worker)
 
         # log performance on the validation set
-        tensor_log(valid_loader, train_device, writer, epoch, nets, loss_function)
+        metrics = tensor_log(valid_loader, train_device, writer, epoch, nets, loss_function)
+
+    hparams = { key: getattr(nets, key) for key in ['lidar', 'with_grid_cell_spikings', 'with_dist', 'with_conv_layer'] }
+    metrics = { "Final/"+key: value for key, value in metrics.items() }
+    writer.add_hparams(hparams, metrics)
 
 
 def validate_func(net : Model, dataset : ReachabilityDataset, batch_size, train_device,
