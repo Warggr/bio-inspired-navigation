@@ -64,7 +64,7 @@ class ReachabilityDataset(torch.utils.data.Dataset):
                 self.dataset_len += len(self.dataset[k]['positions'])
                 self.cumsum.append(len(self.dataset[k]['positions']) + self.cumsum[-1])
         else:
-            self.dataset_len = len(list(self.dataset['positions']))
+            self.dataset_len = len(self.dataset['positions'])
 
     def sample(self, index):
         if self.externalLink:
