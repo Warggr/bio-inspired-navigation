@@ -91,25 +91,25 @@ class Siamese(Model):
 
 
 class CNN(Model):
-    def __init__(self, config : 'SampleConfig', with_conv_layer=True, with_dist=False):
+    def __init__(self, config : 'SampleConfig', with_conv_layer=True):
         self.with_conv_layer = with_conv_layer
-        self.with_dist = with_dist
-        self.with_grid_cell_spikings = config.with_grid_cell_spikings
-        self.lidar = config.lidar
+        self.sample_config = config
         # Defining the NN and optimizers
 
-        input_dim = 512
-        if self.with_dist:
-            input_dim += 3
-        if self.with_grid_cell_spikings:
-            input_dim += 1
-
         nets = initialize_regressors({})
-        nets["img_encoder"] = NNModuleWithOptimizer( ImagePairEncoderV2(init_scale=1.0))
+        input_dim = 0
+
+        if self.sample_config.images:
+            input_dim += 512
+            nets["img_encoder"] = NNModuleWithOptimizer( ImagePairEncoderV2(init_scale=1.0))
+        if self.sample_config.with_dist:
+            input_dim += 3
+        if self.sample_config.with_grid_cell_spikings:
+            input_dim += 1
         if self.with_conv_layer:
             nets["conv_encoder"] = NNModuleWithOptimizer( ConvEncoder(init_scale=1.0, input_dim=512, no_weight_init=False))
-        if self.lidar:
-            one_lidar_input_dim = 52 if self.lidar == 'raw_lidar' else BoundaryCellActivity.size
+        if self.sample_config.lidar:
+            one_lidar_input_dim = 52 if self.sample_config.lidar == 'raw_lidar' else BoundaryCellActivity.size
             nets["lidar_encoder"] = NNModuleWithOptimizer( LidarEncoder(2*one_lidar_input_dim, 10) )
             input_dim += 10
         nets["fully_connected"] = NNModuleWithOptimizer( FCLayers(init_scale=1.0, input_dim=input_dim, no_weight_init=False))
@@ -117,34 +117,42 @@ class CNN(Model):
         super().__init__(nets)
 
     def get_prediction(self,
-        src_batch, dst_batch,
+        batch_src_images=None, batch_dst_images=None,
         batch_transformation=None,
         batch_src_spikings=None, batch_dst_spikings=None,
         batch_src_distances=None, batch_dst_distances=None,
     ) -> (float, float, float):
-        batch_size, c, h, w = dst_batch.size()
         # Extract features
-        x = self.nets['img_encoder'](src_batch, dst_batch)
+        all_x = []
 
-        if self.with_conv_layer:
-            # Convolutional Layer
-            x = self.nets['conv_encoder'](x.view(batch_size, -1, 1))
-            assert not torch.any(x.isnan())
+        if self.sample_config.images:
+            batch_size = batch_dst_images.size()[0]
+            x = self.nets['img_encoder'](batch_src_images, batch_dst_images)
 
-        if self.with_grid_cell_spikings:
+            if self.with_conv_layer:
+                # Convolutional Layer
+                x = self.nets['conv_encoder'](x.view(batch_size, -1, 1))
+                assert not torch.any(x.isnan())
+            all_x.append(x)
+
+        if self.sample_config.with_grid_cell_spikings:
             spikings_features = get_grid_cell(batch_src_spikings, batch_dst_spikings)
-            x = torch.cat((x, spikings_features.unsqueeze(1)), 1)
+            x = spikings_features.unsqueeze(1)
             assert not torch.any(x.isnan())
+            all_x.append(x)
 
-        if self.with_dist:
-            x = torch.cat((batch_transformation, x), 1)
-            assert not torch.any(x.isnan())
+        if self.sample_config.with_dist:
+            all_x.append(batch_transformation)
 
-        if self.lidar:
+        if self.sample_config.lidar:
+            assert not torch.any(batch_src_distances.isnan())
+            assert not torch.any(batch_dst_distances.isnan())
+            assert not torch.any(self.nets['lidar_encoder'].fc.weight.isnan())
             lidar_features = self.nets['lidar_encoder'](batch_src_distances, batch_dst_distances)
-            x = torch.cat((x, lidar_features), 1)
-            assert not torch.any(x.isnan())
+            assert not torch.any(lidar_features.isnan())
+            all_x.append(lidar_features)
 
+        x = torch.cat(all_x, 1)
         assert not torch.any(x.isnan())
 
         # Get prediction

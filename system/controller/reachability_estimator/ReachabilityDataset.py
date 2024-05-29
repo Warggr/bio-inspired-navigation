@@ -17,7 +17,7 @@ from system.controller.simulation.pybullet_environment import types, LidarReadin
 
 import sys
 import os
-from typing import Tuple
+from typing import Tuple, Literal, Optional
 from dataclasses import dataclass
 
 boundaryCellEncoder = BoundaryCellNetwork.load()
@@ -83,17 +83,26 @@ class Sample:
         ])
 
 
+@dataclass
 class SampleConfig:
     def __init__(self,
         grid_cell_spikings=False,
-        lidar=None,
+        lidar: Optional[Literal['raw_lidar', 'ego_bc', 'allo_bc']]=None,
+        images = True,
+        dist = False,
     ):
         self.with_grid_cell_spikings = grid_cell_spikings
         self.lidar = lidar
+        self.images = images
+        self.with_dist = dist
+        assert self.images or self.lidar or self.with_grid_cell_spikings or self.with_dist, "At least one input is required"
+
     def suffix(self) -> str:
         return (''
             + ('+spikings' if self.with_grid_cell_spikings else '')
             + (f'+lidar--{self.lidar}' if self.lidar else '')
+            + ('+noimages' if not self.images else '')
+            + ('+dist' if self.with_dist else '')
         )
 
 DATA_STORAGE_FOLDER = os.path.join(os.path.dirname(__file__), "data", "reachability")
@@ -140,9 +149,23 @@ class ReachabilityDataset(torch.utils.data.Dataset):
         data = self.sample(index)
         sample, reachability = Sample.from_tuple(data)
 
-        model_args = [torch.tensor(sample.src.img).float(), torch.tensor(sample.dst.img).float()]
+        reachability = torch.tensor(reachability).clamp(0.0, 1.0) # make it a tensor of float
+        position = sample.dst.pos - sample.src.pos
+        angle = sample.dst.angle - sample.src.angle
+        ground_truth = (reachability, torch.tensor(position), torch.tensor(angle))
 
-        None_tensor = torch.tensor(torch.nan) # we can't use None because it has to be a tensor or list to be collated into batches by the dataloader
+        None_tensor = torch.tensor(torch.nan) # we can't use None because it has to be a tensor to be collated into batches by the dataloader
+        model_args = []
+
+        if self.config.images:
+            model_args += [torch.tensor(sample.src.img).float(), torch.tensor(sample.dst.img).float()]
+        else:
+            model_args += [ None_tensor, None_tensor ]
+
+        if self.config.with_dist:
+            model_args += [ torch.tensor(np.append(position, angle)) ]
+        else:
+            model_args += [ None_tensor ]
 
         if self.config.with_grid_cell_spikings:
             model_args += [ sample.src.spikings, sample.dst.spikings ]
@@ -172,10 +195,6 @@ class ReachabilityDataset(torch.utils.data.Dataset):
         else:
             model_args += [ None_tensor, None_tensor ]
 
-        reachability = torch.tensor(reachability).clamp(0.0, 1.0) # make it a tensor of float
-        position = torch.tensor(sample.dst.pos - sample.src.pos)
-        angle = torch.tensor(sample.dst.angle - sample.src.angle)
-        ground_truth = (reachability, position, angle)
 
         return model_args, ground_truth
 

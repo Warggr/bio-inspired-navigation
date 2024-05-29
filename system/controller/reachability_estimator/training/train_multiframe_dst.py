@@ -359,17 +359,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('mode', choices=['train', 'test', 'validate'], help='mode')
     parser.add_argument('--dataset-features', nargs='+', default=[])
+    parser.add_argument('--images', help='Images are included in the dataset', action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('--spikings', dest='with_grid_cell_spikings', help='Grid cell spikings are included in the dataset', action='store_true')
     parser.add_argument('--lidar', help='LIDAR distances are included in the dataset', choices=['raw_lidar', 'ego_bc', 'allo_bc'])
-    parser.add_argument('--pair-conv', dest='with_conv_layer', help='Pair-conv neural network', action='store_true', default=True)
-    parser.add_argument('--with_dist', help='<TODO: I\'m not sure what that is>', action='store_true')
-    parser.add_argument('--resume', action='store_true')
+    parser.add_argument('--pair-conv', dest='with_conv_layer', help='Pair-conv neural network', action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument('--dist', help='Provide the distance and angle to the reachability estimator', action='store_true')
+    parser.add_argument('--resume', action='store_true', help='Continue training from last saved model')
 
     args = parser.parse_args()
 
     config = SampleConfig(
         grid_cell_spikings=args.with_grid_cell_spikings,
         lidar=args.lidar,
+        images=args.images,
+        dist=args.dist,
     )
 
     args.dataset_features = ''.join([ f'-{feature}' for feature in args.dataset_features ])
@@ -383,7 +386,7 @@ if __name__ == '__main__':
     backbone = 'convolutional' # convolutional, res_net
 
     # Defining the NN and optimizers
-    model_kwargs = { key: getattr(args, key) for key in ['with_conv_layer', 'with_dist'] }
+    model_kwargs = { key: getattr(args, key) for key in ['with_conv_layer'] }
     nets = Model.create_from_config(backbone, config, **model_kwargs)
 
     loss_function = make_loss_function(position_loss_weight=0.6, angle_loss_weight=0.3)
