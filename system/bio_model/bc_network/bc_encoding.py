@@ -62,7 +62,8 @@ class BoundaryCellNetwork:
             scaledTransformationLayers[:, i] = transformationLayers[:, i] * headingScaler[i]
         bvcActivity = np.sum(scaledTransformationLayers, 1)
         maxBVC = np.amax(bvcActivity)
-        bvcActivity = bvcActivity/maxBVC
+        if maxBVC > 0:
+            bvcActivity = bvcActivity/maxBVC
 
         return transformationLayers, bvcActivity
 

@@ -140,29 +140,37 @@ class ReachabilityDataset(torch.utils.data.Dataset):
         data = self.sample(index)
         sample, reachability = Sample.from_tuple(data)
 
-        model_args = [sample.src.img, sample.dst.img]
+        model_args = [torch.tensor(sample.src.img).float(), torch.tensor(sample.dst.img).float()]
+
+        None_tensor = torch.tensor(torch.nan) # we can't use None because it has to be a tensor or list to be collated into batches by the dataloader
 
         if self.config.with_grid_cell_spikings:
             model_args += [ sample.src.spikings, sample.dst.spikings ]
-
-        src_lidar, dst_lidar = sample.src.lidar, sample.dst.lidar
-        if self.config.lidar in ['allo_bc', 'ego_bc']:
-            src_lidar = bcActivityForLidar(src_lidar)
-            dst_lidar = bcActivityForLidar(dst_lidar)
         else:
-            src_lidar = src_lidar.distances
-            dst_lidar = dst_lidar.distances
-
-        if self.config.lidar == 'allo_bc':
-            def ego_to_allo(ego, angle):
-                heading = HDCActivity.headingCellsActivityTraining(angle)
-                _, allo = boundaryCellEncoder.calculateActivities(ego, heading)
-                return allo
-            src_lidar = ego_to_allo(src_lidar, sample.src.angle)
-            dst_lidar = ego_to_allo(dst_lidar, sample.dst.angle)
+            model_args += [ None_tensor, None_tensor ]
 
         if self.config.lidar:
-            model_args += [ src_lidar, dst_lidar ]
+            src_lidar, dst_lidar = sample.src.lidar, sample.dst.lidar
+            if self.config.lidar in ['allo_bc', 'ego_bc']:
+                src_lidar = bcActivityForLidar(src_lidar)
+                dst_lidar = bcActivityForLidar(dst_lidar)
+            else:
+                src_lidar = src_lidar.distances
+                dst_lidar = dst_lidar.distances
+            assert not np.isnan(np.min(src_lidar))
+
+            if self.config.lidar == 'allo_bc':
+                def ego_to_allo(ego, angle):
+                    heading = HDCActivity.headingCellsActivityTraining(angle)
+                    _, allo = boundaryCellEncoder.calculateActivities(ego, heading)
+                    return allo
+                src_lidar = ego_to_allo(src_lidar, sample.src.angle)
+                dst_lidar = ego_to_allo(dst_lidar, sample.dst.angle)
+            assert not np.isnan(np.min(src_lidar))
+
+            model_args += [ torch.tensor(src_lidar).float(), torch.tensor(dst_lidar).float() ]
+        else:
+            model_args += [ None_tensor, None_tensor ]
 
         reachability = torch.tensor(reachability).clamp(0.0, 1.0) # make it a tensor of float
         position = torch.tensor(sample.dst.pos - sample.src.pos)

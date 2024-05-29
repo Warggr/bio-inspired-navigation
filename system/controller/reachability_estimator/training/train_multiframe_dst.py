@@ -115,8 +115,6 @@ def process_batch(item : Batch, train_device : TrainDevice):
     model_args, ground_truth = item
     model_args = [ data.to(device=train_device, non_blocking=True) for data in model_args ]
     ground_truth = [ data.to(device=train_device, non_blocking=True) for data in ground_truth ]
-    for i in [0, 1, 4, 5]: # src and dst images and lidar
-        model_args[i] = model_args[i].float() # TODO Pierre: this is ugly
     return model_args, ground_truth
 
 Result = (float, float, float)
@@ -132,8 +130,9 @@ def make_loss_function(position_loss_weight = 0.6, angle_loss_weight = 0.3) -> L
             loss = loss_reachability
         else:
             loss_position = torch.sum(torch.nn.functional.mse_loss(position_prediction, position, reduction='none'), dim=1)
-            loss_angle = torch.nn.functional.mse_loss(angle_prediction, angle, reduction='none')
-            loss = loss_reachability + reachability @ (position_loss_weight * loss_position + angle_loss_weight * loss_angle)
+            loss_angle = torch.sum((1 - torch.cos(angle_prediction - angle)) ** 2) # see e.g. https://stats.stackexchange.com/a/425270
+            gate = torch.logical_and(reachability, reachability_prediction).float()
+            loss = loss_reachability + gate @ (position_loss_weight * loss_position + angle_loss_weight * loss_angle)
 
         # Loss
         loss = loss.sum()
@@ -387,7 +386,7 @@ if __name__ == '__main__':
     model_kwargs = { key: getattr(args, key) for key in ['with_conv_layer', 'with_dist'] }
     nets = Model.create_from_config(backbone, config, **model_kwargs)
 
-    loss_function = make_loss_function(position_loss_weight=0.006, angle_loss_weight=0.003)
+    loss_function = make_loss_function(position_loss_weight=0.6, angle_loss_weight=0.3)
     global_args = {
         'train_device': "cpu",
         'loss_function': loss_function,
