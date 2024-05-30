@@ -255,6 +255,8 @@ def train_multiframedst(
     valid_size = len(dataset) - train_size
     train_dataset, valid_dataset = torch.utils.data.random_split(dataset, [train_size, valid_size])
 
+    latest_metrics = None
+
     for epoch in range(epoch + 1, hyperparams.max_epochs + 1):
         print('===== epoch %d =====' % epoch)
 
@@ -311,11 +313,15 @@ def train_multiframedst(
                                   num_workers=n_dataset_worker)
 
         # log performance on the validation set
-        metrics = tensor_log(valid_loader, train_device, writer, epoch, nets, loss_function)
+        latest_metrics = tensor_log(valid_loader, train_device, writer, epoch, nets, loss_function)
 
-    hparams = { key: getattr(nets, key) for key in ['lidar', 'with_grid_cell_spikings', 'with_dist', 'with_conv_layer'] }
-    metrics = { "Final/"+key: value for key, value in metrics.items() }
-    writer.add_hparams(hparams, metrics)
+    if latest_metrics is None:
+        valid_loader = DataLoader(valid_dataset, batch_size=hyperparams.batch_size, num_workers=n_dataset_worker)
+        latest_metrics = tensor_log(valid_loader, train_device, writer, hyperparams.max_epochs, nets, loss_function)
+    hparams = vars(nets.sample_config) | { 'with_conv_layer': nets.with_conv_layer }
+    latest_metrics = { "Final/"+key: value for key, value in latest_metrics.items() }
+    print("Writing metrics:", latest_metrics)
+    writer.add_hparams(hparams, latest_metrics)
 
 
 def validate_func(net : Model, dataset : ReachabilityDataset, batch_size, train_device,
