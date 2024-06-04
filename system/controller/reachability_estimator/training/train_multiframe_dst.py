@@ -129,10 +129,9 @@ def make_loss_function(position_loss_weight = 0.6, angle_loss_weight = 0.3) -> L
         if position_prediction is None:
             loss = loss_reachability
         else:
-            loss_position = torch.sum(torch.nn.functional.mse_loss(position_prediction, position, reduction='none'), dim=1)
+            loss_position = torch.sum(torch.nn.functional.mse_loss(position_prediction, position, reduction='none'), dim=1) / len(position)
             loss_angle = torch.sum((1 - torch.cos(angle_prediction - angle)) ** 2) / len(angle) # see e.g. https://stats.stackexchange.com/a/425270
-            gate = torch.logical_and(reachability, reachability_prediction).float()
-            loss = loss_reachability + gate @ (position_loss_weight * loss_position + angle_loss_weight * loss_angle)
+            loss = loss_reachability + reachability @ (position_loss_weight * loss_position + angle_loss_weight * loss_angle)
 
         # Loss
         loss = loss.sum()
