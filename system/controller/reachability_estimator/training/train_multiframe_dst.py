@@ -141,6 +141,7 @@ def make_loss_function(position_loss_weight = 0.6, angle_loss_weight = 0.3) -> L
             return loss, (loss_reachability, loss_position, loss_angle)
         else:
             return loss
+    loss_function.hparams = { 'position_loss_weight': position_loss_weight, 'angle_loss_weight': angle_loss_weight }
     return loss_function
 
 def tensor_log(
@@ -318,7 +319,7 @@ def train_multiframedst(
     if latest_metrics is None:
         valid_loader = DataLoader(valid_dataset, batch_size=hyperparams.batch_size, num_workers=n_dataset_worker)
         latest_metrics = tensor_log(valid_loader, train_device, writer, hyperparams.max_epochs, nets, loss_function)
-    hparams = vars(nets.sample_config) | { 'with_conv_layer': nets.with_conv_layer }
+    hparams = vars(nets.sample_config) | { 'with_conv_layer': nets.with_conv_layer } | getattr(loss_function, hparams, {})
     latest_metrics = { "Final/"+key: value for key, value in latest_metrics.items() }
     print("Writing metrics:", latest_metrics)
     writer.add_hparams(hparams, latest_metrics)
