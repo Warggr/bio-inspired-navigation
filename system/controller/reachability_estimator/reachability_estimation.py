@@ -15,11 +15,16 @@ import tabulate
 import sys
 import os
 from abc import ABC, abstractmethod
-from typing import Type, Dict, override, Self
+from typing import Type, Dict, Self
 import system.controller.reachability_estimator.networks as networks
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.bio_model.place_cell_model import PlaceCell
 from system.controller.reachability_estimator.types import ReachabilityController, PlaceInfo, types
+
+try:
+    from typing import override
+except ImportError:
+    from system.polyfill import override
 
 def reachability_estimator_factory(type: str = 'distance', /, debug: bool = False, **kwargs) -> 'ReachabilityEstimator':
     """ Returns an instance of the reachability estimator interface

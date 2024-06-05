@@ -8,3 +8,8 @@ def batched(iterable, n):
     it = iter(iterable)
     while batch := tuple(itertools.islice(it, n)):
         yield batch
+
+# https://peps.python.org/pep-0698/
+# override is a type hinting decorator, so we don't need it to do anything useful
+def override(fun):
+    return fun
