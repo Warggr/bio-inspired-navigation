@@ -128,25 +128,24 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
     """ Creates a network-based reachability estimator that judges reachability
         between two locations based on observations and grid cell spikings """
 
-    def __init__(self, backbone: networks.Model, device: str = 'cpu', debug: bool = True, batch_size: int = 64, with_grid_cell_spikings : bool = False, with_dist : bool = False):
+    def __init__(self, backbone: networks.Model, device: str = 'cpu', debug: bool = True, batch_size: int = 64, config : SampleConfig = SampleConfig()):
         """
         arguments:
         backbone: str       -- neural network used as a backbone
         device: str         -- device used for calculations (default cpu)
         debug: bool         -- is in debug mode
-        with_grid_cell_spikings: bool -- flag indicates whether to include grid cell firing to input
         batch_size: int     -- size of batches (default 64)
+        config              -- the SampleConfig to use for inputs
         """
         super().__init__(threshold_same=0.933, threshold_reachable=0.4, debug=debug)
 
-        self.with_grid_cell_spikings = with_grid_cell_spikings
-        self.with_dist = with_dist
+        self.config = config
 
         self.backbone = backbone
         self.batch_size = batch_size
 
     @staticmethod
-    def from_file(weights_file: str, weights_folder: str = WEIGHTS_FOLDER, *args, **kwargs):
+    def from_file(weights_file: str, weights_folder: str = WEIGHTS_FOLDER, **kwargs):
         """ Loads a NetworkReachabilityEstimator from a snapshot in a file.
 
         arguments:
@@ -155,8 +154,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
 
         other arguments are passed to the NetworkReachabilityEstimator constructor
         """
-        backbone_kwargs = { key: value for key, value in kwargs.items() if key.startswith('with_') }
-        # TODO more fine-grained control of which args are passed to the backbone
+        re = NetworkReachabilityEstimator(backbone=None, **kwargs)
 
         weights_filepath = os.path.join(weights_folder, weights_file)
         state_dict = torch.load(weights_filepath, map_location='cpu')
@@ -167,11 +165,11 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         # self.print_debug('global args:')
         # self.print_debug(tabulate.tabulate(global_args.items()))
 
-        backbone_classname = global_args.get('backbone')
-        batch_size = global_args.get('batch_size')
-        model_variant = global_args.get('model_variant')
+        backbone_classname = global_args.pop('backbone')
+        global_args = { key: value for key, value in global_args.items() if key in ['with_conv_layer'] }
+        # TODO: other possible global_args
 
-        backbone = networks.Model.create_from_config(backbone_classname, model_variant, **backbone_kwargs)
+        backbone = networks.Model.create_from_config(backbone_classname=backbone_classname, config=re.config, **global_args)
 
         # self.print_debug(backbone.nets)
 
@@ -184,7 +182,8 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
             net.load_state_dict(state_dict['nets'][name])
             net.train(False)
 
-        return NetworkReachabilityEstimator(backbone, *args, **kwargs)
+        re.backbone = backbone
+        return re
 
     def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo) -> float:
         """ Predicts reachability value between two locations """
@@ -229,7 +228,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
             with torch.no_grad():
                 if isinstance(src_batch[0], np.ndarray):
                     src_batch = np.array(src_batch)
-                    if self.with_grid_cell_spikings:
+                    if self.config.with_grid_cell_spikings:
                         src_spikings = np.array(src_spikings)
                 elif isinstance(src_batch[0], torch.Tensor):
                     if not isinstance(src_batch, torch.Tensor):
@@ -238,7 +237,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
                     raise RuntimeError('Unsupported datatype: %s' % type(src_batch[0]))
                 if isinstance(dst_batch[0][0], np.ndarray):
                     dst_batch = np.array(dst_batch)
-                    if self.with_grid_cell_spikings:
+                    if self.config.with_grid_cell_spikings:
                         goal_spikings = np.array(goal_spikings)
                 elif isinstance(dst_batch[0][0], torch.Tensor):
                     if not isinstance(dst_batch, torch.Tensor):
@@ -247,10 +246,11 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
                     raise RuntimeError('Unsupported datatype: %s' % type(dst_batch[0]))
 
                 additional_info = {}
-                if self.with_grid_cell_spikings:
+                if self.config.with_grid_cell_spikings:
                     additional_info['batch_src_spikings'] = torch.from_numpy(src_spikings).float()
+                    # TODO Pierre: why is sometimes with_grid_cell_spikings set but the goal spikings are not set?
                     additional_info['batch_dst_spikings'] = torch.from_numpy(goal_spikings).float()
-                if self.with_dist:
+                if self.config.with_dist:
                     additional_info['batch_src_distances'] = torch.from_numpy(src_distances).float()
                     # additional_info['batch_dst_distances'] = torch.from_numpy(goal_distances).float()
 
