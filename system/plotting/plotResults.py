@@ -93,7 +93,7 @@ def plotTrajectory(xy_coordinates):
 
 
 def plotTrajectoryInEnvironment(env : 'PybulletEnvironment', title="", xy_coordinates=None, env_model=None, cognitive_map=None, path=None,
-                                goal=True, trajectory=True, start=None, end=None):
+                                goal=None, trajectory=True, start=None, end=None):
     if not xy_coordinates:
         xy_coordinates = env.robot.data_collector.xy_coordinates
 
@@ -103,7 +103,7 @@ def plotTrajectoryInEnvironment(env : 'PybulletEnvironment', title="", xy_coordi
     # plot goal vector
     if goal:
         X, Y = xy_coordinates[-1]
-        U, V = env.robot.data_collector[-1][4]
+        U, V = goal
 
         q = ax.quiver(X, Y, U, V, units='xy', scale=1, color=TUM_colors["TUMAccentGreen"])
 

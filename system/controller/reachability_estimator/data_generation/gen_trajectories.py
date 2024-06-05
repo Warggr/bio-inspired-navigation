@@ -158,9 +158,13 @@ def waypoint_movement(env_model, cam_freq, traj_length, map_layout, gc_network) 
             if len(samples) > traj_length / cam_freq:
                 break
 
-            over, data = vector_navigation(env, g, gc_network, model="analytical", step_limit=5000, plot_it=False,
+            compass = AnalyticalCompass(start, g)
+            goal_reached, data = vector_navigation(env, compass, gc_network, step_limit=5000, plot_it=False,
                                            obstacles=False, collect_data_freq=cam_freq)
             samples += data
+            if not goal_reached:
+                print("Couldn't reach intermediate goal - breaking")
+                break
         if len(samples) > 0:
             start = samples[-1][0]
 
@@ -184,7 +188,6 @@ def generate_multiple_trajectories(out_hd5_obj, num_traj, trajectory_length, cam
         ('xy_coordinates', (np.float32, 2)),
         ('orientation', np.float32),
         ('grid_cell_spiking', (np.float32, 9600)),
-        ('')
     ])
 
     seed = 123457

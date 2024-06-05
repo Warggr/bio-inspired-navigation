@@ -4,7 +4,11 @@ import numpy as np
 from typing import Optional
 
 class Compass(ABC):
-    def __init__(self, goal_pos : Optional[Vector2D] = None, stuck_threshold : int = 200):
+    """
+    The Compass class tracks the current position and goal position, and allows to compute goal vectors.
+    """
+
+    def __init__(self, goal_pos : Optional[Vector2D] = None):
         """
         Creates a Compass that gives a goal position to the agent.
         arrival_threshold -- threshold for goal_vector length that signals arrival at goal
@@ -14,8 +18,6 @@ class Compass(ABC):
 
         """
         self.goal_pos = goal_pos
-        self.stuck_threshold = stuck_threshold
-        self.nr_ofsteps = 0 # keeps track of number of steps taken with current decoder (used for switching between pod and linlook decoder)
 
     @abstractproperty
     @property
@@ -23,35 +25,36 @@ class Compass(ABC):
         ...
 
     @abstractmethod
-    def calculate_goal_vector(self, robotPosition : Vector2D) -> Vector2D:
+    def calculate_goal_vector(self) -> Vector2D:
+        """ Computes the goal vector based on the stored current and goal position """
         ...
 
-    def update(self, robot : 'Robot') -> bool:
+    @abstractmethod
+    def update_position(self, robot : 'Robot'):
+        """ Updates the stored position """
+        ...
+
+    def reset(self, new_goal : Vector2D):
+        """ Sets a new goal position """
+        print("Resetting goal_pos to", new_goal)
+        self.goal_pos = new_goal
+
+    def reached_goal(self) -> bool:
         '''
         Updates the Compass position to the newest position of the Robot.
         Returns True if the goal was reached, False otherwise
         '''
-        goal_vector = self.calculate_goal_vector(robot.position)
+        goal_vector = self.calculate_goal_vector()
 
-        if np.linalg.norm(goal_vector) < self.arrival_threshold:
-            return True
-
-        stop = self.stuck_threshold
-        self.nr_ofsteps += 1
-        #if self.buffer + stop < len(self.data_collector.data) and stop < len(self.data_collector.data):
-        if self.nr_ofsteps > stop:
-            if np.linalg.norm(self.goal_pos - robot.position) < 0.1:
-                raise robot.Stuck()
-
-        # Still going
-        return False
+        return np.linalg.norm(goal_vector) < self.arrival_threshold
 
     def step(self, robot : 'Robot', *args, **kwargs) -> bool:
-        goal_vector = self.calculate_goal_vector(robot.position)
+        goal_vector = self.calculate_goal_vector()
         if np.linalg.norm(goal_vector) == 0:
             return True
         robot.navigation_step(goal_vector, *args, **kwargs)
-        return self.update(robot)
+        self.update_position(robot)
+        return self.reached_goal()
 
     @staticmethod
     def factory(mode, *args, **kwargs) -> 'Compass':
@@ -67,10 +70,14 @@ class AnalyticalCompass(Compass):
 
     arrival_threshold = 0.1
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(stuck_threshold=100, *args, **kwargs)
+    def __init__(self, start_pos : Optional[Vector2D] = None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.current_pos : Vector2D = start_pos
 
-    def calculate_goal_vector(self, robotPosition : Vector2D) -> Vector2D:
-        goal_vector = [self.goal_pos[0] - robotPosition[0], self.goal_pos[1] - robotPosition[1]]
+    def update_position(self, robot : 'Robot'):
+        self.current_pos = robot.position
+
+    def calculate_goal_vector(self) -> Vector2D:
+        goal_vector = [self.goal_pos[0] - self.current_pos[0], self.goal_pos[1] - self.current_pos[1]]
 
         return goal_vector

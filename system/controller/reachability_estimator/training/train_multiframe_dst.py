@@ -318,7 +318,7 @@ def train_multiframedst(
     if latest_metrics is None:
         valid_loader = DataLoader(valid_dataset, batch_size=hyperparams.batch_size, num_workers=n_dataset_worker)
         latest_metrics = tensor_log(valid_loader, train_device, writer, hyperparams.max_epochs, nets, loss_function)
-    hparams = vars(nets.sample_config) | { 'with_conv_layer': nets.with_conv_layer } | getattr(loss_function, hparams, {})
+    hparams = vars(nets.sample_config) | { 'with_conv_layer': nets.with_conv_layer } | getattr(loss_function, 'hparams', {})
     latest_metrics = { "Final/"+key: value for key, value in latest_metrics.items() }
     print("Writing metrics:", latest_metrics)
     writer.add_hparams(hparams, latest_metrics)
