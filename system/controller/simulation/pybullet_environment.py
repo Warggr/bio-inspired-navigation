@@ -118,10 +118,14 @@ class PybulletEnvironment:
 
         self.visualize = visualize  # to open JAVA application
 
-        if self.visualize:
-            p.connect(p.GUI)
+        if os.getenv('BULLET_SHMEM_SERVER', False):
+            clientId = p.connect(p.SHARED_MEMORY)
+        elif self.visualize:
+            clientId = p.connect(p.GUI)
         else:
-            p.connect(p.DIRECT)
+            clientId = p.connect(p.DIRECT)
+        # if we're connected to a different client, we need to pass that clientId as an argument to basically all pybullet functions
+        assert clientId == 0, f"{clientId=}"
 
         if realtime:
             assert self.visualize, "realtime without visualization does not make sense"
@@ -166,6 +170,9 @@ class PybulletEnvironment:
             all_wall_kwargs = { 'textures': resource_path("textures", "walls", "yellow_wall.png") }
             all_wall_kwargs.update(wall_kwargs)
             self.mazeID = self.__load_walls(resource_path(self.env_model), **all_wall_kwargs)
+        else:
+            self.planeID = None
+            self.mazeID = []
 
         p.setGravity(0, 0, -9.81)
 
@@ -178,6 +185,21 @@ class PybulletEnvironment:
             # check if agent touches maze -> invalid start position
             if not env_model == "plane" and not "obstacle" in env_model and self.detect_maze_agent_contact():
                 raise ValueError("Invalid start position. Agent and maze overlap.")
+        else:
+            self.robot = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, ex_type, ex_value, traceback):
+        if self.robot is not None:
+            self.robot.delete()
+        if self.planeID is not None:
+            p.removeBody(self.planeID)
+        for wallID in self.mazeID:
+            p.removeBody(wallID)
+        p.removeAllUserDebugItems()
+        p.disconnect()
 
     @property
     def dimensions(self):
@@ -425,6 +447,15 @@ class Robot:
         self.save_position_and_speed(goal_vector=goal_vector)  # save initial configuration
 
         self.mapping = 1.5  # see local_navigation experiments
+
+    def __enter__(self):
+        assert self.env.robot is None
+        self.env.robot = self
+        return self
+
+    def __exit__(self, ex_type, ex_value, traceback):
+        self.env.robot = None
+        self.delete()
 
     def navigation_step(self, goal_vector : Vector2D, obstacles=True, combine=1.5):
         """ One navigation step for the agent.
@@ -727,23 +758,21 @@ if __name__ == "__main__":
     - Savinov_val2
     - Savinov_val3
     """
-    # env_model = "plane"
-    # env_model = "Savinov_test7"
-    # env_model = "Savinov_val2"
-    env_model = "Savinov_val3"
+    try:
+        env_model = sys.argv[1]
+    except IndexError:
+        env_model = "Savinov_val3"
 
     random = Random(0)
-    env = PybulletEnvironment(env_model, visualize=True, realtime=True, start=[-0.5, 0],
+    with PybulletEnvironment(env_model, visualize=True, realtime=True, start=[-0.5, 0],
         wall_kwargs={
             'textures': lambda i: random.choice(all_possible_textures)
         }
-    )
-    try:
-        env.robot.keyboard_simulation()
-    except KeyboardInterrupt:
-        pass
+    ) as env:
+        try:
+            env.robot.keyboard_simulation()
+        except KeyboardInterrupt:
+            pass
 
-    # plot the agent's trajectory in the environment
-    plot.plotTrajectoryInEnvironment(env)
-
-    env.end_simulation()
+        # plot the agent's trajectory in the environment
+        plot.plotTrajectoryInEnvironment(env)

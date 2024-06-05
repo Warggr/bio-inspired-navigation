@@ -176,33 +176,32 @@ def create_gc_spiking(start : Vector2D, goal : Vector2D) -> types.Spikings:
     navigation this would have happened in the exploration phase.
     """
 
-    env = PybulletEnvironment("plane", start=start)
-    robot = env.robot
+    with PybulletEnvironment("plane", start=start) as env:
+        robot = env.robot
 
-    # Grid-Cell Initialization
-    gc_network = setup_gc_network(env.dt)
+        # Grid-Cell Initialization
+        gc_network = setup_gc_network(env.dt)
 
-    compass = AnalyticalCompass(start_pos=robot.position, goal_pos=goal)
-    robot.turn_to_goal(compass.calculate_goal_vector())
+        compass = AnalyticalCompass(start_pos=robot.position, goal_pos=goal)
+        robot.turn_to_goal(compass.calculate_goal_vector())
 
-    i = 0
-    while True:
-        i += 1
-        if i == 5000:
-            raise AssertionError("Agent should not get caught in a loop in an empty plane.")
+        i = 0
+        while True:
+            i += 1
+            if i == 5000:
+                raise AssertionError("Agent should not get caught in a loop in an empty plane.")
 
-        goal_vector = compass.calculate_goal_vector()
-        if np.linalg.norm(goal_vector) == 0:
-            break
-        robot.navigation_step(goal_vector, obstacles=False)
-        compass.update_position(robot.position)
-        gc_network.track_movement(robot.xy_speed)
-        reached_goal = compass.reached_goal()
+            goal_vector = compass.calculate_goal_vector()
+            if np.linalg.norm(goal_vector) == 0:
+                break
+            robot.navigation_step(goal_vector, obstacles=False)
+            compass.update_position(robot.position)
+            gc_network.track_movement(robot.xy_speed)
+            reached_goal = compass.reached_goal()
 
-        if reached_goal:
-            if plotting: plot.plotTrajectoryInEnvironment(env)
-            env.end_simulation()
-            return gc_network.consolidate_gc_spiking()
+            if reached_goal:
+                if plotting: plot.plotTrajectoryInEnvironment(env)
+                return gc_network.consolidate_gc_spiking()
 
 
 def setup_gc_network(dt) -> GridCellNetwork:
@@ -374,10 +373,10 @@ if __name__ == "__main__":
         gc_network = setup_gc_network(dt)
         target_spiking = create_gc_spiking(args.start, args.goal)
 
-        env = PybulletEnvironment(env_model, dt=dt, start=args.start, visualize=args.visualize)
         compass = Compass.factory(mode=args.decoder, gc_network=gc_network, goal_pos=args.goal)
 
-        vector_navigation(env, compass, gc_network, target_gc_spiking=target_spiking, step_limit=float('inf'),
+        with PybulletEnvironment(env_model, dt=dt, start=args.start, visualize=args.visualize) as env:
+            vector_navigation(env, compass, gc_network, target_gc_spiking=target_spiking, step_limit=float('inf'),
                           plot_it=False, exploration_phase=False)
 
     elif args.experiment == "vector_navigation":

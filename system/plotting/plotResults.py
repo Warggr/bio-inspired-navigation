@@ -159,11 +159,8 @@ def plotStartGoalDataset(env_model, starts_goals):
 
 
 def plotStartGoalPair(env_model, start_position, start_heading, target_position, target_heading):
-    from system.controller.simulation.pybullet_environment import PybulletEnvironment
-    env = PybulletEnvironment(env_model, mode="analytical")
-
     fig, ax = plt.subplots()
-    add_environment(ax, env.env_model)
+    add_environment(ax, env_model)
     circle = plt.Circle(start_position, 0.2, color=TUM_colors['TUMAccentBlue'], alpha=1)
     ax.add_artist(circle)
     arrow = plt.Arrow(start_position[0], start_position[1], math.cos(start_heading), math.sin(start_heading),
@@ -175,7 +172,6 @@ def plotStartGoalPair(env_model, start_position, start_heading, target_position,
                       color=TUM_colors['TUMAccentOrange'], alpha=1)
     ax.add_artist(arrow)
     plt.show()
-    env.end_simulation()
 
 
 

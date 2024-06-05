@@ -223,17 +223,25 @@ if __name__ == "__main__":
 
     tj = TopologicalNavigation(env_model, model, pc_network, cognitive_map, gc_network, pod)
 
-    env = PybulletEnvironment(env_model, mode="analytical", build_data_set=True, visualize=args.visualize)
-    plot.plotTrajectoryInEnvironment(env, goal=False, cognitive_map=tj.cognitive_map, trajectory=False)
+    with PybulletEnvironment(env_model, build_data_set=True, visualize=args.visualize, contains_robot=False) as env:
+        # TODO Pierre figure out how to remove unnecessary xy_coordinates
+        plot.plotTrajectoryInEnvironment(env, xy_coordinates=[0,0], goal=False, cognitive_map=tj.cognitive_map, trajectory=False)
 
-    successful = 0
-    for navigation_i in range(100):
-        success, start, end = tj.navigate(cognitive_map_filename=map_file_after_lifelong_learning, env=env)
-        if success:
-            successful += 1
-        tj.cognitive_map.draw()
-        print(f"Navigation {navigation_i} finished")
-        plot.plotTrajectoryInEnvironment(env, goal=False, cognitive_map=tj.cognitive_map, trajectory=False)
+        random = np.random.default_rng(seed=args.seed)
+
+        successful = 0
+        for navigation_i in range(100):
+            start_index, goal_index = None, None
+            while start_index == goal_index:
+                start_index, goal_index = random.integers(0, len(tj.cognitive_map.node_network.nodes), size=2)
+                assert len(tj.cognitive_map.node_network.nodes) > 1
+
+            success = tj.navigate(start_ind=start_index, goal_ind=goal_index, cognitive_map_filename=map_file_after_lifelong_learning, env=env, combine=10)
+            if success:
+                successful += 1
+            tj.cognitive_map.draw()
+            print(f"Navigation {navigation_i} finished")
+            plot.plotTrajectoryInEnvironment(env, goal=False, cognitive_map=tj.cognitive_map, trajectory=False)
 
     print(f"{successful} successful navigations")
     print("Navigation finished")
