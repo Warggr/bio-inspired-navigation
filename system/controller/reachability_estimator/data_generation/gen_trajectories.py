@@ -18,6 +18,7 @@ if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), "../../../.."))
 
 from system.controller.simulation.pybullet_environment import PybulletEnvironment
+from system.controller.simulation.environment_cache import EnvironmentCache
 from system.controller.local_controller.local_navigation import setup_gc_network, vector_navigation, WaypointInfo
 from system.controller.simulation.environment.map_occupancy import MapLayout
 
@@ -97,16 +98,16 @@ def sample_location(env_model):
     y = np.around(np.random.uniform(dimensions[2], dimensions[3]), 1)
     return (x, y)
 
+cache = EnvironmentCache()
 
 def valid_location(env_model):
     """ Sample valid location for agent in the environment """
     while True:
         x, y = sample_location(env_model)
-        env = PybulletEnvironment(env_model, 1e-2, mode="pod", start=[x, y])
-        if not env.detect_maze_agent_contact():
-            env.end_simulation()
-            return [x, y]
-        env.end_simulation()
+        env = cache[env_model]
+        with Robot(env=env, base_position=[x, y]):
+            if not env.detect_maze_agent_contact():
+                return [x, y]
 
 
 def gen_multiple_goals(env_name, nr_of_goals):

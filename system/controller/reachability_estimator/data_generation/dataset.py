@@ -25,6 +25,7 @@ if __name__ == "__main__":
 from system.controller.reachability_estimator.reachability_utils import ViewOverlapReachabilityController
 
 from system.controller.simulation.pybullet_environment import PybulletEnvironment, all_possible_textures
+from system.controller.simulation.environment_cache import EnvironmentCache
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.controller.simulation.environment.map_occupancy_helpers.map_utils import path_length
 from system.plotting.plotResults import plotStartGoalDataset
@@ -143,10 +144,11 @@ class TrajectoriesDataset(data.Dataset):
             map_name: np.cumsum([self.traj_len_dict[_] for _ in traj_ids])
             for map_name, traj_ids in traj_ids_per_map.items()}
 
-        self.envs = {
-            map_name: PybulletEnvironment(map_name, mode="analytical", build_data_set=True, contains_robot=False, **env_kwargs)
-            for map_name in self.map_names
-        }
+        self.envs = EnvironmentCache.getinstance(override_env_kwargs=env_kwargs)
+        for map_name in self.map_names:
+            try:
+                self.envs.load(map_name)
+            except KeyError: pass
 
         self.opened = False
         self.load_to_mem = False
