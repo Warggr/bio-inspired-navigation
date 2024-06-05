@@ -402,6 +402,8 @@ class Map(object):
 
         result *= self.resolution
 
+        assert not np.all(result == 0)
+
         return result
 
     def view_overlap(self, pos1, heading1, pos2, heading2, fov,
@@ -419,7 +421,10 @@ class Map(object):
         # obstacles.
         def offset_points(xy):
             normals = compute_normals(xy)
+            assert not np.isnan(normals[0, 0]), xy
             return xy + normals * offset
+
+        assert fov != 0
 
         if mode == 'plane':
             depth1 = self.get_1d_depth_plane(pos1, n_test_rays, heading1, fov)

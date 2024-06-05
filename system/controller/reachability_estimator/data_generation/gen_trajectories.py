@@ -207,6 +207,7 @@ def generate_multiple_trajectories(out_hd5_obj, num_traj, trajectory_length, cam
             continue
 
         samples = waypoint_movement(mapname, cam_freq, trajectory_length, map_layout, gc_network)
+        # TODO: flatten each sample[:, 3]
         print(f"trajectory {samples[0]}-{samples[1]} with {len(samples)} steps")
         dset = out_hd5_obj.create_dataset(
             dset_name,

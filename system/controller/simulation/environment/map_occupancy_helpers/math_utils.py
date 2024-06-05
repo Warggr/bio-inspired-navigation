@@ -36,6 +36,7 @@ def depth_to_xy_plane(depth, pos=None, heading=0.0, fov=np.pi * 2.0):
     w = np.tan(fov / 2) * 2.0
 
     theta = np.arctan2(1.0, w / 2 - np.arange(n, dtype=np.float32) * w / n) - np.pi / 2 + heading
+    assert not all((thetai == theta[0] for thetai in theta))
     # The above is equivalent to
     # theta2 = np.zeros(n, np.float32)
     # for i in range(n):

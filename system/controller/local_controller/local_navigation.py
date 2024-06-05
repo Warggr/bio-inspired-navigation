@@ -27,7 +27,7 @@ from system.controller.local_controller.compass import Compass, AnalyticalCompas
 import system.plotting.plotResults as plot
 import numpy as np
 from abc import abstractmethod
-from typing import Optional
+from typing import Optional, List
 
 plotting = True  # if True: plot everything
 debug = os.getenv('DEBUG', False)  # if True: print debug output
@@ -158,7 +158,7 @@ class ComboGcCompass(GcCompass):
         return goal_reached
 
 
-def create_gc_spiking(start : Vector2D, goal : Vector2D):
+def create_gc_spiking(start : Vector2D, goal : Vector2D) -> types.Spikings:
     """ 
     Agent navigates from start to goal accross a plane without any obstacles, using the analyticallly 
     calculated goal vector to genereate the grid cell spikings necessary for the decoders. During actual
@@ -207,8 +207,8 @@ def setup_gc_network(dt) -> GridCellNetwork:
     return gc_network
 
 
-def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network, target_gc_spiking=None,
                       step_limit=float('inf'), plot_it=False, obstacles=True,
+def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : GridCellNetwork, target_gc_spiking=None,
                       collect_data_freq=False, collect_data_reachable=False, exploration_phase=False,
                       pc_network: PlaceCellNetwork = None, cognitive_map: CognitiveMapInterface = None):
     """
@@ -228,12 +228,15 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network, t
     exploration_phase      -- track movement for cognitive map and place cell model (this is a misnomer and also used in the navigation phase)
     pc_network             -- place cell network
     cognitive_map          -- cognitive map object
+    All remaining arguments are passed to the Robot.navigation_step() function
+
+    Returns: (depending on the arguments):
+    goal_reached : bool, data : List[WaypointInfo] if collect_data_freq
+    goal_reached : bool, ???  if collect_data_reachable
+    goal_reached : bool, last_pc : PlaceCell else
     """
 
-    from numbers import Number
-    assert len(goal) == 2 and isinstance(goal[0], Number) and isinstance(goal[1], Number), goal
-
-    data = []
+    data : List[WaypointInfo] = []
     robot = env.robot
 
     if gc_network:

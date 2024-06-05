@@ -148,7 +148,7 @@ class GridCellModule:
             s = implicit_euler(s0, self.w, b, tau, dt)  # this step might actually not be necessary, pls investigate
             self.s = s  # updates spiking value
 
-
+# TODO Pierre: suggestion: instead of a virtual and a real grid spiking, use a second GridCellNetwork object that is cloned from the real one
 class GridCellNetwork:
     """GridCellNetwork holds all Grid Cell Modules"""
 

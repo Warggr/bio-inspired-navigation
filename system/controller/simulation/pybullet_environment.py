@@ -452,10 +452,9 @@ class Robot:
             if not intersect(self.position, normed_goal_vector, point, obstacle_vector * multiple):
                 multiple = 0
             goal_vector = normed_goal_vector * combine + obstacle_vector * multiple
-            print("add obstacles:", goal_vector, end=',')
+            self.env.add_debug_line(self.position, np.array(self.position) + goal_vector, color=(0, 0, 1), width=3)
 
         gains = self.compute_gains(goal_vector)
-        print("gains:", gains)
 
         #print(f'Step({gains=})', end='\t')
         self._step(gains, goal_vector)
@@ -557,12 +556,6 @@ class Robot:
             self.env.camera()
 
     def _step(self, gains : [float, float], current_goal_vector : Vector2D):
-
-        # print("Gains:", gains)
-        #
-        #print("  old position:", self.position)
-        #print("  old speed:", self.xy_speed)
-
         # change speed
         p.setJointMotorControlArray(bodyUniqueId=self.ID,
                             jointIndices=[4, 6],
@@ -593,7 +586,7 @@ class Robot:
             direction_vector = np.array([-np.sin(angle), np.cos(angle)])
         else:
             try:
-                # TODO: isn't that overkill compared to e.g. just taking the slope of two points?
+                # TODO Pierre: isn't that overkill compared to e.g. just taking the slope of two points?
                 # Calculate the slope (m) of the line using linear regression
                 # Step 2: Calculate a straight line using linear regression that fits the best to these points
                 hit_points = np.array(hit_points)
@@ -626,7 +619,6 @@ class Robot:
 
     def turn_to_goal(self, goal_vector : Vector2D):
         """ Agent turns to face in goal vector direction """
-        print("Turning to goal...")
 
         i = 0
         MAX_ITERATIONS = 10
@@ -657,7 +649,6 @@ class Robot:
 
             gains = [v_left, -v_left]
 
-            print(f"Step with {gains=}")
             self._step(gains, goal_vector)
 
         # turning in place does not mean the agent is stuck
@@ -724,8 +715,8 @@ all_possible_textures = [ os.path.join(texture_folder, file) for file in sorted(
 if __name__ == "__main__":
     """
     Test keyboard movement an plotting in different environments. 
-    Press arrow keys to move, SPACE to visualize egocentric rays with obstacle detection and  BACKSPACE to exit.
-    
+    Press arrow keys to move, SPACE to visualize egocentric rays with obstacle detection and BACKSPACE to exit.
+
     Available environments:
     - plane
     - obstacle_map_0

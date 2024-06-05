@@ -41,6 +41,7 @@ class PlaceCell:
         self.plotted_found = [False, False]  # Was used for debug plotting, of linear lookahead
 
         self.observations = observations
+        assert observations[0] is not None
         self.lidar : Optional[np.ndarray] = None
 
     def compute_firing(self, s_vectors):

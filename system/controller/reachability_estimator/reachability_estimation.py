@@ -208,7 +208,6 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
                                                          of each pair, nullable
         goal_spikings: [numpy.ndarray]                -- grid cell firings corresponding to the second locations
                                                          of each pair, nullable
-        batch_size: int                               -- length of each input list and of returned list
 
         returns:
         [float] -- reachability values

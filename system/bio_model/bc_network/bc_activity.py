@@ -50,8 +50,10 @@ def bcActivity(angle : types.Angle, distance : float, out : Optional[p.BoundaryC
 
 def normalize(activity_vector: p.BoundaryCellActivity) -> p.BoundaryCellActivity:
     maximum = np.max(activity_vector)
+    assert not np.isnan(np.min(activity_vector))
     if maximum > 0.0:
         activity_vector = activity_vector / maximum
+        assert not np.isnan(np.min(activity_vector))
     return activity_vector
 
 def bcActivityForLidar(lidar : types.LidarReading) -> p.BoundaryCellActivity:

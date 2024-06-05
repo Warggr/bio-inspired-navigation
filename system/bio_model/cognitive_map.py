@@ -73,6 +73,7 @@ class CognitiveMapInterface(ABC):
         """ Returns a path in the graph from start to goal nodes"""
         try:
             path = nx.shortest_path(self.node_network, source=start, target=goal)
+            # TODO Pierre: we could use A* with distances or something
         except nx.NetworkXNoPath:
             return None
 

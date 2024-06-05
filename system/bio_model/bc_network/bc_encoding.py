@@ -61,9 +61,11 @@ class BoundaryCellNetwork:
         for i in range(20):
             scaledTransformationLayers[:, i] = transformationLayers[:, i] * headingScaler[i]
         bvcActivity = np.sum(scaledTransformationLayers, 1)
+        assert not np.isnan(np.max(bvcActivity))
         maxBVC = np.amax(bvcActivity)
         if maxBVC > 0:
             bvcActivity = bvcActivity/maxBVC
+        assert not np.isnan(np.min(bvcActivity))
 
         return transformationLayers, bvcActivity
 
@@ -111,6 +113,8 @@ def train(
         egocentricRate = bcForWall(rstart, rend)
         ego2TransformationWts[:, :, transformationLayer] += np.outer(egocentricRate, np.transpose(BVCrate))
 
+    assert not np.isnan(np.sum(ego2TransformationWts))
+
     for index in range(p.nrTransformationLayers):
         heading = p.transformationAngles[index]
         HDCrate = HDCActivity.headingCellsActivityTraining(heading)
@@ -118,12 +122,16 @@ def train(
         # HDCrate = sparse(HDCrate)     for better computational costs
         heading2TransformationWts[:, :, index] = np.outer(np.ones(p.nrBVC), HDCrate)
 
+    assert not np.isnan(np.sum(heading2TransformationWts))
+
     #rescaling
     divtmp = np.zeros((p.nrBVC, p.nrBVC))
     for index in range(20):
         ego2TransformationWts[:, :, index] = ego2TransformationWts[:, :, index] / np.amax(ego2TransformationWts[:, :, index])
         divtmp = np.outer(np.sum(ego2TransformationWts[:, :, index], 1), np.ones(p.nrBVC))
         ego2TransformationWts[:, :, index] = np.divide(ego2TransformationWts[:, :, index], divtmp)
+
+    assert not np.isnan(np.sum(ego2TransformationWts))
 
     return BoundaryCellNetwork(ego2TransformationWts, heading2TransformationWts, transformation2BVCWts)
 
