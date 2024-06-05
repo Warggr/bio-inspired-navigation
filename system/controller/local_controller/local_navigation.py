@@ -278,8 +278,10 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
             [firing_values, created_new_pc] = pc_network.track_movement(gc_network, observations,
                                                                         robot.position, exploration_phase)
 
+            lidar = env.lidar()
+            assert lidar is not None
             mapped_pc = cognitive_map.track_vector_movement(
-                firing_values, created_new_pc, pc_network.place_cells[-1], lidar=env.lidar(),
+                firing_values, created_new_pc, pc_network.place_cells[-1], lidar=lidar,
                 exploration_phase=exploration_phase, pc_network=pc_network)
             if mapped_pc is not None:
                 last_pc = mapped_pc
