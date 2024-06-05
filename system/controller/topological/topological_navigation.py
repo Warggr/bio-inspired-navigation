@@ -25,6 +25,7 @@ from system.bio_model.place_cell_model import PlaceCellNetwork, PlaceCell
 from system.controller.local_controller.compass import Compass, AnalyticalCompass
 from system.controller.local_controller.local_navigation import vector_navigation, setup_gc_network, PodGcCompass, LinearLookaheadGcCompass
 import system.plotting.plotResults as plot
+from system.types import Vector2D
 
 # if True plot results
 plotting = True
@@ -55,12 +56,14 @@ class TopologicalNavigation(object):
         self.path_length_limit = 30  # max number of topological navigation steps
         self.step_limit = 500  # max number of vector navigation steps
 
-    def navigate(self, start_ind: int = None, goal_ind: int = None, cognitive_map_filename: str = None, env: Optional[PybulletEnvironment] = None):
+    def navigate(self, start_ind: int, goal_ind: int, cognitive_map_filename: str = None, env: Optional[PybulletEnvironment] = None,
+        *nav_args, **nav_kwargs,
+    ):
         """ Navigates the agent through the environment with topological navigation.
 
         arguments:
-        start_ind: int              -- index of start node in the cognitive map, if None: random is chosen
-        goal_ind: int               -- index of goal node in the cognitive map, if None: random is chosen
+        start_ind: int              -- index of start node in the cognitive map
+        goal_ind: int               -- index of goal node in the cognitive map
         cognitive_map_filename: str -- name of file to save the cognitive map to
 
         returns:
@@ -69,19 +72,8 @@ class TopologicalNavigation(object):
         int  -- index of goal node
         """
 
-        if start_ind is None:
-            start = np.random.choice(list(self.cognitive_map.node_network.nodes))
-            start_ind = list(self.cognitive_map.node_network).index(start)
-        else:
-            start = list(self.cognitive_map.node_network.nodes)[start_ind]
-
-        if goal_ind is None:
-            goal = None
-            while goal is None or goal == start:
-                goal = np.random.choice(list(self.cognitive_map.node_network.nodes))
-            goal_ind = list(self.cognitive_map.node_network).index(goal)
-        else:
-            goal = list(self.cognitive_map.node_network.nodes)[goal_ind]
+        start = list(self.cognitive_map.node_network.nodes)[start_ind]
+        goal = list(self.cognitive_map.node_network.nodes)[goal_ind]
 
         # Plan a topological path through the environment,
         # if no such path exists choose random start and goal until a path is found
@@ -122,12 +114,14 @@ class TopologicalNavigation(object):
         curr_path_length = 0
         while i + 1 < len(path) and curr_path_length < self.path_length_limit:
             goal_pos = list(path[i + 1].env_coordinates)
-            compass.goal_pos = goal_pos
+            assert goal_pos is not None
+            compass.reset(new_goal=goal_pos)
+            assert compass.goal_pos is not None
             goal_spiking = path[i + 1].gc_connections
             stop, pc = vector_navigation(env, compass, self.gc_network, goal_spiking,
                                          obstacles=True, exploration_phase=False, pc_network=self.pc_network,
                                          cognitive_map=self.cognitive_map, plot_it=False,
-                                         step_limit=self.step_limit)
+                                         step_limit=self.step_limit, *nav_args, **nav_kwargs)
             self.cognitive_map.postprocess_vector_navigation(node_p=path[i], node_q=path[i + 1],
                                                              observation_p=last_pc, observation_q=pc, success=stop == 1)
 
@@ -167,15 +161,15 @@ class TopologicalNavigation(object):
         self.cognitive_map.postprocess_topological_navigation()
         if cognitive_map_filename is not None:
             self.cognitive_map.save(filename=cognitive_map_filename)
-        return curr_path_length < self.path_length_limit, start_ind, goal_ind
+        return curr_path_length < self.path_length_limit
 
-    def locate_node(self, compass : Compass, pc: PlaceCell, goal: PlaceCell):
+    def locate_node(self, compass : Compass, position: Vector2D, goal: PlaceCell):
         """
         Maps a location of the given place cell to the node in the graph.
         Among multiple close nodes prioritize the one that has a valid path to the goal.
 
         arguments:
-        compass: Compass   -- current environment of the agent
+        compass: Compass   -- A Compass that will be reset to get distance to the goal.
         pc: PlaceCell      -- a place cell to be located
         goal: PlaceCell    -- goal node
 
@@ -185,9 +179,9 @@ class TopologicalNavigation(object):
         """
         closest_node = None
         for node in self.cognitive_map.node_network.nodes:
-            #compass = compass.reset()
-            compass.calculate_goal_vector(pc.env_coordinates)
-            if compass.reached_goal():
+            compass.reset(new_goal=node.env_coordinates)
+            goal_vector = compass.calculate_goal_vector(robotPosition=position)
+            if np.linalg.norm(goal_vector) < compass.arrival_threshold: # TODO: maybe we could find the *closest* node?
                 closest_node = node
                 new_path = self.cognitive_map.find_path(node, goal)
                 if new_path:
@@ -201,21 +195,22 @@ if __name__ == "__main__":
     The exploration should be completed before running this script. 
     """
     from system.controller.reachability_estimator.reachability_estimation import reachability_estimator_factory
+    from system.controller.reachability_estimator.ReachabilityDataset import SampleConfig
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--visualize', action='store_true')
+    parser.add_argument('--seed', type=int, default=None, help='Seed for random index generation.') # for reproducibility / debugging purposes
     args = parser.parse_args()
 
     re_type = "neural_network"
     re_weights_file = "re_mse_weights.50"
     map_file = "after_exploration.gpickle"
     map_file_after_lifelong_learning = "after_lifelong_learning.gpickle"
-    with_grid_cell_spikings = True
     env_model = "Savinov_val3"
     model = "combo"
+    input_config = SampleConfig(grid_cell_spikings=True)
 
-    re = reachability_estimator_factory(re_type, weights_file=re_weights_file, env_model=env_model,
-                                        with_grid_cell_spikings=with_grid_cell_spikings)
+    re = reachability_estimator_factory(re_type, weights_file=re_weights_file, config=input_config)
     pc_network = PlaceCellNetwork(from_data=True, reach_estimator=re)
     cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from=map_file, debug=True)
     gc_network = setup_gc_network(1e-2)

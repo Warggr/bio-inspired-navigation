@@ -17,8 +17,9 @@ import os
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), "../../../.."))
 
-from system.controller.simulation.pybullet_environment import PybulletEnvironment
+from system.controller.simulation.pybullet_environment import PybulletEnvironment, Robot
 from system.controller.simulation.environment_cache import EnvironmentCache
+from system.controller.local_controller.compass import AnalyticalCompass
 from system.controller.local_controller.local_navigation import setup_gc_network, vector_navigation, WaypointInfo
 from system.controller.simulation.environment.map_occupancy import MapLayout
 

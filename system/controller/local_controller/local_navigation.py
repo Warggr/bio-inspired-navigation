@@ -23,6 +23,7 @@ from system.controller.simulation.math_utils import Vector2D
 from system.bio_model.grid_cell_model import GridCellNetwork
 from system.controller.simulation.pybullet_environment import PybulletEnvironment, Robot
 from system.controller.local_controller.compass import Compass, AnalyticalCompass
+from system.types import WaypointInfo, types
 
 import system.plotting.plotResults as plot
 import numpy as np
@@ -134,6 +135,7 @@ class ComboGcCompass(GcCompass):
     def __init__(self, pod_network : 'PhaseOffsetDetectorNetwork', gc_network : GridCellNetwork, *args, **kwargs):
         super().__init__(gc_network, *args, **kwargs)
         # self.gc_network = gc_network # already done by the super().__init__
+        self.pod_network = pod_network
 
         compass = PodGcCompass(pod_network, gc_network, *args, **kwargs)
         compass = GoalVectorCache(compass)
@@ -148,6 +150,7 @@ class ComboGcCompass(GcCompass):
             self.impl.reset(new_goal)
 
     def calculate_goal_vector(self, *args, **kwargs):
+        # TODO this often returns 0,0 for some reason
         return self.impl.calculate_goal_vector(*args, **kwargs)
 
     @property
@@ -218,10 +221,12 @@ def setup_gc_network(dt) -> GridCellNetwork:
     return gc_network
 
 
-                      step_limit=float('inf'), plot_it=False, obstacles=True,
 def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : GridCellNetwork, target_gc_spiking=None,
+    step_limit=float('inf'), plot_it=False,
                       collect_data_freq=False, collect_data_reachable=False, exploration_phase=False,
-                      pc_network: PlaceCellNetwork = None, cognitive_map: CognitiveMapInterface = None):
+    pc_network: PlaceCellNetwork = None, cognitive_map: CognitiveMapInterface = None,
+    *nav_args, **nav_kwargs
+):
     """
     Agent navigates towards goal.
 
@@ -233,7 +238,6 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
     gc_spiking             --  grid cell spikings at the goal (pod, linear_lookahead, combo)
     step_limit             --  navigation stops after step_limit amount of steps (default infinity)
     plot_it                --  if true: plot the navigation (default false)
-    obstacles              --  if true: movement vector is a combination of goal and obstacle vector (default true)
     collect_data_freq      -- return necessary data for trajectory generation
     collect_data_reachable -- return necessary data for reachability dataset generation
     exploration_phase      -- track movement for cognitive map and place cell model (this is a misnomer and also used in the navigation phase)
@@ -250,7 +254,7 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
     data : List[WaypointInfo] = []
     robot = env.robot
 
-    if gc_network:
+    if gc_network and (target_gc_spiking is not None):
         gc_network.set_as_target_state(target_gc_spiking)
 
     robot.nr_ofsteps = 0

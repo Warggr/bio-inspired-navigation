@@ -153,7 +153,6 @@ class TrajectoriesDataset(data.Dataset):
         self.opened = False
         self.load_to_mem = False
         self.first = True
-        self.view_overlap_reachability_controller = ViewOverlapReachabilityController(self.layout)
 
     def _init_once(self, seed):
         # Should be called after the dataset runs in a separate process

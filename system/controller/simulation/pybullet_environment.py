@@ -349,8 +349,11 @@ class PybulletEnvironment:
     def end_simulation(self):
         p.disconnect()
 
-    def add_debug_line(self, start, end, color, width=1):
+    def add_debug_line(self, start, end, color, width=1, height=None):
         """ add line into visualization """
+        if len(start) == 2 or height:
+            height = height or 1
+            start = [*start, height]; end = [*end, height]
         if self.visualize:
             p.addUserDebugLine(start, end, color, width)
 
@@ -652,8 +655,9 @@ class Robot:
         """ Agent turns to face in goal vector direction """
 
         i = 0
-        MAX_ITERATIONS = 10
-        while i == 0 or (abs(diff_angle) > 0.05 and i < MAX_ITERATIONS):
+        MAX_ITERATIONS = 1000
+        diff_angle = None
+        while i < MAX_ITERATIONS and (diff_angle is None or abs(diff_angle) > 0.05):
             i += 1
             normed_goal_vector = np.array(goal_vector) / np.linalg.norm(np.array(goal_vector))
 
