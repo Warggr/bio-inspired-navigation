@@ -14,7 +14,7 @@ import itertools
 import bisect
 import random
 import matplotlib.pyplot as plt
-from typing import Tuple, Generator, Dict
+from typing import Tuple, Generator, Dict, Optional
 
 import sys
 import os
@@ -280,7 +280,7 @@ class TrajectoriesDataset(data.Dataset):
             path_l = path_length(waypoints)
             return map_name, src_sample, dst_sample, path_l
 
-    def __getitem__(self, idx) -> Tuple[Sample, bool]:
+    def __getitem__(self, idx) -> Sample:
         ''' Loads or creates a sample. Sample contains ... 
 
         returns:
@@ -305,16 +305,8 @@ class TrajectoriesDataset(data.Dataset):
 
         env = self.envs[map_name]
 
-        sample = Sample(HalfSample.create_from_placecell(src_sample, env), HalfSample.create_from_placecell(dst_sample, env))
+        return Sample(place_info(src_sample, env), place_info(dst_sample, env))
 
-        #print(f"Computing reachability for {sample.src_pos}, {sample.dst_pos}")
-        try:
-            r = self.view_overlap_reachability_controller.reachable(map_name, src_sample, dst_sample, path_l, sample.src_img, sample.dst_img)
-        except ValueError:
-            return None
-        #print(f"Reachability computed {r}")
-
-        return sample, r
 
 
 DATASET_KEY = 'positions'
@@ -332,6 +324,7 @@ def assert_conforms_to_type(data, dtype):
 
 def create_and_save_reachability_samples(
     rd : TrajectoriesDataset, f : h5py.File,
+    reachability_controller : ReachabilityController = ViewOverlapReachabilityController(),
     nr_samples=1000,
     flush_freq=50,
 ) -> h5py.File:
@@ -367,12 +360,15 @@ def create_and_save_reachability_samples(
     buffer = []
 
     for i in (bar := tqdm(range(start_index, nr_samples), initial=start_index, total=nr_samples)):
-        item = None
-        while item is None:
+        while True:
             random_index = random.randrange(rd.traj_len_cumsum[-1])
-            item = rd[random_index]
+            sample = rd[random_index]
 
-        sample, reachable = item
+            try:
+                reachable = self.reachability_controller.reachable(env, sample.src, sample.dst, path_l)
+            except AssertionError:
+                continue
+
         sum_r += int(reachable)
 
         buffer.append(sample.to_tuple(reachable))
@@ -456,6 +452,10 @@ if __name__ == "__main__":
     parser.add_argument('--extension', help='extension of the dataset file', default='.hd5')
     parser.add_argument('--image-plot', action=argparse.BooleanOptionalAction, help='Show image of samples taken')
     parser.add_argument('-c', '--color-walls', help='number of wall colors', type=int, default=1)
+    parser.add_argument('--re',
+        choices=['view_overlap', 'network', 'distance', 'simulation'], default='view_overlap',
+        help='The reachability estimator to generate ground truth reachability values'
+    )
     args = parser.parse_args()
 
     textures = all_possible_textures[:args.color_walls]
@@ -463,6 +463,7 @@ if __name__ == "__main__":
     # Input file
     filename = os.path.join(get_path(), "data", "trajectories", args.traj_file)
     filename = os.path.realpath(filename)
+    re = ReachabilityController.factory(controller_type=args.re)
     rd = TrajectoriesDataset([filename], env_kwargs={ 'wall_kwargs': { 'textures': textures } })
 
     suffix = '' if args.color_walls == 1 else f'-{args.color_walls}colors'
@@ -474,6 +475,7 @@ if __name__ == "__main__":
 
     create_and_save_reachability_samples(
         rd, f,
+        reachability_controller=re,
         nr_samples=args.num_samples,
         flush_freq=args.flush_freq,
     )
