@@ -365,6 +365,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('mode', choices=['train', 'test', 'validate'], help='mode')
     parser.add_argument('--dataset-features', nargs='+', default=[])
+    parser.add_argument('--dataset-basename', help='The base name of the reachability dataset HD5 file', default='dataset')
     parser.add_argument('--images', help='Images are included in the dataset', action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('--spikings', dest='with_grid_cell_spikings', help='Grid cell spikings are included in the dataset', action='store_true')
     parser.add_argument('--lidar', help='LIDAR distances are included in the dataset', choices=['raw_lidar', 'ego_bc', 'allo_bc'])
@@ -386,7 +387,7 @@ if __name__ == '__main__':
     if args.with_conv_layer:
         suffix += '+conv'
 
-    filename = "dataset" + args.dataset_features + ".hd5"
+    filename = args.dataset_basename + args.dataset_features + ".hd5"
     dataset = ReachabilityDataset(filename, sample_config=config)
 
     backbone = 'convolutional' # convolutional, res_net
