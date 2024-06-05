@@ -41,7 +41,7 @@ class PlaceCell:
         self.plotted_found = [False, False]  # Was used for debug plotting, of linear lookahead
 
         self.observations = observations
-        self.distances : Optional[np.ndarray] = None
+        self.lidar : Optional[np.ndarray] = None
 
     def compute_firing(self, s_vectors):
         """Computes firing value based on current grid cell spiking"""
@@ -104,6 +104,15 @@ class PlaceCell:
     def __hash__(self):
         return hash(tuple(self.env_coordinates))
 
+    # Introducing aliases for some properties so this can be used as a PlaceInfo
+    @property
+    def pos(self): return self.env_coordinates
+    @property
+    def angle(self): return self.observations[0] # TODO
+    @property
+    def img(self): return self.observations[-1] # TODO
+    @property
+    def spikings(self): return self.gc_connections
 
 class PlaceCellNetwork:
     """A PlaceCellNetwork holds information about all Place Cells"""

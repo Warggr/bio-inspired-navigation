@@ -271,7 +271,7 @@ class CognitiveMap(CognitiveMapInterface):
         # Check if we have entered a new place cell
         if created_new_pc:
             entered_different_pc = True
-            pc.distances = lidar
+            pc.lidar = lidar
             self.add_node_to_map(pc)
 
         elif pc_active_firing > self.active_threshold and self.prior_idx_pc_firing != idx_pc_active:

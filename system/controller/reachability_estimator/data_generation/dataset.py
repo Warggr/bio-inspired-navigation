@@ -28,8 +28,8 @@ from system.controller.simulation.pybullet_environment import PybulletEnvironmen
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.controller.simulation.environment.map_occupancy_helpers.map_utils import path_length
 from system.plotting.plotResults import plotStartGoalDataset
-from system.controller.simulation.pybullet_environment import types
-from system.controller.reachability_estimator.ReachabilityDataset import Sample, HalfSample
+from system.types import types, FlatSpikings, WaypointInfo
+from system.controller.reachability_estimator.types import Sample, PlaceInfo, ReachabilityController
 
 def get_path():
     """ returns path to data storage folder """
@@ -47,14 +47,20 @@ def print_debug(*params):
         print(*params)
 
 
-def create_HalfSample(
-    data: Tuple[types.Vector2D, types.Angle, types.Spikings],
+def spikings_reshape(img_array : FlatSpikings) -> types.Spikings:
+    """ image stored in array form to image in correct shape for nn """
+    img = np.reshape(img_array, (6, 1600))
+    return img
+
+def place_info(
+    data: WaypointInfo,
     env: PybulletEnvironment,
-) -> HalfSample:
-    pos, angle, spikings = src
+) -> PlaceInfo:
+    pos, angle, spikings = data
+    spikings = spikings_reshape(spikings)
     img = env.camera([pos, angle])
     lidar, _ = env.lidar([pos, angle])
-    return HalfSample(pos, angle, spikings, img, lidar)
+    return PlaceInfo(pos, angle, spikings, img, lidar)
 
 
 class TrajectoriesDataset(data.Dataset):
@@ -200,7 +206,7 @@ class TrajectoriesDataset(data.Dataset):
     def __len__(self):
         return self.traj_len_cumsum[-1]
 
-    def _draw_sample_same_traj(self, idx) -> (str, Tuple[types.Vector2D, types.Angle, types.Spikings], Tuple[types.Vector2D, types.Angle, types.Spikings], float):
+    def _draw_sample_same_traj(self, idx) -> Optional[(str, WaypointInfo, WaypointInfo, float)]:
         """ Draw a source and goal sample from the same trajectory.
             Their distance will be between distance_min and distance_max.
             They will be separated by timesteps in range of range_min to range_max.

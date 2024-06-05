@@ -51,7 +51,7 @@ import system.plotting.plotResults as plot
 from system.bio_model.grid_cell_model import GridCellNetwork
 
 from system.controller.simulation.math_utils import vectors_in_one_direction, intersect, compute_angle
-from system.types import Vector2D, Angle
+from system.types import types, LidarReading, Vector2D
 from system.controller.simulation.environment_config import environment_dimensions
 
 try:
@@ -59,39 +59,6 @@ try:
 except AttributeError:
     from system.polyfill import batched
     itertools.batched = batched
-
-class LidarReading:
-    def __init__(self, distances: List[float], angles: List[Angle]):
-        self.distances = distances
-        self.angles = angles
-    
-    def __getitem__(self, index):
-        return self.distances[index]
-
-    @staticmethod
-    def angles(
-        start_angle,
-        tactile_cone = math.radians(310),
-        num_ray_dir = 62, # number of directions to check (e.g. 16,51,71)
-        blind_spot_cone = math.radians(50),
-    ) -> Iterable[Angle]:
-        max_angle = tactile_cone / 2
-        for angle_offset in np.linspace(-max_angle, max_angle, num=num_ray_dir):
-            if abs(angle_offset) < blind_spot_cone / 2:
-                continue
-            yield start_angle + angle_offset
-
-class types:
-    DepthImage = np.ndarray
-    Vector2D = Vector2D
-    Vector3D = Tuple[float, float, float]
-    Quaternion = Tuple[float, float, float, float]
-    Spikings = List[float]
-    Angle = Angle
-    Image = np.ndarray
-    LidarReading = LidarReading
-
-types.PositionAndOrientation = Tuple[types.Vector3D, types.Angle]
 
 def closest_subsegment(values : List[float]) -> (int, int):
     values = np.array(values)
@@ -125,7 +92,7 @@ class PybulletEnvironment:
         visualize=False,
         realtime=False,
         build_data_set=False,
-        start : Optional[Vector2D] = None,
+        start : Optional[types.Vector2D] = None,
         orientation : types.Angle = np.pi/2,
         frame_limit=5000,
         contains_robot=True,
@@ -498,7 +465,7 @@ class Robot:
             self.data_collector.images.append(self.env.camera())
 
     @property
-    def position_and_angle(self):
+    def position_and_angle(self) -> Tuple[types.Vector2D, types.Angle]:
         # Possible improvement: check if retrieving last value from data_collector is faster
         position, angle = p.getBasePositionAndOrientation(self.ID)
         assert position[2] > -10 #== PybulletEnvironment.ROBOT_Z_POS
@@ -525,7 +492,7 @@ class Robot:
         angle = p.getEulerFromQuaternion(linkWorldOrientation)[2]
         return linkWorldPosition, angle
 
-    def save_position_and_speed(self, goal_vector : Vector2D):
+    def save_position_and_speed(self, goal_vector : types.Vector2D):
         position, angle = self.position_and_angle
         linear_v = self.xy_speed
         self.data_collector.append(position, angle, linear_v, goal_vector)

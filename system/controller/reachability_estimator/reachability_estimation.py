@@ -19,6 +19,7 @@ from typing import Type, Dict
 import system.controller.reachability_estimator.networks as networks
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.bio_model.place_cell_model import PlaceCell
+from system.controller.reachability_estimator.types import ReachabilityController, PlaceInfo, types
 
 def reachability_estimator_factory(type: str = 'distance', /, device: str = 'cpu', debug: bool = False, env_model : str = None, **kwargs) -> 'ReachabilityEstimator':
     """ Returns an instance of the reachability estimator interface
@@ -178,24 +179,25 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
 
         return NetworkReachabilityEstimator(backbone, *args, **kwargs)
 
-    def predict_reachability(self, start: PlaceCell, goal: PlaceCell) -> float:
+    def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo) -> float:
         """ Predicts reachability value between two locations """
-        args = [ start.observations[0], goal.observations[-1] ]
-        if self.with_grid_cell_spikings:
-            if isinstance(goal.gc_connections, list):
-                goal.gc_connections = np.array(goal.gc_connections)
-            args += [
-                spikings_reshape(start.gc_connections.flatten()),
-                spikings_reshape(goal.gc_connections.flatten())
-            ]
-        if self.with_dist:
-            args += [ start.distances ]
-        args = [ [arg] for arg in args ] # predict_reachability_batch expects batches / lists for each param
-        return self.predict_reachability_batch(*args)[0]
+        # types.Image format, returned by env.camera, has size (64x64x4) (channels last)
+        # while the NN expects (4x64x64) (channels first)
+        # TODO Pierre: we could do this conversion lower in the call stack (e.g. in reachability_factor_batch or in networks.py)
+        start_imgs = np.transpose(start.img, (2, 0, 1))
+        goal_imgs = np.transpose(goal.img, (2, 0, 1))
 
-    def predict_reachability_batch(self, starts: [numpy.ndarray | torch.Tensor], goals: [numpy.ndarray | torch.Tensor],
+        args = [
+            start_imgs, goal_imgs,
+            start.spikings, goal.spikings,
+            start.lidar, goal.lidar,
+        ]
+        args = [ [arg] for arg in args ] # reachability_factor_batch expects batches / lists for each param
+        return self.reachability_factor_batch(*args)[0]
+
+    def reachability_factor_batch(self, starts: [numpy.ndarray | torch.Tensor], goals: [numpy.ndarray | torch.Tensor],
         src_spikings: [numpy.ndarray | torch.Tensor] = None, goal_spikings: [numpy.ndarray | torch.Tensor] = None,
-        src_distances: numpy.ndarray = None, # goal_distances: numpy.ndarray = None,                        
+        src_distances: numpy.ndarray = None, goal_distances: numpy.ndarray = None,
     ) -> [float]:
         """ Predicts reachability for multiple location pairs
 
@@ -216,7 +218,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
             src_batch: [numpy.ndarray | torch.Tensor], dst_batch: [numpy.ndarray | torch.Tensor],
             src_spikings: [numpy.ndarray] = None, goal_spikings: [numpy.ndarray] = None,
             src_distances: [numpy.ndarray] = None, # goal_distances: [numpy.ndarray] = None,
-        ) -> (float, float, float):
+        ) -> networks.Batch[networks.Model.Prediction]:
             """ Helper function, main logic for predicting reachability for multiple location pairs """
             with torch.no_grad():
                 if isinstance(src_batch[0], np.ndarray):
@@ -255,7 +257,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         assert len(starts) == len(goals)
         n = len(starts)
 
-        results : [(float, float, float)] = []
+        results : [networks.Model.Prediction] = []
         n_remaining = n
         batch_size = min(self.batch_size, len(starts))
         while n_remaining > 0:
@@ -294,53 +296,50 @@ class SimulationReachabilityEstimator(ReachabilityEstimator):
         self.env_model = env_model
         self.fov = 120 * np.pi / 180
 
-    def predict_reachability(self, start: PlaceCell, goal: PlaceCell) -> float:
+    @override
+    def reachable(self, env : 'PybulletEnvironment', start: PlaceInfo, goal: PlaceInfo, path_l = None) -> bool:
         """ Determines reachability factor between two locations """
-        from system.controller.local_controller.local_navigation import setup_gc_network, vector_navigation
+        from system.controller.simulation.pybullet_environment import Robot
+        from system.controller.local_controller.local_navigation import setup_gc_network, vector_navigation, GcCompass
 
         """ Return reachability estimate from start to goal using the re_type """
-        if not self.env_model:
-            raise ValueError("missing env_model; needed for simulating reachability")
+
         """ Simulate movement between start and goal and return whether goal was reached """
-        dt = 1e-2
 
         # initialize grid cell network and create target spiking
-        gc_network = setup_gc_network(dt)
-        gc_network.set_as_current_state(start.gc_connections)
-        target_spiking = goal.gc_connections
-        start_pos = start.env_coordinates
-        goal_pos = goal.env_coordinates
+        gc_network = setup_gc_network(self.dt)
+        gc_network.set_as_current_state(start.spikings)
+        target_spiking = goal.spikings
 
-        model = "combo"
+        compass = GcCompass.factory(mode="combo", gc_network=gc_network, goal_pos=goal.env_coordinates)
+        with Robot(env=env, base_position=start.env_coordinates, base_orientation=start.angle) as robot:
+            goal_reached, _ = vector_navigation(env, compass, gc_network, target_gc_spiking=target_spiking,
+                                        step_limit=750, plot_it=False)
+            final_position, final_angle = robot.position_and_angle
 
-        from system.controller.simulation.pybullet_environment import PybulletEnvironment
-        env = PybulletEnvironment(False, dt, self.env_model, "analytical", start=list(start_pos))
+        if goal_reached:
+            map_layout = MapLayout(env.env_model)
 
-        over, _ = vector_navigation(env, list(goal_pos), gc_network, target_gc_spiking=target_spiking, model=model,
-                                    step_limit=750, plot_it=False)
+            overlap_ratios = map_layout.view_overlap(final_position, final_angle, goal.env_coordinates, goal.angle, self.fov, mode='plane')
 
-        if over == 1:
-            map_layout = MapLayout(self.env_model)
-
-            overlap_ratios = map_layout.view_overlap(env.xy_coordinates[-1], env.orientation_angle[-1],
-                                                     goal_pos, env.orientation_angle[-1], self.fov, mode='plane')
-
-            env.end_simulation()
             if overlap_ratios[0] < 0.1 and overlap_ratios[1] < 0.1:
                 # Agent is close to the goal, but seperated by a wall.
-                return 0.0
-            elif np.linalg.norm(goal_pos - env.xy_coordinates[-1]) > 0.7:
+                return False
+            elif np.linalg.norm(goal.env_coordinates - final_position) > 0.7:
                 # Agent actually didn't reach the goal and is too far away.
-                return 0.0
+                return False
             else:
                 # Agent did actually reach the goal
-                return 1.0
+                return True
         else:
-            env.end_simulation()
-            return 0.0
+            return False
 
-    def pass_threshold(self, reachability_factor, threshold) -> bool:
-        return reachability_factor >= threshold
+    @override
+    def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo) -> float:
+        if self.reachable(start, goal): # TODO provide the env somewhere
+            return 1.0
+        else:
+            return 0.0
 
 
 class ViewOverlapReachabilityEstimator(ReachabilityEstimator):
@@ -360,7 +359,7 @@ class ViewOverlapReachabilityEstimator(ReachabilityEstimator):
         self.distance_threshold = 0.7
         self.map_layout = MapLayout(self.env_model)
 
-    def predict_reachability(self, start: PlaceCell, goal: PlaceCell) -> float:
+    def reachability_factor(self, start: PlaceCell, goal: PlaceCell) -> float:
         """ Reachability Score based on the view overlap of start and goal in the environment """
         # untested and unfinished
         start_pos = start.env_coordinates
@@ -371,9 +370,6 @@ class ViewOverlapReachabilityEstimator(ReachabilityEstimator):
         overlap_ratios = self.map_layout.view_overlap(start_pos, heading1, goal_pos, heading1, self.fov, mode='plane')
 
         return (overlap_ratios[0] + overlap_ratios[1]) / 2
-
-    def pass_threshold(self, reachability_factor, threshold) -> bool:
-        return reachability_factor > threshold
 
 
 def spikings_reshape(img_array):

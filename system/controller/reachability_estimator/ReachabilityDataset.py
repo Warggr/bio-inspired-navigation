@@ -10,9 +10,9 @@ import matplotlib.pyplot as plt
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
-from system.controller.reachability_estimator.training.utils import img_reshape, spikings_reshape
 from system.plotting.plotResults import plotStartGoalDataset
 from system.bio_model.bc_network import bcActivityForLidar, BoundaryCellNetwork, HDCActivity, BoundaryCellActivity
+from system.controller.reachability_estimator.types import Sample
 from system.controller.simulation.pybullet_environment import types, LidarReading
 
 import sys
@@ -21,67 +21,6 @@ from typing import Tuple, Literal, Optional
 from dataclasses import dataclass
 
 boundaryCellEncoder = BoundaryCellNetwork.load()
-
-DEFAULT_NUMBER_OF_ANGLES = 52 #len(list(types.LidarReading.angles(0)))
-
-@dataclass
-class HalfSample:
-    pos : types.Vector2D
-    angle : types.Angle
-    spikings : types.Spikings
-    img : types.Image
-    lidar : types.LidarReading
-
-
-@dataclass
-class Sample:
-    src : HalfSample
-    dst : HalfSample
-
-    def to_tuple(self, reachable : bool) -> Tuple:
-        """ Returns a tuple which can be put into a Numpy array of type Sample.dtype """
-        return (
-            self.src.img.flatten(), self.dst.img.flatten(),
-            reachable,
-            self.src.pos, self.dst.pos,
-            self.src.angle, self.dst.angle,
-            self.src.spikings, self.dst.spikings,
-            self.src.lidar.distances, self.dst.lidar.distances, # assuming default angle config
-        )
-
-    @staticmethod
-    def from_tuple(tup : Tuple) -> ('Sample', bool):
-        (
-            src_img, dst_img,
-            reachable,
-            src_pos, dst_pos,
-            src_angle, dst_angle,
-            src_spikings, dst_spikings,
-            src_lidar, dst_lidar,
-        ) = tup
-        return Sample(
-            HalfSample(
-                src_pos, src_angle, src_spikings, img_reshape(src_img), LidarReading(src_lidar, LidarReading.angles(src_angle))
-            ),
-            HalfSample(
-                dst_pos, dst_angle, dst_spikings, img_reshape(dst_img), LidarReading(dst_lidar, LidarReading.angles(dst_angle))
-            ),
-        ), reachable
-
-    dtype = np.dtype([
-            ('start_observation', (np.int32, 64*64*4)), # 64 x 64 x 4
-            ('goal_observation', (np.int32, 64*64*4)), # using (64, 64, 4) would be more elegant but H5py doesn't accept it
-            ('reached', bool),
-            ('start', (np.float32, 2)),  # x, y
-            ('goal', (np.float32, 2)),  # x, y
-            ('start_orientation', np.float32),  # theta
-            ('goal_orientation', np.float32),  # theta
-            ('start_spikings', (np.float32, 40*40*6)),  # 40 * 40 * 6
-            ('goal_spikings', (np.float32, 40*40*6)),  # 40 * 40 * 6
-            ('start_lidar', (np.float32, DEFAULT_NUMBER_OF_ANGLES)),
-            ('goal_lidar', (np.float32, DEFAULT_NUMBER_OF_ANGLES)),
-        ])
-
 
 @dataclass
 class SampleConfig:
@@ -150,7 +89,7 @@ class ReachabilityDataset(torch.utils.data.Dataset):
         sample, reachability = Sample.from_tuple(data)
 
         reachability = torch.tensor(reachability).clamp(0.0, 1.0) # make it a tensor of float
-        position = sample.dst.pos - sample.src.pos
+        position = sample.dst.env_coordinates - sample.src.env_coordinates
         angle = sample.dst.angle - sample.src.angle
         ground_truth = (reachability, torch.tensor(position), torch.tensor(angle))
 

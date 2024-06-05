@@ -18,11 +18,12 @@ if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), "../../../.."))
 
 from system.controller.simulation.pybullet_environment import PybulletEnvironment
-from system.controller.local_controller.local_navigation import setup_gc_network, vector_navigation
+from system.controller.local_controller.local_navigation import setup_gc_network, vector_navigation, WaypointInfo
 from system.controller.simulation.environment.map_occupancy import MapLayout
 
 import system.plotting.plotResults as plot
 
+from typing import List
 
 def get_path():
     """ returns path to data storage folder """
@@ -120,7 +121,7 @@ def gen_multiple_goals(env_name, nr_of_goals):
     return points
 
 
-def waypoint_movement(env_model, cam_freq, traj_length, map_layout, gc_network):
+def waypoint_movement(env_model, cam_freq, traj_length, map_layout, gc_network) -> List[WaypointInfo]:
     ''' Calculates environment-specific waypoints from start to goal and creates
     trajectory by making agent follow them.
     
@@ -132,10 +133,10 @@ def waypoint_movement(env_model, cam_freq, traj_length, map_layout, gc_network):
 
     # initialize environment
     start = valid_location(env_model)
-    samples = []
+    samples : List['PlaceInfo'] = []
     visualize = False
     dt = 1e-2
-    env = PybulletEnvironment(env_model, dt, "analytical", build_data_set=True, start=start)
+    env = PybulletEnvironment(env_model, dt, visualize=True, build_data_set=True, start=start)
 
     while len(samples) < traj_length / cam_freq:
         goal = sample_location(env_model)

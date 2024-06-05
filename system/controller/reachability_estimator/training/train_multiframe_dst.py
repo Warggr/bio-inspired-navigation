@@ -117,7 +117,7 @@ def process_batch(item : Batch, train_device : TrainDevice):
     ground_truth = [ data.to(device=train_device, non_blocking=True) for data in ground_truth ]
     return model_args, ground_truth
 
-Result = (float, float, float)
+Result = (float, 'Vector2D', float)
 LossFunction = Callable[(Result, Result), torch.Tensor]
 
 def make_loss_function(position_loss_weight = 0.6, angle_loss_weight = 0.3) -> LossFunction:

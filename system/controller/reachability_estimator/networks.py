@@ -8,6 +8,7 @@
 ***************************************************************************************
 """
 from system.bio_model.bc_network.parameters import BoundaryCellActivity
+from system.types import types
 
 import math
 import numpy as np
@@ -20,7 +21,11 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from torchmetrics import MeanSquaredError
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, Iterable, Tuple
+from typing import Dict, Optional, Iterable, Tuple, Self, TypeVar, Generic
+
+T = TypeVar('T')
+class Batch(Generic[T]): # only used for type hints - doesn't actually do anything
+    pass
 
 class AutoAdamOptimizer: # Sentinel value
     pass
@@ -34,6 +39,8 @@ class NNModuleWithOptimizer:
         self.opt = opt
 
 class Model(ABC):
+    Prediction = Tuple[float, types.Vector2D, types.Angle]
+
     """ Interface for networks """
     def __init__(self, nets : Dict[str, NNModuleWithOptimizer]):
         self.nets = { name: val.net for name, val in nets.items() }
@@ -45,7 +52,7 @@ class Model(ABC):
         batch_transformation=None,
         batch_src_spikings=None, batch_dst_spikings=None,
         batch_src_distances=None, batch_dst_distances=None,
-    ) -> (float, float, float):
+    ) -> Batch['Model.Prediction']:
         ...
 
     @staticmethod
@@ -86,7 +93,7 @@ class Siamese(Model):
         src_batch, dst_batch,
         batch_transformation=None,
         batch_src_spikings=None, batch_dst_spikings=None
-    ) -> (float, float, float):
+    ) -> Model.Prediction:
         return get_grid_cell(batch_src_spikings, batch_dst_spikings), None, None
 
 
@@ -121,7 +128,7 @@ class CNN(Model):
         batch_transformation=None,
         batch_src_spikings=None, batch_dst_spikings=None,
         batch_src_distances=None, batch_dst_distances=None,
-    ) -> (float, float, float):
+    ) -> Model.Prediction:
         # Extract features
         all_x = []
 
@@ -199,7 +206,7 @@ class ResNet(Model):
         batch_transformation=None,
         batch_src_spikings=None, batch_dst_spikings=None,
         batch_src_distances=None, batch_dst_distances=None,
-    ) -> (float, float, float):
+    ) -> Batch[Model.Prediction]:
         # Extract features
         src_features = self.nets['res_net'](src_batch.view(batch_size, c, h, w))
         dst_features = self.nets['res_net'](dst_batch.view(batch_size, c, h, w))
@@ -299,7 +306,7 @@ class AngleRegression(nn.Module):
                 with torch.no_grad():
                     self.fc.bias.zero_()
 
-    def forward(self, x):
+    def forward(self, x) -> Batch[types.Angle]:
         x = self.fc(x)
         x = self.sigmoid(x)
         x = x * self.two_pi - self.pi
@@ -318,7 +325,7 @@ class PositionRegression(nn.Module):
                 with torch.no_grad():
                     self.fc.bias.zero_()
 
-    def forward(self, x):
+    def forward(self, x) -> Batch[types.Vector2D]:
         x = self.fc(x)
         return x
 
@@ -440,6 +447,7 @@ class ImagePairEncoderV2(nn.Module):
                     yield layer
 
     def forward(self, src_imgs, dst_imgs):
+        assert src_imgs.shape[1:] == (4, 64, 64)
         x = torch.cat([src_imgs, dst_imgs, src_imgs - dst_imgs], dim=1)
         x = self.layers(x)
         return x.view(x.size(0), -1)
