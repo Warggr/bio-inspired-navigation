@@ -31,34 +31,31 @@ def reachability_estimator_factory(type: str = 'distance', /, device: str = 'cpu
         device: str         -- type of the computations, possible values: ['cpu' (default), 'gpu']
         weights_file: str   -- filename of the weights for network-based estimator if exists
         with_grid_cell_spikings: bool -- parameter for network-based estimator, flag to include grid cell spikings into input
-        env_model: str      -- model of the environment for simulation-based estimator
 
     returns:
         ReachabilityEstimator object of the corresponding type
     """
     if type == 'distance':
-        return DistanceReachabilityEstimator(device=device, debug=debug)
+        return DistanceReachabilityEstimator(debug=debug)
     elif type == 'neural_network':
-        return NetworkReachabilityEstimator.from_file(device=device, debug=debug, **kwargs)
+        return NetworkReachabilityEstimator.from_file(debug=debug, **kwargs)
     elif type == 'simulation':
-        return SimulationReachabilityEstimator(device=device, debug=debug, env_model=env_model)
+        return SimulationReachabilityEstimator(debug=debug)
     elif type == 'view_overlap':
-        return ViewOverlapReachabilityEstimator(device=device, debug=debug)
+        return ViewOverlapReachabilityEstimator(debug=debug)
     else:
         raise ValueError("Reachability estimator type not defined: " + type)
 
 
-class ReachabilityEstimator(ABC):
-    def __init__(self, threshold_same: float, threshold_reachable: float, device: str = 'cpu', debug: bool = False):
+class ReachabilityEstimator(ReachabilityController):
+    def __init__(self, threshold_same: float, threshold_reachable: float, debug: bool = False):
         """ Abstract base class defining the interface for reachability estimator implementations.
 
         arguments:
         threshold_same: float      -- threshold for determining when nodes are close enough to be considered same node
         threshold_reachable: float -- threshold for determining when nodes are close enough to be considered reachable
-        device                     -- device used for calculations (default cpu)
         debug: bool                -- enables logging
         """
-        self.device = device
         self.debug = debug
         self.threshold_same = threshold_same
         self.threshold_reachable = threshold_reachable
@@ -69,53 +66,63 @@ class ReachabilityEstimator(ABC):
             print(*params)
 
     @abstractmethod
-    def predict_reachability(self, start: PlaceCell, goal: PlaceCell) -> float:
-        """ Abstract function, determines reachability factor between two locations """
+    def reachability_factor(self, start : PlaceInfo, goal : PlaceInfo) -> float:
+        """
+        Abstract function, determines reachability factor between two locations
+        The meaning of the reachability factor depends on the implementation, but bigger is always better.
+        To make the factor a probability for all implementations, use self.get_connectivity_probability
+        """
         pass
 
-    def get_reachability(self, p: PlaceCell, q: PlaceCell) -> (bool, float):
+    @override
+    def reachable(self, env, start : PlaceInfo, goal : PlaceInfo, path_l = None) -> bool:
+        reachability_factor = self.reachability_factor(start, goal)
+        return reachability_factor >= self.threshold_reachable
+
+    def get_reachability(self, start : PlaceInfo, goal : PlaceInfo) -> (bool, float):
         """ Determines whether two nodes are reachable based on the reachability threshold
 
         returns:
         bool  -- flag that indicates that locations are reachable
         float -- reachability probability
         """
-        reachability_factor = self.predict_reachability(p, q)
-        return self.pass_threshold(reachability_factor, self.threshold_reachable), reachability_factor
+        reachability_factor = self.reachability_factor(start, goal)
+        return (reachability_factor >= self.threshold_reachable), self.get_connectivity_probability(reachability_factor)
 
-    @abstractmethod
-    def pass_threshold(self, reachability_factor, threshold) -> bool:
-        """ Abstract function, decides if the reachability value passes the threshold """
-        pass
-
-    def is_same(self, p: PlaceCell, q: PlaceCell) -> bool:
+    def is_same(self, p: PlaceInfo, q: PlaceInfo) -> bool:
         """ Determine whether two nodes are close to each other sufficiently to consider them the same node """
-        return self.pass_threshold(self.predict_reachability(p, q), self.threshold_same)
+        return self.reachability_factor(p, q) >= self.threshold_same
 
     def get_connectivity_probability(self, reachability_factor):
-        """ Computes connectivity probability based on reachability factor """
+        """
+        Computes connectivity probability based on reachability factor.
+        By default the factor is the probability itself.
+        """
         return reachability_factor
 
 
 class DistanceReachabilityEstimator(ReachabilityEstimator):
-    def __init__(self, device='cpu', debug=False):
+    THRESHOLD_SAME = 0.4
+
+    def __init__(self, debug=False):
         """ Creates a reachability estimator that judges reachability between two locations based on the distance
             
         arguments:
-        device -- device used for calculations (default cpu)
         debug  -- is in debug mode
         """
-        super().__init__(threshold_same=0.4, threshold_reachable=0.75, device=device, debug=debug)
+        super().__init__(threshold_same=-self.THRESHOLD_SAME, threshold_reachable=-0.75, debug=debug)
 
-    def predict_reachability(self, start: PlaceCell, goal: PlaceCell) -> float:
+    @override
+    def reachability_factor(self, env_model, src : PlaceInfo, dst : PlaceInfo, path_l=None) -> bool:
         """ Returns distance between start and goal as an estimation of reachability"""
-        return np.linalg.norm(start.env_coordinates - goal.env_coordinates)
+        return -np.linalg.norm(src.pos - dst.pos) # Since a bigger factor means better reachability, we use negative distance
 
-    def pass_threshold(self, reachability_factor: float, threshold: float) -> bool:
-        """ Two nodes are reachable if the distance is less than the threshold """
-        return reachability_factor < threshold
 
 WEIGHTS_FOLDER = os.path.join(os.path.dirname(__file__), "data/models")
+
+NNResult = (float, float, float)
+
+from .ReachabilityDataset import SampleConfig
 
 class NetworkReachabilityEstimator(ReachabilityEstimator):
     """ Creates a network-based reachability estimator that judges reachability
@@ -130,7 +137,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         with_grid_cell_spikings: bool -- flag indicates whether to include grid cell firing to input
         batch_size: int     -- size of batches (default 64)
         """
-        super().__init__(threshold_same=0.933, threshold_reachable=0.4, device=device, debug=debug)
+        super().__init__(threshold_same=0.933, threshold_reachable=0.4, debug=debug)
 
         self.with_grid_cell_spikings = with_grid_cell_spikings
         self.with_dist = with_dist
@@ -271,29 +278,20 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
             n_remaining -= batch_size
         return torch.cat(results, dim=0).data.cpu().numpy()
 
-    def pass_threshold(self, reachability_factor, threshold) -> bool:
-        """ Two nodes are reachable if the confidence value of the network is greater than the threshold """
-        return reachability_factor > threshold
-
     def get_connectivity_probability(self, reachability_factor):
         """ Converts output of the network into connectivity factor """
+        # TODO Pierre: I don't understand this, I thought the value was already a probability?
         return min(1.0, max((self.threshold_reachable - reachability_factor * 0.3) / self.threshold_reachable, 0.1))
 
 
 class SimulationReachabilityEstimator(ReachabilityEstimator):
-    def __init__(self, device='cpu', debug=False, env_model=None):
+    def __init__(self, debug=False):
         """ Creates a reachability estimator that judges reachability
             between two locations based success of navigation simulation
-
-        arguments:
-        threshold_same: float      -- threshold for determining when nodes are close enough to be considered same node
-        threshold_reachable: float -- threshold for determining when nodes are close enough to be considered reachable
-        device                     -- device used for calculations (default cpu)
-        debug: bool                -- enables logging
         """
-        super().__init__(threshold_same=1.0, threshold_reachable=1.0, device=device, debug=debug)
-        self.env_model = env_model
+        super().__init__(threshold_same=None, threshold_reachable=1.0, debug=debug) # we can't decide whether two points are the same, only whether they are reachable
         self.fov = 120 * np.pi / 180
+        self.dt = 1e-2
 
     @override
     def reachable(self, env : 'PybulletEnvironment', start: PlaceInfo, goal: PlaceInfo, path_l = None) -> bool:
@@ -342,17 +340,16 @@ class SimulationReachabilityEstimator(ReachabilityEstimator):
 
 
 class ViewOverlapReachabilityEstimator(ReachabilityEstimator):
-    def __init__(self, device='cpu', debug=False):
+    def __init__(self, debug=False):
         """ Creates a reachability estimator that judges reachability
             between two locations based the overlap of their fields of view
 
         arguments:
         threshold_same: float      -- threshold for determining when nodes are close enough to be considered same node
         threshold_reachable: float -- threshold for determining when nodes are close enough to be considered reachable
-        device                     -- device used for calculations (default cpu)
         debug: bool                -- enables logging
         """
-        super().__init__(threshold_same=0.4, threshold_reachable=0.3, device=device, debug=debug)
+        super().__init__(threshold_same=0.4, threshold_reachable=0.3, debug=debug)
         self.env_model = "Savinov_val3"
         self.fov = 120 * np.pi / 180
         self.distance_threshold = 0.7

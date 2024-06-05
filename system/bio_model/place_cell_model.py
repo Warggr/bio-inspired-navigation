@@ -149,9 +149,7 @@ class PlaceCellNetwork:
 
     def in_range(self, reach: [float]) -> bool:
         """ Determine whether one value meets the threshold """
-        return any(
-            [self.reach_estimator.pass_threshold(reach_value, self.reach_estimator.threshold_same) for reach_value in
-             reach])
+        return any(reach_value > self.reach_estimator.threshold_same for reach_value in reach)
 
     def track_movement(self, gc_network, observations, coordinates, creation_allowed):
         """Keeps track of current grid cell firing"""
