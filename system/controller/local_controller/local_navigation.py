@@ -91,6 +91,9 @@ class GcCompass(Compass):
         super().__init__(*args, **kwargs)
         self.gc_network = gc_network
 
+    def update_position(self, robot : 'Robot'):
+        pass # TODO Pierre: ensure that the GCNetwork is updated separately
+
     @staticmethod
     def factory(mode, gc_network : GridCellNetwork, *args,
         pod_network : Optional[PhaseOffsetDetectorNetwork] = None,
