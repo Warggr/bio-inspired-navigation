@@ -447,7 +447,11 @@ class ImagePairEncoderV2(nn.Module):
                     yield layer
 
     def forward(self, src_imgs, dst_imgs):
+        assert src_imgs.shape[1:] == (64, 64, 4) # that's the format returned by env.camera() and used in the rest of the code
+        src_imgs = src_imgs.transpose(1, 3).transpose(2, 3) # reorder 0123 -> 0321 -> 0312, i.e. batch size first
+        dst_imgs = dst_imgs.transpose(1, 3).transpose(2, 3)
         assert src_imgs.shape[1:] == (4, 64, 64)
+
         x = torch.cat([src_imgs, dst_imgs, src_imgs - dst_imgs], dim=1)
         x = self.layers(x)
         return x.view(x.size(0), -1)

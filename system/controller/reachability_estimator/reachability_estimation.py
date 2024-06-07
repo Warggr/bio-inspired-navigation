@@ -194,12 +194,9 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         """ Predicts reachability value between two locations """
         # types.Image format, returned by env.camera, has size (64x64x4) (channels last)
         # while the NN expects (4x64x64) (channels first)
-        # TODO Pierre: we could do this conversion lower in the call stack (e.g. in reachability_factor_batch or in networks.py)
-        start_imgs = np.transpose(start.img, (2, 0, 1))
-        goal_imgs = np.transpose(goal.img, (2, 0, 1))
 
         args = [
-            start_imgs, goal_imgs,
+            start.img, goal.img,
             start.spikings, goal.spikings,
             start.lidar, goal.lidar,
         ]
