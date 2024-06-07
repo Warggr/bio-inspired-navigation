@@ -14,7 +14,7 @@ import itertools
 import bisect
 import random
 import matplotlib.pyplot as plt
-from typing import Tuple, Generator, Dict, Optional
+from typing import Tuple, Iterator, Dict, Optional, Protocol
 
 import sys
 import os
@@ -25,11 +25,12 @@ if __name__ == "__main__":
 from system.controller.reachability_estimator.reachability_utils import ViewOverlapReachabilityController
 
 from system.controller.simulation.pybullet_environment import PybulletEnvironment, all_possible_textures
+from system.controller.simulation.environment_config import environment_dimensions
 from system.controller.simulation.environment_cache import EnvironmentCache
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.controller.simulation.environment.map_occupancy_helpers.map_utils import path_length
 from system.plotting.plotResults import plotStartGoalDataset
-from system.types import types, FlatSpikings, WaypointInfo
+from system.types import types, FlatSpikings, WaypointInfo, Vector2D
 from system.controller.reachability_estimator.types import Sample, PlaceInfo, ReachabilityController
 
 def get_path():
@@ -63,6 +64,11 @@ def place_info(
     lidar, _ = env.lidar([pos, angle])
     return PlaceInfo(pos, angle, spikings, img, lidar)
 
+class SampleGenerator(Protocol, Iterator[Tuple[Sample, float, str]]):
+    def env_model(self) -> str:
+        ...
+    def __next__(self) -> Tuple[Sample, float, str]:
+        ...
 
 class TrajectoriesDataset(data.Dataset):
     '''
@@ -81,7 +87,7 @@ class TrajectoriesDataset(data.Dataset):
     For details see original source code: https://github.com/xymeng/rmp_nav
     '''
 
-    def __init__(self, hd5_files, env_kwargs = {}):
+    def __init__(self, hd5_files, env_cache : EnvironmentCache):
         self.hd5_files = sorted(list(hd5_files))
 
         # open hd5 files
@@ -144,7 +150,7 @@ class TrajectoriesDataset(data.Dataset):
             map_name: np.cumsum([self.traj_len_dict[_] for _ in traj_ids])
             for map_name, traj_ids in traj_ids_per_map.items()}
 
-        self.envs = EnvironmentCache.getinstance(override_env_kwargs=env_kwargs)
+        self.envs = env_cache
         for map_name in self.map_names:
             try:
                 self.envs.load(map_name)
@@ -207,7 +213,7 @@ class TrajectoriesDataset(data.Dataset):
     def __len__(self):
         return self.traj_len_cumsum[-1]
 
-    def _draw_sample_same_traj(self, idx) -> Optional[(str, WaypointInfo, WaypointInfo, float)]:
+    def _draw_sample_same_traj(self, idx) -> Optional[Tuple[str, WaypointInfo, WaypointInfo, float]]:
         """ Draw a source and goal sample from the same trajectory.
             Their distance will be between distance_min and distance_max.
             They will be separated by timesteps in range of range_min to range_max.
@@ -251,7 +257,15 @@ class TrajectoriesDataset(data.Dataset):
 
         return map_name, src_sample, dst_sample, path_l
 
-    def _draw_sample_diff_traj(self, idx):
+    def _draw_sample_same_traj_multiple_tries(self, idx) -> (str, WaypointInfo, WaypointInfo, float):
+        while True:
+            result = self._draw_sample_same_traj(idx)
+            if result is not None:
+                return result
+            else:
+                idx = (idx + self.rng.randint(1000)) % len(self)
+
+    def _draw_sample_diff_traj(self, idx) -> (str, WaypointInfo, WaypointInfo, float):
         """ Draw a source and goal sample from two different trajectories on the same map.
         
         returns:
@@ -281,33 +295,37 @@ class TrajectoriesDataset(data.Dataset):
             path_l = path_length(waypoints)
             return map_name, src_sample, dst_sample, path_l
 
-    def __getitem__(self, idx) -> Sample:
-        ''' Loads or creates a sample. Sample contains ... 
-
-        returns:
-
-        sample containing start and end points
-        reachability
-        '''
-        self._init_once(idx)
-
+    def _draw_sample(self, idx, diff_traj_prob = 0.1) -> (str, WaypointInfo, WaypointInfo, float):
         # choose with probability p from same/different trajectory
-        # p = self.rng.uniform(0.0, 1.0)
+        p = self.rng.uniform(0.0, 1.0)
 
-        # self.sample_diff_traj_prob = 0.1
-        # if p < self.sample_diff_traj_prob:
-        #     map_name, src_sample, dst_sample, path_l = self._draw_sample_diff_traj(idx)
-        # else:
-        pair = self._draw_sample_same_traj(idx)
-        while pair is None:
-            idx = (idx + self.rng.randint(1000)) % len(self)
-            pair = self._draw_sample_same_traj(idx)
-        map_name, src_sample, dst_sample, path_l = pair
+        if p < diff_traj_prob:
+            return self._draw_sample_diff_traj(idx)
+        else:
+            return self._draw_sample_same_traj_multiple_tries(idx)
 
-        env = self.envs[map_name]
+    class _Iterator:
+        def __init__(self, parent : 'TrajectoriesDataset', parent_function):
+            self.parent = parent
+            self.parent_function = parent_function
+        def __next__(self) -> Tuple[Sample, float, str]:
+            random_idx = random.randint(0, len(self.parent))
+            parent._init_once(random_idx)
+            pair = parent_function(self=parent, idx=random_idx) # TODO Pierre this is ugly
+            map_name, src_sample, dst_sample, path_l = pair
 
-        return Sample(place_info(src_sample, env), place_info(dst_sample, env))
+            env = self.parent.envs[map_name]
+            return Sample(place_info(src_sample, env), place_info(dst_sample, env)), path_l, map_name
+        def env_model(self):
+            return self.parent.map_names[0]
 
+    def iterate(self, mode='same_traj') -> SampleGenerator:
+        functions = {
+            'same_traj': TrajectoriesDataset._draw_sample_same_traj_multiple_tries,
+            'diff_traj': TrajectoriesDataset._draw_sample_diff_traj,
+            'maybe_diff_traj': TrajectoriesDataset._draw_sample,
+        }
+        return self._Iterator(self, parent_function=functions[mode])
 
 
 DATASET_KEY = 'positions'
@@ -322,9 +340,87 @@ def assert_conforms_to_type(data, dtype):
         else:
             assert dtyp.shape[0] == len(field), f"{dtyp.shape} != {len(field)}"
 
+from system.controller.local_controller.local_navigation import setup_gc_network
+
+def too_close_to_wall(p : Vector2D, map : MapLayout):
+    map_coords = map.map_coord_to_path_coord(p[0], p[1])
+    return map.path_map[map_coords] != 0
+
+def random_coordinates(xmin, xmax, ymin, ymax):
+    return np.array([ random.uniform(xmin, ymin), random.uniform(ymin, ymax) ])
+
+def in_rect(x : Vector2D, rect):
+    xmin, xmax, ymin, ymax = rect
+    return x[0] >= xmin and x[1] >= ymin and \
+        x[0] <= xmax and x[1] <= ymax
+
+class RandomSamples:
+    def __init__(self, env : PybulletEnvironment):
+        self.env = env
+        self.map = MapLayout(env.env_model)
+    def env_model(self):
+        return self.env.env_model
+
+    def points(self) -> Tuple[Vector2D, Vector2D]:
+        result = []
+        for i in range(2):
+            i = 0
+            while True:
+                i += 1
+                p = random_coordinates(*environment_dimensions(self.env.env_model))
+                print(f"[i={i}]Trying", p1, "...")
+                if not too_close_to_wall(p1, self.map):
+                    break
+            result.append(p)
+        return result
+
+    def points_to_sample(self, p1 : Vector2D, p2 : Vector2D) -> Tuple[Sample, float, str]:
+        waypoints = self.map.find_path(p1, p2)
+        assert waypoints is not None
+        path_l = path_length(waypoints)
+
+        dt = 1
+        # TODO Pierre: does that actually work?
+        gc_network = setup_gc_network(dt)
+        start_spikings : FlatSpikings = gc_network.consolidate_gc_spiking().flatten()
+        gc_network.track_movement(xy_speed=(p2 - p1)/dt)
+        goal_spikings : FlatSpikings = gc_network.consolidate_gc_spiking().flatten()
+
+        a1, a2 = [ random.uniform(-np.pi, np.pi) for _ in range(2) ]
+        return Sample(place_info((p1, a1, start_spikings), self.env), place_info((p2, a2, goal_spikings), self.env)), path_l, self.map.name
+
+    def sample(self) -> Tuple[Sample, float, str]:
+        return self.points_to_sample(*self.points())
+
+    def __next__(self):
+        return self.sample()
+
+class RandomSamplesWithLimitedDistance(RandomSamples):
+    def __init__(self, *args, r_max = 3.0, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.r_max = r_max
+
+    def points(self) -> Tuple[Vector2D, Vector2D]:
+        i = 0
+        dims = environment_dimensions(self.env.env_model)
+        while True:
+            i += 1
+            p1 = random_coordinates(*dims)
+            if too_close_to_wall(p1, self.map):
+                continue
+            for j in range(100):
+                r = np.sqrt(random.uniform(0, self.r_max**2)) # sqrt ensures that the samples are drawn uniformly from the circle
+                theta = random.uniform(-np.pi, np.pi)
+                distance = np.array([ np.cos(theta), np.sin(theta) ]) * r
+                p2 = p1 + distance
+                if (not in_rect(p2, dims)) or too_close_to_wall(p2, self.map):
+                    continue
+                else:
+                    return p1, p2
 
 def create_and_save_reachability_samples(
-    rd : TrajectoriesDataset, f : h5py.File,
+    samples : SampleGenerator, f : h5py.File,
+    envs : EnvironmentCache,
     reachability_controller : ReachabilityController = ViewOverlapReachabilityController(),
     nr_samples=1000,
     flush_freq=50,
@@ -335,7 +431,7 @@ def create_and_save_reachability_samples(
     rd : dataset to draw positions from
     """
 
-    env_model = rd.map_names[0]
+    env_model = samples.env_model()
     print_debug("env_model: ", env_model)
     f.attrs.create('map_type', env_model)
 
@@ -361,14 +457,16 @@ def create_and_save_reachability_samples(
     buffer = []
 
     for i in (bar := tqdm(range(start_index, nr_samples), initial=start_index, total=nr_samples)):
-        while True:
-            random_index = random.randrange(rd.traj_len_cumsum[-1])
-            sample = rd[random_index]
+        reachable = None
+        while reachable is None:
+            sample, path_l, map_name = next(samples)
 
-            try:
-                reachable = self.reachability_controller.reachable(env, sample.src, sample.dst, path_l)
-            except AssertionError:
-                continue
+            env = envs[map_name]
+
+            if True: #try:
+                reachable = reachability_controller.reachable(env, sample.src, sample.dst, path_l)
+            #except AssertionError:
+            #    continue
 
         sum_r += int(reachable)
 
@@ -455,7 +553,11 @@ if __name__ == "__main__":
     parser.add_argument('-c', '--color-walls', help='number of wall colors', type=int, default=1)
     parser.add_argument('--re',
         choices=['view_overlap', 'network', 'distance', 'simulation'], default='view_overlap',
-        help='The reachability estimator to generate ground truth reachability values'
+        help='The reachability estimator to generate ground truth reachability values',
+    )
+    parser.add_argument('--gen', '--generate-point-pairs',
+        choices=['same_traj', 'diff_traj', 'maybe_diff_traj', 'random', 'random_circle'], default='same_traj',
+        help='How to generate pairs of points',
     )
     args = parser.parse_args()
 
@@ -465,7 +567,6 @@ if __name__ == "__main__":
     filename = os.path.join(get_path(), "data", "trajectories", args.traj_file)
     filename = os.path.realpath(filename)
     re = ReachabilityController.factory(controller_type=args.re)
-    rd = TrajectoriesDataset([filename], env_kwargs={ 'wall_kwargs': { 'textures': textures } })
 
     suffix = '' if args.color_walls == 1 else f'-{args.color_walls}colors'
 
@@ -474,8 +575,21 @@ if __name__ == "__main__":
     filename = os.path.realpath(filename)
     f = h5py.File(filename, 'a')
 
+    env_kwargs={ 'wall_kwargs': { 'textures': textures } }
+    env_cache = EnvironmentCache(override_env_kwargs=env_kwargs)
+    if args.gen.endswith('_traj'):
+        rd = TrajectoriesDataset([filename], env_cache=env_cache)
+        samples = rd.iterate(mode=args.gen)
+    else:
+        if args.gen == 'random':
+            samples = RandomSamples(env_cache["Savinov_val3"])
+        elif args.gen == 'random_circle':
+            samples = RandomSamplesWithLimitedDistance(env_cache["Savinov_val3"])
+        else: raise ValueError(args.gen)
+
     create_and_save_reachability_samples(
-        rd, f,
+        samples, f,
+        envs=env_cache,
         reachability_controller=re,
         nr_samples=args.num_samples,
         flush_freq=args.flush_freq,
