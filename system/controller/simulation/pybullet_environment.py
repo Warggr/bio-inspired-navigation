@@ -83,7 +83,7 @@ def resource_path(*filepath):
 class PybulletEnvironment:
     """This class deals with everything pybullet or environment (obstacles) related"""
 
-    WHISKER_LENGTH = 0.2
+    WHISKER_LENGTH = 1
     ROBOT_Z_POS = 0.02 # see p3dx model
 
     def __init__(self,
