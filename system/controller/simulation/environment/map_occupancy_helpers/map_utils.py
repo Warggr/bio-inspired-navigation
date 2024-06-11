@@ -86,13 +86,15 @@ def a_star(obstacle_map, start_pos, goal_pos, soft_obstacle_scale=0.0):
                             parents[(x2, y2)] = (x, y)
 
     if goal_pos not in parents:
-        return None
+        raise ValueError("Couldn't reach goal with A*")
 
     path = []
     x, y = goal_pos
     while (x, y) != start_pos:
         path.append((x, y))
         x, y = parents[(x, y)]
+    assert (x, y) == start_pos
+    path.append(start_pos)
 
     return path[::-1]
 

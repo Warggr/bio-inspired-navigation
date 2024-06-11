@@ -16,7 +16,7 @@ class PlaceInfo:
     All the info that can be extracted about a certain place.
     """
 
-    env_coordinates : types.Vector2D
+    pos : types.Vector2D
     angle : types.Angle
     spikings : types.Spikings
     img : types.Image
@@ -34,7 +34,7 @@ class Sample:
         return (
             self.src.img.flatten(), self.dst.img.flatten(),
             reachable,
-            self.src.env_coordinates, self.dst.env_coordinates,
+            self.src.pos, self.dst.pos,
             self.src.angle, self.dst.angle,
             self.src.spikings.flatten(), self.dst.spikings.flatten(),
             self.src.lidar.distances, self.dst.lidar.distances, # assuming default angle config

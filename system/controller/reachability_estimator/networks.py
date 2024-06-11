@@ -143,8 +143,7 @@ class CNN(Model):
             all_x.append(x)
 
         if self.sample_config.with_grid_cell_spikings:
-            spikings_features = get_grid_cell(batch_src_spikings, batch_dst_spikings)
-            x = spikings_features.unsqueeze(1)
+            x = get_grid_cell(batch_src_spikings, batch_dst_spikings)
             assert not torch.any(x.isnan())
             all_x.append(x)
 
@@ -250,7 +249,7 @@ def get_grid_cell(batch_src_spikings, batch_dst_spikings) -> [float]:
     batch_similarity_scores = (batch_similarity_scores * module_weights).sum(1) / module_weights.sum()
     batch_similarity_scores = (torch.max(batch_similarity_scores,
                                          torch.fill(torch.zeros((batch_size,)), 0.99)) - 0.99) / 0.01
-    return batch_similarity_scores
+    return batch_similarity_scores.unsqueeze(1)
 
 
 class GridCellSiameseNetwork(nn.Module):

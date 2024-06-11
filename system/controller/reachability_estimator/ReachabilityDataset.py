@@ -107,7 +107,7 @@ class ReachabilityDataset(torch.utils.data.Dataset):
             model_args += [ None_tensor ]
 
         if self.config.with_grid_cell_spikings:
-            model_args += [ sample.src.spikings, sample.dst.spikings ]
+            model_args += [ torch.tensor(sample.src.spikings), torch.tensor(sample.dst.spikings) ]
         else:
             model_args += [ None_tensor, None_tensor ]
 

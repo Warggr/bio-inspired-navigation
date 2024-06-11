@@ -4,9 +4,9 @@ import numpy as np
 Angle = float # assumed to be in radians
 
 class LidarReading:
-    def __init__(self, distances: List[float], angles: List[Angle]):
+    def __init__(self, distances: List[float], angles: Iterable[Angle]):
         self.distances = distances
-        self.angles = angles
+        self.angles = list(angles)
 
     def __getitem__(self, index):
         return self.distances[index]

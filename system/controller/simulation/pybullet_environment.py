@@ -606,7 +606,7 @@ class Robot:
     ''' Calculates the obstacle_vector from the ray distances'''
     def calculate_obstacle_vector(self, lidar_data : Optional[Tuple[LidarReading, List[Vector2D]]] = None):
         if lidar_data is None:
-            lidar_data = self.env.lidar(tactile_cone=120, num_ray_dir=21, blind_spot_cone=0, agent_pos_orn=self.lidar_sensor_position)
+            lidar_data = self.env.lidar(tactile_cone=120, num_ray_dir=21, blind_spot_cone=0, agent_pos_orn=self.lidar_sensor_position, ray_length=1)
         lidar, hit_points = lidar_data
         start_index, end_index = closest_subsegment(lidar.distances)
         hit_points = hit_points[start_index:end_index+1]

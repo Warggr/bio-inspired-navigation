@@ -310,7 +310,7 @@ class TrajectoriesDataset(data.Dataset):
             self.parent_function = parent_function
         def __next__(self) -> Tuple[Sample, float, str]:
             random_idx = random.randint(0, len(self.parent))
-            parent._init_once(random_idx)
+            self.parent._init_once(random_idx)
             pair = parent_function(self=parent, idx=random_idx) # TODO Pierre this is ugly
             map_name, src_sample, dst_sample, path_l = pair
 
@@ -336,7 +336,7 @@ def assert_conforms_to_type(data, dtype):
         if dtyp.char == '?':
             assert isinstance(field, np.bool_) or isinstance(field, bool) # TODO: surely there's a more concise way
         elif dtyp == np.dtype('float32'):
-            assert isinstance(field, np.float32)
+            assert isinstance(field, np.float32) or isinstance(field, float), f"{field} != np.float32"
         else:
             assert dtyp.shape[0] == len(field), f"{dtyp.shape} != {len(field)}"
 
@@ -368,7 +368,7 @@ class RandomSamples:
             while True:
                 i += 1
                 p = random_coordinates(*environment_dimensions(self.env.env_model))
-                print(f"[i={i}]Trying", p1, "...")
+                print(f"[i={i}]Trying", p, "...")
                 if not too_close_to_wall(p1, self.map):
                     break
             result.append(p)

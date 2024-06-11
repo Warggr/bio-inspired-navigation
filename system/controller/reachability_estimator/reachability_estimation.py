@@ -250,7 +250,6 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
                 additional_info = {}
                 if self.config.with_grid_cell_spikings:
                     additional_info['batch_src_spikings'] = torch.from_numpy(src_spikings).float()
-                    # TODO Pierre: why is sometimes with_grid_cell_spikings set but the goal spikings are not set?
                     additional_info['batch_dst_spikings'] = torch.from_numpy(goal_spikings).float()
                 if self.config.with_dist:
                     additional_info['batch_src_distances'] = torch.from_numpy(src_distances).float()
