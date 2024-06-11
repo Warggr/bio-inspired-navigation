@@ -182,32 +182,32 @@ def generate_multiple_trajectories(out_hd5_obj, num_traj, trajectory_length, cam
     dt = 1e-2
     gc_network = setup_gc_network(dt)
     map_layout = MapLayout(mapname)
+    with PybulletEnvironment(mapname, dt, visualize=True, build_data_set=True, contains_robot=False) as env:
+        i = 0
+        while i < num_traj:
+            traj_id = rng_trajid.randint(0xfffffff)
+            dset_name = '/%08x' % traj_id
 
-    i = 0
-    while i < num_traj:
-        traj_id = rng_trajid.randint(0xfffffff)
-        dset_name = '/%08x' % traj_id
+            print('processing trajectory %d id: %08x' % (i, traj_id))
 
-        print('processing trajectory %d id: %08x' % (i, traj_id))
+            start_time = time.time()
 
-        start_time = time.time()
+            if dset_name in out_hd5_obj:
+                print('dataset %s exists. skipped' % dset_name)
+                continue
 
-        if dset_name in out_hd5_obj:
-            print('dataset %s exists. skipped' % dset_name)
-            continue
+            samples = waypoint_movement(env, cam_freq, trajectory_length, map_layout, gc_network)
+            # TODO: flatten each sample[:, 3]
+            print(f"trajectory {samples[0]}-{samples[1]} with {len(samples)} steps")
+            dset = out_hd5_obj.create_dataset(
+                dset_name,
+                data=np.array(samples, dtype=dtype),
+                maxshape=(None,), dtype=dtype)
 
-        samples = waypoint_movement(mapname, cam_freq, trajectory_length, map_layout, gc_network)
-        # TODO: flatten each sample[:, 3]
-        print(f"trajectory {samples[0]}-{samples[1]} with {len(samples)} steps")
-        dset = out_hd5_obj.create_dataset(
-            dset_name,
-            data=np.array(samples, dtype=dtype),
-            maxshape=(None,), dtype=dtype)
+            out_hd5_obj.flush()
+            i += 1
 
-        out_hd5_obj.flush()
-        i += 1
-
-        print("--- %s seconds for one trajectory ---" % (time.time() - start_time))
+            print("--- %s seconds for one trajectory ---" % (time.time() - start_time))
 
 
 def generate_and_save_trajectories(filename, mapname, num_traj, traj_length, cam_freq):

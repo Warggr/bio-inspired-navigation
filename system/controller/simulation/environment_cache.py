@@ -65,3 +65,11 @@ class EnvironmentCache:
             del new_conf[key]
             if key in previous_conf: del previous_conf[key]
         return previous_conf == new_conf
+
+    def __enter__(self):
+        for key in self.envs:
+            self.envs[key] = self.envs[key].__enter__()
+        return self
+    def __exit__(self, ex_type, ex_value, traceback):
+        for key in self.envs:
+            self.envs[key].__exit__(ex_type, ex_value, traceback)

@@ -577,24 +577,24 @@ if __name__ == "__main__":
     f = h5py.File(filename, 'a')
 
     env_kwargs={ 'wall_kwargs': { 'textures': textures } }
-    env_cache = EnvironmentCache(override_env_kwargs=env_kwargs)
-    if args.gen.endswith('_traj'):
-        rd = TrajectoriesDataset([filename], env_cache=env_cache)
-        samples = rd.iterate(mode=args.gen)
-    else:
-        if args.gen == 'random':
-            samples = RandomSamples(env_cache["Savinov_val3"])
-        elif args.gen == 'random_circle':
-            samples = RandomSamplesWithLimitedDistance(env_cache["Savinov_val3"])
-        else: raise ValueError(args.gen)
+    with EnvironmentCache(override_env_kwargs=env_kwargs) as env_cache:
+        if args.gen.endswith('_traj'):
+            rd = TrajectoriesDataset([filename], env_cache=env_cache)
+            samples = rd.iterate(mode=args.gen)
+        else:
+            if args.gen == 'random':
+                samples = RandomSamples(env_cache["Savinov_val3"])
+            elif args.gen == 'random_circle':
+                samples = RandomSamplesWithLimitedDistance(env_cache["Savinov_val3"])
+            else: raise ValueError(args.gen)
 
-    create_and_save_reachability_samples(
-        samples, f,
-        envs=env_cache,
-        reachability_controller=re,
-        nr_samples=args.num_samples,
-        flush_freq=args.flush_freq,
-    )
-    if args.image_plot:
-        print("Finished creating samples. Now displaying them")
-        display_samples(f, imageplot=True)
+        create_and_save_reachability_samples(
+            samples, f,
+            envs=env_cache,
+            reachability_controller=re,
+            nr_samples=args.num_samples,
+            flush_freq=args.flush_freq,
+        )
+        if args.image_plot:
+            print("Finished creating samples. Now displaying them")
+            display_samples(f, imageplot=True)
