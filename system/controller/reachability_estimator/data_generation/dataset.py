@@ -562,7 +562,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.wall_colors == '1color':
-        textures = [ os.path.join( 'yellow_walls.png') ]
+        textures = [ os.path.join( 'yellow_wall.png') ]
     elif args.wall_colors == '3colors':
         textures = all_possible_textures[:args.wall_colors]
     elif args.wall_colors == 'patterns':
