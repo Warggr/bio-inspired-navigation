@@ -31,17 +31,19 @@ assert LidarReading.DEFAULT_NUMBER_OF_ANGLES == len(list(LidarReading.angles(0))
 
 Vector2D = Tuple[float, float]
 Vector3D = Tuple[float, float, float]
+Spikings = 'np.ndarray[float, (40, 40, 6)]' # TODO: actual non-string type hint
+Image = 'np.ndarray[float, (64, 64, 4)]'
+AllowedMapName = str # TODO: an enumeration of the actual map names, i.e. Literal['Savinov_val3', ...]
 
 class types:
-    DepthImage = np.ndarray
     Vector2D = Vector2D
     Vector3D = Vector3D
     Quaternion = Tuple[float, float, float, float]
-    Spikings = 'np.ndarray[float, (40, 40, 6)]' # TODO: actual non-string type hint
+    Spikings = Spikings
     Angle = Angle
-    Image = 'np.ndarray[float, (64, 64, 4)]'
+    Image = Image
     PositionAndOrientation = Tuple[Vector3D, Angle]
-    AllowedMapName = str # TODO: an enumeration of the actual map names, i.e. Literal['Savinov_val3', ...]
+    AllowedMapName = AllowedMapName
     LidarReading = LidarReading
 
 FlatSpikings = 'np.ndarray[float, 9600]'

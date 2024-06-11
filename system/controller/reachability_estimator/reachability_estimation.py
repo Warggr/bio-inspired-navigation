@@ -204,8 +204,8 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         return self.reachability_factor_batch(*args)[0]
 
     def reachability_factor_batch(self, starts: [numpy.ndarray | torch.Tensor], goals: [numpy.ndarray | torch.Tensor],
-        src_spikings: [numpy.ndarray | torch.Tensor] = None, goal_spikings: [numpy.ndarray | torch.Tensor] = None,
-        src_distances: numpy.ndarray = None, goal_distances: numpy.ndarray = None,
+        src_spikings: [numpy.ndarray | torch.Tensor], goal_spikings: [numpy.ndarray | torch.Tensor],
+        src_lidar: numpy.ndarray, goal_lidar: numpy.ndarray,
     ) -> [float]:
         """ Predicts reachability for multiple location pairs
 
@@ -223,8 +223,8 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
 
         def get_prediction(
             src_batch: [numpy.ndarray | torch.Tensor], dst_batch: [numpy.ndarray | torch.Tensor],
-            src_spikings: [numpy.ndarray] = None, goal_spikings: [numpy.ndarray] = None,
-            src_distances: [numpy.ndarray] = None, # goal_distances: [numpy.ndarray] = None,
+            src_spikings: [numpy.ndarray], goal_spikings: [numpy.ndarray],
+            src_lidar: [numpy.ndarray], goal_lidar: [numpy.ndarray],
         ) -> networks.Batch[networks.Model.Prediction]:
             """ Helper function, main logic for predicting reachability for multiple location pairs """
             with torch.no_grad():
@@ -252,8 +252,8 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
                     additional_info['batch_src_spikings'] = torch.from_numpy(src_spikings).float()
                     additional_info['batch_dst_spikings'] = torch.from_numpy(goal_spikings).float()
                 if self.config.with_dist:
-                    additional_info['batch_src_distances'] = torch.from_numpy(src_distances).float()
-                    # additional_info['batch_dst_distances'] = torch.from_numpy(goal_distances).float()
+                    additional_info['batch_src_lidar'] = torch.from_numpy(src_lidar).float()
+                    additional_info['batch_dst_lidar'] = torch.from_numpy(goal_lidar).float()
 
                 return self.backbone.get_prediction(
                     torch.from_numpy(src_batch).float(),

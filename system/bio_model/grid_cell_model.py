@@ -11,6 +11,8 @@ import numpy as np
 import os
 from typing import List
 
+from system.types import Spikings
+
 # Grid Cell model is based on Edvardsen 2015. Please refer to the thesis or the paper for detailed explanations
 
 def rec_d(d):
@@ -181,7 +183,6 @@ class GridCellNetwork:
             for m, gm in enumerate(gm_values):
                 gc = GridCellModule(n, gm, dt, {"w": w_vectors[m], "h": h_vectors[m]})
                 self.gc_modules.append(gc)
-                print("Loaded GC module with gm", gc.gm)
 
             self.load_initialized_network("s_vectors_initialized.npy", gc_name=gc_name)
 
@@ -235,7 +236,7 @@ class GridCellNetwork:
         np.save(directory + "/h_vectors.npy", h_vectors)
         np.save(directory + "/gm_values.npy", gm_values)
 
-    def consolidate_gc_spiking(self, virtual=False):
+    def consolidate_gc_spiking(self, virtual=False) -> Spikings:
         """Consolidate spiking in one matrix for saving"""
         s_vectors = np.zeros((len(self.gc_modules), len(self.gc_modules[0].s)))
         for idx, gc in enumerate(self.gc_modules):
@@ -253,7 +254,7 @@ class GridCellNetwork:
         for m, gc in enumerate(self.gc_modules):
             gc.t = np.copy(gc.s)
 
-    def set_as_target_state(self, gc_connections):
+    def set_as_target_state(self, gc_connections : Spikings):
         for m, gc in enumerate(self.gc_modules):
             gc.t = gc_connections[m]
         print("Set new target state")

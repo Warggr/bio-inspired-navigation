@@ -48,7 +48,7 @@ class Model(ABC):
 
     @abstractmethod
     def get_prediction(self,
-        src_batch, dst_batch,
+        batch_src_images=None, batch_dst_images=None,
         batch_transformation=None,
         batch_src_spikings=None, batch_dst_spikings=None,
         batch_src_distances=None, batch_dst_distances=None,
@@ -93,7 +93,7 @@ class Siamese(Model):
         src_batch, dst_batch,
         batch_transformation=None,
         batch_src_spikings=None, batch_dst_spikings=None
-    ) -> Model.Prediction:
+    ) -> Batch[Model.Prediction]:
         return get_grid_cell(batch_src_spikings, batch_dst_spikings), None, None
 
 

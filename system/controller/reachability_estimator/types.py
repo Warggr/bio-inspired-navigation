@@ -1,4 +1,5 @@
-from system.types import types, LidarReading
+import system.types as types
+from system.types import LidarReading
 import numpy as np
 from dataclasses import dataclass
 from abc import ABC, abstractmethod

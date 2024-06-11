@@ -15,6 +15,7 @@ def a_star(obstacle_map, start_pos, goal_pos, soft_obstacle_scale=0.0):
     height, width = obstacle_map.shape
 
     # Convert to standard python types. This speeds up path finding significantly.
+    assert obstacle_map[goal_pos[::-1]] != 255 and obstacle_map[start_pos[::-1]] != 255
     obstacle_map = obstacle_map.tolist()
     start_pos = tuple(start_pos)
     goal_pos = tuple(goal_pos)

@@ -22,6 +22,7 @@ from system.controller.simulation.environment_cache import EnvironmentCache
 from system.controller.local_controller.compass import AnalyticalCompass
 from system.controller.local_controller.local_navigation import setup_gc_network, vector_navigation, WaypointInfo
 from system.controller.simulation.environment.map_occupancy import MapLayout
+import system.types as types
 
 import system.plotting.plotResults as plot
 
@@ -175,7 +176,7 @@ def waypoint_movement(env_model, cam_freq, traj_length, map_layout, gc_network) 
     return samples
 
 
-def generate_multiple_trajectories(out_hd5_obj, num_traj, trajectory_length, cam_freq, mapname):
+def generate_multiple_trajectories(out_hd5_obj, num_traj, trajectory_length, cam_freq, mapname : types.AllowedMapName):
     ''' Generate multiple trajectories
     
     arguments:

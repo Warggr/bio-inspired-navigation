@@ -108,7 +108,7 @@ def run_test_model(dataset, filename = "trained_model_new.50"):
     writer.add_scalar("Recall/Testing", test_recall, 1)
     writer.add_scalar("fscore/Testing", test_f1, 1)
 
-Batch = Any
+Batch = Any # TODO
 TrainDevice = Literal['cpu', 'gpu'] # TODO (Pierre): not sure about how exactly 'gpu' is called
 
 def process_batch(item : Batch, train_device : TrainDevice):
@@ -367,7 +367,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset-features', nargs='+', default=[])
     parser.add_argument('--dataset-basename', help='The base name of the reachability dataset HD5 file', default='dataset')
     parser.add_argument('--images', help='Images are included in the dataset', action=argparse.BooleanOptionalAction, default=True)
-    parser.add_argument('--spikings', dest='with_grid_cell_spikings', help='Grid cell spikings are included in the dataset', action='store_true')
+    parser.add_argument('--spikings', help='Grid cell spikings are included in the dataset', action='store_true')
     parser.add_argument('--lidar', help='LIDAR distances are included in the dataset', choices=['raw_lidar', 'ego_bc', 'allo_bc'])
     parser.add_argument('--pair-conv', dest='with_conv_layer', help='Pair-conv neural network', action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('--dist', help='Provide the distance and angle to the reachability estimator', action='store_true')
@@ -376,7 +376,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     config = SampleConfig(
-        grid_cell_spikings=args.with_grid_cell_spikings,
+        grid_cell_spikings=args.spikings,
         lidar=args.lidar,
         images=args.images,
         dist=args.dist,

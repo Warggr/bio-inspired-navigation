@@ -42,7 +42,7 @@ else:
     from .map_occupancy_helpers import map_utils_cpp as map_cpp
 
 from typing import Tuple, List
-Vector2D = Tuple[float, float]
+from system.types import Vector2D, AllowedMapName
 
 class Map(object):
     def __init__(self,

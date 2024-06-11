@@ -80,13 +80,13 @@ class ReachabilityDataset(torch.utils.data.Dataset):
 
     def sample(self, index):
         if self.externalLink:
-            return self.dataset[str(self._get_link_index(index))][self.keys[index]][()]
+            tup = self.dataset[str(self._get_link_index(index))][self.keys[index]][()]
         else:
-            return self.dataset['positions'][index]
+            tup = self.dataset['positions'][index]
+        return Sample.from_tuple(tup)
 
     def __getitem__(self, index):
-        data = self.sample(index)
-        sample, reachability = Sample.from_tuple(data)
+        sample, reachability = self.sample(index)
 
         reachability = torch.tensor(reachability).clamp(0.0, 1.0) # make it a tensor of float
         position = sample.dst.env_coordinates - sample.src.env_coordinates

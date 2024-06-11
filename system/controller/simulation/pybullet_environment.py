@@ -75,6 +75,7 @@ def closest_subsegment(values : List[float]) -> (int, int):
     return start_index, end_index
 
 DIRNAME = os.path.dirname(__file__)
+DEBUG = os.getenv('DEBUG', False)
 
 def resource_path(*filepath):
     return os.path.realpath(os.path.join(DIRNAME, "environment", *filepath))
@@ -87,7 +88,7 @@ class PybulletEnvironment:
     ROBOT_Z_POS = 0.02 # see p3dx model
 
     def __init__(self,
-        env_model : str,
+        env_model : str = "Savinov_val3",
         dt : float = 1e-2,
         visualize=False,
         realtime=False,
@@ -400,13 +401,13 @@ class PybulletEnvironment:
             hit_object_uid = hit[0]
 
             if hit_object_uid < 0:
-                self.add_debug_line(start, end, rayMissColor)
                 #if i == 0:
                 #    self.add_debug_line(start, end, (0, 0, 0))
                 ray_return.append(-1)
             else:
+                if self.robot:
+                    assert hit_object_uid != self.robot.ID
                 hitPosition = hit[3]
-                self.add_debug_line(start, hitPosition, rayHitColor)
                 self.add_debug_line(start, end, rayHitColor)
                 distance = math.sqrt((hitPosition[0] - start[0]) ** 2 + (hitPosition[1] - start[1]) ** 2)
                 assert 0 <= distance and distance <= 1
@@ -416,9 +417,6 @@ class PybulletEnvironment:
 
 
 class Robot:
-    class Stuck(Exception):
-        pass
-
     def __init__(
         self,
         env: PybulletEnvironment,
@@ -470,8 +468,6 @@ class Robot:
         combine     -- factor for combining obstacle avoidance and goal vector. See local_navigation experiments
         """
         #rayFromPoint = self.position
-
-        #goal_vector = self.compass.calculate_goal_vector(rayFromPoint)
 
         if obstacles:
             point, obstacle_vector = self.calculate_obstacle_vector()
