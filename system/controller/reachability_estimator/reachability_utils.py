@@ -16,7 +16,11 @@ from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.plotting.plotResults import plotStartGoalPair
 from system.controller.reachability_estimator.types import PlaceInfo, ReachabilityController
 
-from typing import Optional, override
+from typing import Optional
+try:
+    from typing import override
+except ImportError: # Python <3.12
+    from system.polyfill import override
 
 def in_fov(src_position, src_heading, src_fov, dst_position):
     # Calculate the vector from the agent to the target
