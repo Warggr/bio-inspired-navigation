@@ -546,7 +546,7 @@ if __name__ == "__main__":
     parser.add_argument('--flush-freq', type=int, dest='flush_freq', default=1000)
     parser.add_argument('--extension', help='extension of the dataset file', default='.hd5')
     parser.add_argument('--image-plot', action=argparse.BooleanOptionalAction, help='Show image of samples taken')
-    parser.add_argument('-c', '--color-walls', help='number of wall colors', type=int, default=1)
+    parser.add_argument('-w', '--wall-colors', help='how to color the walls', choices=['1color', '3colors', 'patterns'], default='1color')
     parser.add_argument('--re',
         choices=['view_overlap', 'network', 'distance', 'simulation'], default='view_overlap',
         help='The reachability estimator to generate ground truth reachability values',
@@ -557,14 +557,19 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    textures = all_possible_textures[:args.color_walls]
+    if args.wall_colors == '1color':
+        textures = [ os.path.join( 'yellow_walls.png') ]
+    elif args.wall_colors == '3colors':
+        textures = all_possible_textures[:args.wall_colors]
+    elif args.wall_colors == 'patterns':
+        textures = lambda i : f'pattern-{i+1}.png'
 
     # Input file
     filename = os.path.join(get_path(), "data", "trajectories", args.traj_file)
     filename = os.path.realpath(filename)
     re = ReachabilityController.factory(controller_type=args.re)
 
-    suffix = '' if args.color_walls == 1 else f'-{args.color_walls}colors'
+    suffix = '' if args.wall_colors == '1color' else f'-{args.wall_colors}'
 
     # Output file
     filename = os.path.join(get_path(), "data", "reachability", args.basename + suffix + args.extension)

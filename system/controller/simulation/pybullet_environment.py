@@ -80,6 +80,7 @@ DEBUG = os.getenv('DEBUG', False)
 def resource_path(*filepath):
     return os.path.realpath(os.path.join(DIRNAME, "environment", *filepath))
 
+WALL_TEXTURE_PATH = resource_path("textures", "walls")
 
 class PybulletEnvironment:
     """This class deals with everything pybullet or environment (obstacles) related"""
@@ -233,7 +234,7 @@ class PybulletEnvironment:
         loaded_textures = {}
         def load_texture(texture_name : str):
             if texture_name not in loaded_textures:
-                loaded_textures[texture_name] = p.loadTexture(texture_name)
+                loaded_textures[texture_name] = p.loadTexture(os.path.join(WALL_TEXTURE_PATH, texture_name))
             return loaded_textures[texture_name]
 
         textures = map(load_texture, textures)
@@ -740,8 +741,7 @@ class DatasetCollector:
         # observations = self.images[::3][-1:]
         # return [np.transpose(observation[2], (2, 0, 1)) for observation in observations]
 
-texture_folder = resource_path("textures", "walls")
-all_possible_textures = [ os.path.join(texture_folder, file) for file in sorted(os.listdir(texture_folder)) if file[-4:] == '.jpg' ]
+all_possible_textures = [ file for file in sorted(os.listdir(WALL_TEXTURE_PATH)) if file[-4:] == '.jpg' ]
 
 if __name__ == "__main__":
     """
