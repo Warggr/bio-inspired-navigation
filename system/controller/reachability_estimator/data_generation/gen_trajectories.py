@@ -18,6 +18,7 @@ if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), "../../../.."))
 
 from system.controller.simulation.pybullet_environment import PybulletEnvironment, Robot
+from system.controller.simulation.environment_config import environment_dimensions
 from system.controller.simulation.environment_cache import EnvironmentCache
 from system.controller.local_controller.compass import AnalyticalCompass
 from system.controller.local_controller.local_navigation import setup_gc_network, vector_navigation, WaypointInfo
@@ -75,104 +76,87 @@ def display_trajectories(filename, env_model):
     y = [i[1] for i in xy_coordinates]
 
     # get dimensions
-    env = PybulletEnvironment(env_model, 1e-2, mode="analytical")
-    fig, ax = plt.subplots()
-    hh = ax.hist2d(x, y, bins=[np.arange(env.dimensions[0], env.dimensions[1], 0.1)
-        , np.arange(env.dimensions[2], env.dimensions[3], 0.1)], norm="symlog")
-    fig.colorbar(hh[3], ax=ax)
-    plt.show()
+    with PybulletEnvironment(env_model) as env:
+        fig, ax = plt.subplots()
+        hh = ax.hist2d(x, y, bins=[np.arange(env.dimensions[0], env.dimensions[1], 0.1)
+            , np.arange(env.dimensions[2], env.dimensions[3], 0.1)], norm="symlog")
+        fig.colorbar(hh[3], ax=ax)
+        plt.show()
 
-
-def sample_location(env_model):
-    ''' Sample location within environment boundaries'''
-    if env_model == "Savinov_val3":
-        dimensions = [-9, 6, -5, 4]
-    elif env_model == "Savinov_val2":
-        dimensions = [-5, 5, -5, 5]
-    elif env_model == "Savinov_test7":
-        dimensions = [-9, 6, -4, 4]
-    elif env_model == "plane":
-        dimensions = [-9, 6, -4, 4]
-    else:
-        raise ValueError("env_model does not exist")
-
-    x = np.around(np.random.uniform(dimensions[0], dimensions[1]), 1)
-    y = np.around(np.random.uniform(dimensions[2], dimensions[3]), 1)
-    return (x, y)
-
-cache = EnvironmentCache()
-
-def valid_location(env_model):
+def valid_location(env_map : MapLayout):
     """ Sample valid location for agent in the environment """
+    dimensions = environment_dimensions(env_map.name)
     while True:
-        x, y = sample_location(env_model)
-        env = cache[env_model]
-        with Robot(env=env, base_position=[x, y]):
-            if not env.detect_maze_agent_contact():
-                return [x, y]
+        x = np.around(np.random.uniform(dimensions[0], dimensions[1]), 1)
+        y = np.around(np.random.uniform(dimensions[2], dimensions[3]), 1)
 
+        if env_map.suitable_position_for_robot([x, y]):
+            return [x, y]
 
-def gen_multiple_goals(env_name, nr_of_goals):
+def gen_multiple_goals(env_map : MapLayout, nr_of_goals):
     ''' Generate start and multiple subgoals'''
 
     points = []
     for i in range(nr_of_goals):
-        points.append(sample_location(env_name))
+        points.append(valid_location(env_map))
 
-    start = valid_location(env_name)
+    start = valid_location(env_map)
     points.insert(0, start)
     return points
 
 
-def waypoint_movement(env_model, cam_freq, traj_length, map_layout, gc_network) -> List[WaypointInfo]:
+def waypoint_movement(env : PybulletEnvironment, cam_freq, traj_length, map_layout : MapLayout, gc_network) -> List[WaypointInfo]:
     ''' Calculates environment-specific waypoints from start to goal and creates
     trajectory by making agent follow them.
     
     arguments:
-    env_model      -- environment name
+    env_model       -- environment name
     cam_freq        -- at what frequency is the state of the agent saved
     traj_length     -- how many timesteps should the agent run
     '''
 
     # initialize environment
-    start = valid_location(env_model)
-    samples : List['PlaceInfo'] = []
-    visualize = False
-    dt = 1e-2
-    env = PybulletEnvironment(env_model, dt, visualize=True, build_data_set=True, start=start)
+    start = valid_location(map_layout)
+    with Robot(env=env, base_position=start) as robot:
 
-    while len(samples) < traj_length / cam_freq:
-        goal = sample_location(env_model)
-        if (goal[0] - start[0]) ** 2 + (goal[1] - start[1]) ** 2 < 3:
-            continue
+        samples : List['PlaceInfo'] = []
 
-        # calculate waypoints, if no path can be found return
-        waypoints = map_layout.find_path(start, goal)
-        if waypoints is None:
-            print_debug("No path found!")
-            continue
+        while len(samples) < traj_length / cam_freq:
+            goal = valid_location(map_layout)
+            if (goal[0] - start[0]) ** 2 + (goal[1] - start[1]) ** 2 < 3:
+                continue
 
-        from numbers import Number
-        for g in waypoints:
-            assert isinstance(g[0], Number), g            
+            # calculate waypoints, if no path can be found return
+            waypoints = map_layout.find_path(start, goal)
+            print("---\nStart:", start)
+            for waypoint in waypoints: print(waypoint)
+            print("Goal:", goal, "\n---")
+            if waypoints is None:
+                print_debug("No path found!")
+                continue
 
-            # if trajectory_length has been reached the trajectory can be saved
-            if len(samples) > traj_length / cam_freq:
-                break
+            from numbers import Number
+            for g in waypoints:
+                assert isinstance(g[0], Number), g
 
-            compass = AnalyticalCompass(start, g)
-            goal_reached, data = vector_navigation(env, compass, gc_network, step_limit=5000, plot_it=False,
-                                           obstacles=False, collect_data_freq=cam_freq)
-            samples += data
-            if not goal_reached:
-                print("Couldn't reach intermediate goal - breaking")
-                break
-        if len(samples) > 0:
-            start = samples[-1][0]
+                # if trajectory_length has been reached the trajectory can be saved
+                if len(samples) > traj_length / cam_freq:
+                    break
+
+                compass = AnalyticalCompass(robot.position, g)
+                print(f"Vector navigation from {robot.position} to {g}")
+                env.add_debug_line(start=robot.position, end=g, color=(1, 0, 0), width=2)
+                goal_reached, data = vector_navigation(env, compass, gc_network, step_limit=5000, plot_it=False,
+                                            obstacles=False, collect_data_freq=cam_freq)
+                samples += data
+                if not goal_reached:
+                    print("Couldn't reach intermediate goal - breaking")
+                    break
+            if len(samples) > 0:
+                start = samples[-1][0]
 
     if plotting:
         plot.plotTrajectoryInEnvironment(env)
-    env.end_simulation()
     return samples
 
 

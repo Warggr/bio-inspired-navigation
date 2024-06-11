@@ -141,6 +141,10 @@ class Map(object):
 
         self.range_scanner = range_libc.PyBresenhamsLine(self.omap, 1000)
 
+    @property
+    def shape(self) -> Tuple[float, float]:
+        return self.binary_occupancy.shape
+
     def _compute_visible_map_bbox(self, background_traversable):
         if background_traversable:
             nz_indices = np.transpose(np.nonzero(self.occupancy_grid == 0))
@@ -183,6 +187,16 @@ class Map(object):
         :return: the reachable locations in the path map's coordinates
         """
         return self.reachable_locs
+
+    def suitable_position_for_robot(self, p : Vector2D) -> bool:
+        print(p, 'is suitable:', end='')
+        map_coords = self.map_coord_to_path_coord(p[0], p[1])
+        try:
+            print(self.path_map[map_coords[::-1]] == 0)
+            return self.path_map[map_coords[::-1]] == 0
+        except IndexError:
+            print('False (out of bounds)')
+            return False
 
     def grid_coord(self, x, y, n_division):
         '''
@@ -240,13 +254,15 @@ class Map(object):
         return dilated
 
     def find_path(self, start_pos : Vector2D, goal_pos : Vector2D) -> List[Vector2D]:
+        assert self.suitable_position_for_robot(start_pos) and self.suitable_position_for_robot(goal_pos)
         start_coord = self.grid_coord(start_pos[0], start_pos[1], self.path_map_division)
         goal_coord = self.grid_coord(goal_pos[0], goal_pos[1], self.path_map_division)
 
         waypoints = a_star(self.path_map, start_coord, goal_coord, soft_obstacle_scale=1.0)
+        assert waypoints[-1] == tuple(goal_coord) and waypoints[0] == tuple(start_coord), (waypoints[0], waypoints[-1], start_coord, goal_coord)
 
-        if waypoints is None:
-            return [(start_pos, goal_pos)]
+        # if waypoints is None:
+        #    return [(start_pos, goal_pos)]
 
         from numbers import Number
         res = []

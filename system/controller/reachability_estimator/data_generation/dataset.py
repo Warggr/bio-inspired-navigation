@@ -342,10 +342,6 @@ def assert_conforms_to_type(data, dtype):
 
 from system.controller.local_controller.local_navigation import setup_gc_network
 
-def too_close_to_wall(p : Vector2D, map : MapLayout):
-    map_coords = map.map_coord_to_path_coord(p[0], p[1])
-    return map.path_map[map_coords] != 0
-
 def random_coordinates(xmin, xmax, ymin, ymax):
     return np.array([ random.uniform(xmin, ymin), random.uniform(ymin, ymax) ])
 
@@ -369,7 +365,7 @@ class RandomSamples:
                 i += 1
                 p = random_coordinates(*environment_dimensions(self.env.env_model))
                 print(f"[i={i}]Trying", p, "...")
-                if not too_close_to_wall(p1, self.map):
+                if self.map.suitable_position_for_robot(p):
                     break
             result.append(p)
         return result
@@ -406,14 +402,14 @@ class RandomSamplesWithLimitedDistance(RandomSamples):
         while True:
             i += 1
             p1 = random_coordinates(*dims)
-            if too_close_to_wall(p1, self.map):
+            if not self.map.suitable_position_for_robot(p1):
                 continue
             for j in range(100):
                 r = np.sqrt(random.uniform(0, self.r_max**2)) # sqrt ensures that the samples are drawn uniformly from the circle
                 theta = random.uniform(-np.pi, np.pi)
                 distance = np.array([ np.cos(theta), np.sin(theta) ]) * r
                 p2 = p1 + distance
-                if (not in_rect(p2, dims)) or too_close_to_wall(p2, self.map):
+                if (not in_rect(p2, dims)) or (not self.map.suitable_position_for_robot(p2)):
                     continue
                 else:
                     return p1, p2
