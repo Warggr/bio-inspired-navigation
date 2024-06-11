@@ -455,7 +455,11 @@ def create_and_save_reachability_samples(
     for i in (bar := tqdm(range(start_index, nr_samples), initial=start_index, total=nr_samples)):
         reachable = None
         while reachable is None:
-            sample, path_l, map_name = next(samples)
+            try:
+                sample, path_l, map_name = next(samples)
+            except ValueError:
+                tqdm.write(f"Error at sample {i}")
+                continue
 
             env = envs[map_name]
 

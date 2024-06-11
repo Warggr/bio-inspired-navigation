@@ -61,7 +61,9 @@ def waypoint_movement(path: [PlaceCell], env_model: str, gc_network: GridCellNet
 
     with PybulletEnvironment(env_model, dt=dt, build_data_set=True, start=path[0]) as env:
 
-        for i, goal in enumerate(goals):
+        from tqdm import tqdm
+
+        for i, goal in enumerate(tqdm(goals)):
             #print_debug(f"new waypoint with coordinates {goal}.", f'{i / len(goals) * 100} % completed.')
             compass = AnalyticalCompass(start_pos=path[0], goal_pos=goal)
             vector_navigation(env, compass, gc_network, step_limit=5000, obstacles=True,

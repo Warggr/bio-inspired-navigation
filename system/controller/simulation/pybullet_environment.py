@@ -234,7 +234,11 @@ class PybulletEnvironment:
         loaded_textures = {}
         def load_texture(texture_name : str):
             if texture_name not in loaded_textures:
-                loaded_textures[texture_name] = p.loadTexture(os.path.join(WALL_TEXTURE_PATH, texture_name))
+                try:
+                    loaded_textures[texture_name] = p.loadTexture(os.path.join(WALL_TEXTURE_PATH, texture_name))
+                except Exception:
+                    print("Couldn't load", texture_name, f"({os.path.join(WALL_TEXTURE_PATH, texture_name)})")
+                    raise
             return loaded_textures[texture_name]
 
         textures = map(load_texture, textures)
