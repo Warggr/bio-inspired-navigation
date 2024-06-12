@@ -14,7 +14,7 @@ import itertools
 import bisect
 import random
 import matplotlib.pyplot as plt
-from typing import Tuple, Iterator, Dict, Optional, Protocol
+from typing import Tuple, Iterator, Dict, Optional, Protocol, Callable
 
 import sys
 import os
@@ -305,13 +305,14 @@ class TrajectoriesDataset(data.Dataset):
             return self._draw_sample_same_traj_multiple_tries(idx)
 
     class _Iterator:
-        def __init__(self, parent : 'TrajectoriesDataset', parent_function):
+        def __init__(self, parent : 'TrajectoriesDataset', parent_function : Callable[int, Tuple[str, WaypointInfo, WaypointInfo, float]]):
             self.parent = parent
             self.parent_function = parent_function
+            # parent_function is a method of parent which can return samples
         def __next__(self) -> Tuple[Sample, float, str]:
             random_idx = random.randint(0, len(self.parent))
             self.parent._init_once(random_idx)
-            pair = parent_function(self=parent, idx=random_idx) # TODO Pierre this is ugly
+            pair = self.parent_function(idx=random_idx)
             map_name, src_sample, dst_sample, path_l = pair
 
             env = self.parent.envs[map_name]
@@ -321,9 +322,9 @@ class TrajectoriesDataset(data.Dataset):
 
     def iterate(self, mode='same_traj') -> SampleGenerator:
         functions = {
-            'same_traj': TrajectoriesDataset._draw_sample_same_traj_multiple_tries,
-            'diff_traj': TrajectoriesDataset._draw_sample_diff_traj,
-            'maybe_diff_traj': TrajectoriesDataset._draw_sample,
+            'same_traj': self._draw_sample_same_traj_multiple_tries,
+            'diff_traj': self._draw_sample_diff_traj,
+            'maybe_diff_traj': self._draw_sample,
         }
         return self._Iterator(self, parent_function=functions[mode])
 
