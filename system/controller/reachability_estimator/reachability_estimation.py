@@ -309,8 +309,8 @@ class SimulationReachabilityEstimator(ReachabilityEstimator):
         gc_network.set_as_current_state(start.spikings)
         target_spiking = goal.spikings
 
-        compass = GcCompass.factory(mode="combo", gc_network=gc_network, goal_pos=goal.env_coordinates)
-        with Robot(env=env, base_position=start.env_coordinates, base_orientation=start.angle) as robot:
+        compass = GcCompass.factory(mode="combo", gc_network=gc_network, goal_pos=goal.pos)
+        with Robot(env=env, base_position=start.pos, base_orientation=start.angle) as robot:
             goal_reached, _ = vector_navigation(env, compass, gc_network, target_gc_spiking=target_spiking,
                                         step_limit=750, plot_it=False)
             final_position, final_angle = robot.position_and_angle
@@ -318,12 +318,12 @@ class SimulationReachabilityEstimator(ReachabilityEstimator):
         if goal_reached:
             map_layout = MapLayout(env.env_model)
 
-            overlap_ratios = map_layout.view_overlap(final_position, final_angle, goal.env_coordinates, goal.angle, self.fov, mode='plane')
+            overlap_ratios = map_layout.view_overlap(final_position, final_angle, goal.pos, goal.angle, self.fov, mode='plane')
 
             if overlap_ratios[0] < 0.1 and overlap_ratios[1] < 0.1:
                 # Agent is close to the goal, but seperated by a wall.
                 return False
-            elif np.linalg.norm(goal.env_coordinates - final_position) > 0.7:
+            elif np.linalg.norm(goal.pos - final_position) > 0.7:
                 # Agent actually didn't reach the goal and is too far away.
                 return False
             else:
@@ -359,8 +359,8 @@ class ViewOverlapReachabilityEstimator(ReachabilityEstimator):
     def reachability_factor(self, start: PlaceCell, goal: PlaceCell) -> float:
         """ Reachability Score based on the view overlap of start and goal in the environment """
         # untested and unfinished
-        start_pos = start.env_coordinates
-        goal_pos = goal.env_coordinates
+        start_pos = start.pos
+        goal_pos = goal.pos
 
         heading1 = np.degrees(np.arctan2(goal_pos[0] - start_pos[0], goal_pos[1] - start_pos[1]))
 
