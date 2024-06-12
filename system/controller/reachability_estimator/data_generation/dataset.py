@@ -562,28 +562,20 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    re = ReachabilityController.factory(controller_type=args.re)
+
     if args.wall_colors == '1color':
         textures = [ os.path.join( 'yellow_wall.png') ]
     elif args.wall_colors == '3colors':
         textures = all_possible_textures[:args.wall_colors]
     elif args.wall_colors == 'patterns':
         textures = lambda i : f'pattern-{i+1}.png'
-
-    # Input file
-    filename = os.path.join(get_path(), "data", "trajectories", args.traj_file)
-    filename = os.path.realpath(filename)
-    re = ReachabilityController.factory(controller_type=args.re)
-
-    suffix = '' if args.wall_colors == '1color' else f'-{args.wall_colors}'
-
-    # Output file
-    filename = os.path.join(get_path(), "data", "reachability", args.basename + suffix + args.extension)
-    filename = os.path.realpath(filename)
-    f = h5py.File(filename, 'a')
-
     env_kwargs={ 'wall_kwargs': { 'textures': textures } }
+
     with EnvironmentCache(override_env_kwargs=env_kwargs) as env_cache:
         if args.gen.endswith('_traj'):
+            filename = os.path.join(get_path(), "data", "trajectories", args.traj_file)
+            filename = os.path.realpath(filename)
             rd = TrajectoriesDataset([filename], env_cache=env_cache)
             samples = rd.iterate(mode=args.gen)
         else:
@@ -592,6 +584,12 @@ if __name__ == "__main__":
             elif args.gen == 'random_circle':
                 samples = RandomSamplesWithLimitedDistance(env_cache["Savinov_val3"])
             else: raise ValueError(args.gen)
+
+        # Output file
+        suffix = '' if args.wall_colors == '1color' else f'-{args.wall_colors}'
+        filename = os.path.join(get_path(), "data", "reachability", args.basename + suffix + args.extension)
+        filename = os.path.realpath(filename)
+        f = h5py.File(filename, 'a')
 
         create_and_save_reachability_samples(
             samples, f,
