@@ -27,7 +27,7 @@ import system.types as types
 
 import system.plotting.plotResults as plot
 
-from typing import List
+from typing import List, Iterator, Tuple
 
 def get_path():
     """ returns path to data storage folder """
@@ -78,29 +78,14 @@ def display_trajectories(filepath, env_model):
         fig.colorbar(hh[3], ax=ax)
         plt.show()
 
-def valid_location(env_map : MapLayout):
-    """ Sample valid location for agent in the environment """
-    dimensions = environment_dimensions(env_map.name)
-    while True:
-        x = np.around(np.random.uniform(dimensions[0], dimensions[1]), 1)
-        y = np.around(np.random.uniform(dimensions[2], dimensions[3]), 1)
+Dimensions = Tuple[float, float, float, float]
 
-        if env_map.suitable_position_for_robot([x, y]):
-            return [x, y]
+def random_location(dimensions : Dimensions, generator : np.random.RandomState) -> types.Vector2D:
+    x = np.around(generator.uniform(dimensions[0], dimensions[1]), 1)
+    y = np.around(generator.uniform(dimensions[2], dimensions[3]), 1)
+    return [x, y]
 
-def gen_multiple_goals(env_map : MapLayout, nr_of_goals):
-    ''' Generate start and multiple subgoals'''
-
-    points = []
-    for i in range(nr_of_goals):
-        points.append(valid_location(env_map))
-
-    start = valid_location(env_map)
-    points.insert(0, start)
-    return points
-
-
-def waypoint_movement(env : PybulletEnvironment, cam_freq, traj_length, map_layout : MapLayout, gc_network) -> List[WaypointInfo]:
+def waypoint_movement(env : PybulletEnvironment, cam_freq, traj_length, map_layout : MapLayout, gc_network, seed : int) -> List[WaypointInfo]:
     ''' Calculates environment-specific waypoints from start to goal and creates
     trajectory by making agent follow them.
     
@@ -110,14 +95,21 @@ def waypoint_movement(env : PybulletEnvironment, cam_freq, traj_length, map_layo
     traj_length     -- how many timesteps should the agent run
     '''
 
+    random_state = np.random.RandomState(seed=seed)
+    dimensions : Dimensions = environment_dimensions(env.env_model)
+    valid_locations : Iterator[types.Vector2D] = filter( # TODO Pierre: I'm sorry for the unreadable code
+        map_layout.suitable_position_for_robot,
+        iter(lambda: random_location(dimensions, random_state), None),
+    )
+
     # initialize environment
-    start = valid_location(map_layout)
+    start = next(valid_locations)
     with Robot(env=env, base_position=start) as robot:
 
         samples : List['PlaceInfo'] = []
 
         while len(samples) < traj_length / cam_freq:
-            goal = valid_location(map_layout)
+            goal = next(valid_locations)
             if (goal[0] - start[0]) ** 2 + (goal[1] - start[1]) ** 2 < 3:
                 continue
 
@@ -191,7 +183,7 @@ def generate_multiple_trajectories(out_hd5_obj, num_traj, trajectory_length, cam
                 print('dataset %s exists. skipped' % dset_name)
                 continue
 
-            samples = waypoint_movement(env, cam_freq, trajectory_length, map_layout, gc_network)
+            samples = waypoint_movement(env, cam_freq, trajectory_length, map_layout, gc_network, seed=traj_id)
             # TODO: flatten each sample[:, 3]
             print(f"trajectory {samples[0]}-{samples[1]} with {len(samples)} steps")
             dset = out_hd5_obj.create_dataset(
