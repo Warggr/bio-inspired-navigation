@@ -36,7 +36,7 @@ def get_path():
 
 
 # Print debug statements
-debug = False  # False
+debug = os.getenv('DEBUG', False)
 
 
 def print_debug(*params):
@@ -121,8 +121,10 @@ def waypoint_movement(env : PybulletEnvironment, cam_freq, traj_length, map_layo
                 print_debug("No path found!")
                 continue
 
+            from tqdm import tqdm
+
             from numbers import Number
-            for g in waypoints:
+            for g in tqdm(waypoints):
                 assert isinstance(g[0], Number), g
 
                 # if trajectory_length has been reached the trajectory can be saved
@@ -167,7 +169,7 @@ def generate_multiple_trajectories(out_hd5_obj, num_traj, trajectory_length, cam
     dt = 1e-2
     gc_network = setup_gc_network(dt)
     map_layout = MapLayout(mapname)
-    with PybulletEnvironment(mapname, dt, visualize=True, build_data_set=True, contains_robot=False) as env:
+    with PybulletEnvironment(mapname, dt, visualize=False, build_data_set=True, contains_robot=False) as env:
         i = 0
         while i < num_traj:
             traj_id = rng_trajid.randint(0xfffffff)
