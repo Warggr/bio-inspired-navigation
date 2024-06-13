@@ -44,18 +44,13 @@ def print_debug(*params):
         print(*params)
 
 
-plotting = True
+plotting = os.getenv('PLOTTING', False)
 
 
-def display_trajectories(filename, env_model):
+def display_trajectories(filepath, env_model):
     """ display all trajectories on one map, as well as a heatmap to check coverage """
-    filename = filename + ".hd5"
 
     import matplotlib.pyplot as plt
-    dirname = get_path()
-    dirname = os.path.join(dirname, "data/trajectories")
-    dirname = os.path.join(dirname, filename)
-    filepath = os.path.realpath(dirname)
     hf = h5py.File(filepath, 'r')
     print("number of datasets: ", len(hf.keys()))
 
@@ -210,22 +205,18 @@ def generate_multiple_trajectories(out_hd5_obj, num_traj, trajectory_length, cam
             print("--- %s seconds for one trajectory ---" % (time.time() - start_time))
 
 
-def generate_and_save_trajectories(filename, mapname, num_traj, traj_length, cam_freq):
+def generate_and_save_trajectories(filepath, mapname, num_traj, traj_length, cam_freq):
     ''' Generate and save trajectories.
     
     arguments:
     
-    filename    -- filename for storing trajectories
+    filepath    -- filename for storing trajectories
     mapname     -- environment name
     num_traj    -- number of trajectories to be generated
     traj_length -- how many timesteps should the agent run
     cam_freq    -- at what frequency is the state of the agent saved
     '''
-    dirname = get_path()
-    directory = os.path.join(dirname, "data/trajectories")
-    directory = os.path.realpath(directory)
-
-    f = h5py.File(directory + "/" + filename + ".hd5", 'a')
+    f = h5py.File(filepath, 'a')
     f.attrs.create('agent', "waypoint")
     f.attrs.create('map_type', mapname)
 
@@ -244,26 +235,29 @@ if __name__ == "__main__":
     Parameterized:
     Adjust filename, env_model, num_traj, traj_length and cam_freq 
     """
-    test = True
-    if len(sys.argv) == 6:
-        _, filename, env_model, num_traj, trajectory_length, cam_freq = sys.argv
-        print_debug(sys.argv)
-        generate_and_save_trajectories(filename, str(env_model), int(num_traj), int(trajectory_length), int(cam_freq))
-    elif test:
-        print("Testing trajectory generation in available mazes.")
-        print("Testing Savinov_val3")
-        generate_and_save_trajectories("trajectories", "Savinov_val3", num_traj=1000, traj_length=3000, cam_freq=10)
-        display_trajectories("trajectories", "Savinov_val3")
-        # print("Testing Savinov_val2")
-        # save_trajectories("test_2", "Savinov_val2", 1, 3000, 10)
-        # display_trajectories("test_2", "Savinov_val2")
-        # print("Testing Savinov_test7")
-        # save_trajectories("test_3", "Savinov_test7", 1, 3000, 10)
-        # display_trajectories("test_3", "Savinov_test7")
-    else:
-        num_traj = 1000
-        trajectory_length = 3000
-        cam_freq = 10
-        env_model = "Savinov_val3"  # "Savinov_val2","Savinov_test7"
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-f', '--filepath')
+    parser.add_argument('--extension')
+    parser.add_argument('-e', '--env-model', choices=['Savinov_val3', 'Savinov_val2', 'Savinov_test7'], default='Savinov_val3')
+    parser.add_argument('-n', '--num-traj', type=int, default=1000)
+    parser.add_argument('-l', '--traj-length', type=int, help='Length of one trajectory in timesteps', default=3000)
+    parser.add_argument('--cam-freq', type=int, default=10)
+    parser.add_argument('--no-display', help='Do not display trajectories', action='store_true')
+    parser.add_argument('--only-display', help='Do not create trajectory file, only display existing trajectories', action='store_true')
+    args = parser.parse_args()
 
-        display_trajectories("trajectories", env_model)
+    if args.filepath:
+        assert not args.extension, "Specifying full file path makes extension redundant"
+        filepath = args.filepath
+    else:
+        filename = "trajectories"
+        extension = getattr(args, 'extension', ".hd5")
+        filepath = os.path.join(get_path(), "data", "trajectories", filename + extension)
+
+    assert not (args.no_display and args.only_display)
+    if not args.only_display:
+        print("Trajectory generation in maze", args.env_model)
+        generate_and_save_trajectories(filepath, args.env_model, args.num_traj, args.traj_length, args.cam_freq)
+    if not args.no_display:
+        display_trajectories(filepath)
