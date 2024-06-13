@@ -47,11 +47,12 @@ def print_debug(*params):
 plotting = os.getenv('PLOTTING', False)
 
 
-def display_trajectories(filepath, env_model):
+def display_trajectories(filepath):
     """ display all trajectories on one map, as well as a heatmap to check coverage """
 
     import matplotlib.pyplot as plt
     hf = h5py.File(filepath, 'r')
+    env_model = hf.attrs['map_type']
     print("number of datasets: ", len(hf.keys()))
 
     # plot all trajectories in one map
@@ -116,9 +117,6 @@ def waypoint_movement(env : PybulletEnvironment, cam_freq, traj_length, map_layo
 
             # calculate waypoints, if no path can be found return
             waypoints = map_layout.find_path(start, goal)
-            print("---\nStart:", start)
-            for waypoint in waypoints: print(waypoint)
-            print("Goal:", goal, "\n---")
             if waypoints is None:
                 print_debug("No path found!")
                 continue
@@ -132,7 +130,6 @@ def waypoint_movement(env : PybulletEnvironment, cam_freq, traj_length, map_layo
                     break
 
                 compass = AnalyticalCompass(robot.position, g)
-                print(f"Vector navigation from {robot.position} to {g}")
                 env.add_debug_line(start=robot.position, end=g, color=(1, 0, 0), width=2)
                 goal_reached, data = vector_navigation(env, compass, gc_network, step_limit=5000, plot_it=False,
                                             obstacles=False, collect_data_freq=cam_freq)

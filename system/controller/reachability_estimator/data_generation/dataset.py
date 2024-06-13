@@ -64,11 +64,8 @@ def place_info(
     lidar, _ = env.lidar([pos, angle])
     return PlaceInfo(pos, angle, spikings, img, lidar)
 
-class SampleGenerator(Protocol, Iterator[Tuple[Sample, float, str]]):
-    def env_model(self) -> str:
-        ...
-    def __next__(self) -> Tuple[Sample, float, str]:
-        ...
+
+SampleGenerator = Iterator[Tuple[Sample, float, str]]
 
 class TrajectoriesDataset(data.Dataset):
     '''
