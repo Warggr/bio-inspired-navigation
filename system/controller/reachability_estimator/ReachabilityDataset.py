@@ -244,7 +244,9 @@ def create_balanced_datasets(new_file, filename, filepath, length):
         dset = new_f.create_dataset(
             k,
             data=np.array(sample, dtype=dtype),
-            maxshape=(None,), dtype=dtype)
+            maxshape=(None,), dtype=dtype,
+            compression="gzip",
+        )
         new_f.flush()
 
 

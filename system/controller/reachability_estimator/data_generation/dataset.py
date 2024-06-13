@@ -441,11 +441,11 @@ def create_and_save_reachability_samples(
 
         if old_size < nr_samples:
             # Hint: this might fail if somehow the dtype changed from one dataset to the other
-            dset = f.create_dataset('tmp', dtype=dtype, data=dset[:], maxshape=(nr_samples,))
+            dset = f.create_dataset('tmp', dtype=dtype, data=dset[:], maxshape=(nr_samples,), compression="gzip")
             del f[DATASET_KEY]
             f.move('tmp', DATASET_KEY)
     except KeyError:
-        dset = f.create_dataset(DATASET_KEY, data=np.array([], dtype=dtype), dtype=dtype, maxshape=(nr_samples,))
+        dset = f.create_dataset(DATASET_KEY, data=np.array([], dtype=dtype), dtype=dtype, maxshape=(nr_samples,), compression="gzip")
         start_index = 0
 
     from tqdm import tqdm
