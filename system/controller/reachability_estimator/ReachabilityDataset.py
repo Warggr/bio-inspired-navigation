@@ -89,7 +89,7 @@ class ReachabilityDataset(torch.utils.data.Dataset):
         sample, reachability = self.sample(index)
 
         reachability = torch.tensor(reachability).clamp(0.0, 1.0) # make it a tensor of float
-        position = sample.dst.env_coordinates - sample.src.env_coordinates
+        position = sample.dst.pos - sample.src.pos
         angle = sample.dst.angle - sample.src.angle
         ground_truth = (reachability, torch.tensor(position), torch.tensor(angle))
 

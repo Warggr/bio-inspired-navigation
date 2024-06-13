@@ -39,7 +39,7 @@ def crosscheck_re(
         print(f'1>{re1pred}', end='\t')
         for j, re2pred in enumerate([True, False]):
             percentage = results[re1pred, re2pred] / num_samples
-            print(f'{results[re1pred, re2pred]} ({percentage:2.}%)')
+            print(f'{results[re1pred, re2pred]} ({percentage:2.1f}%)', end='\t')
         print('|')
 
     print(f'Assuming the first RE ({repr(res[0])}) to be the ground truth:')
@@ -99,6 +99,4 @@ if __name__ == "__main__":
             env_cache=env_cache,
             num_samples=args.num_samples,
         )
-        if args.image_plot:
-            print("Finished creating samples. Now displaying them")
-            display_samples(f, imageplot=True)
+ 

@@ -310,7 +310,7 @@ class TrajectoriesDataset(data.Dataset):
             self.parent_function = parent_function
             # parent_function is a method of parent which can return samples
         def __next__(self) -> Tuple[Sample, float, str]:
-            random_idx = random.randint(0, len(self.parent))
+            random_idx = random.randint(0, len(self.parent)-1)
             self.parent._init_once(random_idx)
             pair = self.parent_function(idx=random_idx)
             map_name, src_sample, dst_sample, path_l = pair

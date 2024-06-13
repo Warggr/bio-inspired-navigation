@@ -13,7 +13,7 @@ data/models:
 data/trajectories/trajectories.hd5: | data/trajectories
 	python data_generation/gen_trajectories.py
 
-data/reachability/dataset.hd5: | data/reachability
+data/reachability/dataset.hd5: data/reachability/trajectories.hd5 | data/reachability
 	python data_generation/dataset.py -n 200000 --flush-freq 1000 --extension '.hd5.part'
 	ln -s $(shell basename $@).part $@
 
