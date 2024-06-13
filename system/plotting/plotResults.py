@@ -96,9 +96,11 @@ def plotTrajectoryInEnvironment(env : 'PybulletEnvironment', title="", xy_coordi
                                 goal=None, trajectory=True, start=None, end=None):
     if not xy_coordinates:
         xy_coordinates = env.robot.data_collector.xy_coordinates
+    if not env_model:
+        env_model = env.env_model
 
     fig, ax = plt.subplots()
-    add_environment(ax, env.env_model)
+    add_environment(ax, env_model)
 
     # plot goal vector
     if goal:
@@ -130,7 +132,7 @@ def plotTrajectoryInEnvironment(env : 'PybulletEnvironment', title="", xy_coordi
         x, y = zip(*xy_coordinates)
         ax.scatter(x, y, color='#992225', s=10, linewidths=0.5)
 
-    add_environment(ax, env.env_model)
+    add_environment(ax, env_model)
 
     # add_robot(ax, env)
     # if env.goal_pos:

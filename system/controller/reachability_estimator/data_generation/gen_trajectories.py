@@ -104,7 +104,8 @@ def waypoint_movement(env : PybulletEnvironment, cam_freq, traj_length, map_layo
 
     # initialize environment
     start = next(valid_locations)
-    with Robot(env=env, base_position=start) as robot:
+    robot = Robot(env=env, base_position=start)
+    with robot:
 
         samples : List['PlaceInfo'] = []
 
@@ -143,7 +144,7 @@ def waypoint_movement(env : PybulletEnvironment, cam_freq, traj_length, map_layo
                 start = samples[-1][0]
 
     if plotting:
-        plot.plotTrajectoryInEnvironment(env)
+        plot.plotTrajectoryInEnvironment(env=None, env_model=env.env_model, xy_coordinates=robot.data_collector.xy_coordinates)
     return samples
 
 
