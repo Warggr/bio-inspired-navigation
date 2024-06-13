@@ -170,8 +170,7 @@ def generate_multiple_trajectories(out_hd5_obj, num_traj, trajectory_length, cam
     gc_network = setup_gc_network(dt)
     map_layout = MapLayout(mapname)
     with PybulletEnvironment(mapname, dt, visualize=False, build_data_set=True, contains_robot=False) as env:
-        i = 0
-        while i < num_traj:
+        for i in range(num_traj):
             traj_id = rng_trajid.randint(0xfffffff)
             dset_name = '/%08x' % traj_id
 
@@ -192,7 +191,6 @@ def generate_multiple_trajectories(out_hd5_obj, num_traj, trajectory_length, cam
                 maxshape=(None,), dtype=dtype)
 
             out_hd5_obj.flush()
-            i += 1
 
             print("--- %s seconds for one trajectory ---" % (time.time() - start_time))
 
