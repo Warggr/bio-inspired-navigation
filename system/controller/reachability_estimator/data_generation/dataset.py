@@ -14,7 +14,7 @@ import itertools
 import bisect
 import random
 import matplotlib.pyplot as plt
-from typing import Tuple, Iterator, Dict, Optional, Callable, Set
+from typing import Tuple, Iterator, Dict, Optional, Callable, Set, Iterable
 
 import sys
 import os
@@ -120,18 +120,19 @@ class TrajectoriesDataset(data.Dataset):
             else:
                 return s.decode('ascii')
 
+        TrajId = Tuple[int, int]
         # Map (dataset_idx, traj_id) to its corresponding map
+        traj_id_map : Dict[TrajId, types.AllowedMapName]
         traj_id_map = {(dset_idx, traj_id): maybe_decode(fds[dset_idx].attrs['map_type'])
                        for dset_idx, traj_id in self.traj_ids}
 
-        self.map_names = maps
-        self.layout = MapLayout(self.map_names[0])
+        self.maps = { map_name : MapLayout(map_name) for map_name in maps }
 
-        traj_ids_per_map = {_: [] for _ in self.map_names}
+        traj_ids_per_map : Dict[types.AllowedMapName, List[TrajId]]
+        traj_ids_per_map = { map_name: [] for map_name in maps }
         for dset_idx, traj_id in self.traj_ids:
             map_name = traj_id_map[(dset_idx, traj_id)]
-            if map_name in self.map_names:
-                traj_ids_per_map[map_name].append((dset_idx, traj_id))
+            traj_ids_per_map[map_name].append((dset_idx, traj_id))
         self.traj_ids_per_map = traj_ids_per_map
 
         self.samples_per_map = {
@@ -147,7 +148,7 @@ class TrajectoriesDataset(data.Dataset):
             for map_name, traj_ids in traj_ids_per_map.items()}
 
         self.envs = env_cache
-        for map_name in self.map_names:
+        for map_name in self.maps:
             try:
                 self.envs.load(map_name)
             except KeyError: pass
@@ -246,7 +247,7 @@ class TrajectoriesDataset(data.Dataset):
         # return path_length
         goal_pos = list(dst_pos)
         src_pos = list(src_pos)
-        waypoints = self.layout.find_path(src_pos, goal_pos)
+        waypoints = self.maps[map_name].find_path(src_pos, goal_pos)
         if waypoints is None:
             return None
         path_l = path_length(waypoints)
@@ -283,7 +284,7 @@ class TrajectoriesDataset(data.Dataset):
             dst_sample = dst_traj[dst_idx]
 
             # return path_length
-            waypoints = self.layout.find_path(src_sample[0], dst_sample[0])
+            waypoints = self.maps[map_name].find_path(src_sample[0], dst_sample[0])
             # no path found between source and goal -> skip this sample
             if not waypoints:
                 print_debug("No path found.")
@@ -480,7 +481,7 @@ def create_and_save_reachability_samples(
             f.flush()
             bar.set_description(f"percentage reachable: {sum_r / (i-start_index+1)}")
             buffer = []
-    f.attrs.create('map_type', ','.join(env_model))
+    f.attrs.create('map_type', ','.join(map_names))
     return f
 
 
@@ -525,6 +526,19 @@ def display_samples(hf : h5py.File, imageplot=False):
         plotStartGoalDataset(env_model, starts_goals)
 
 
+class CompositeReachabilityEstimator(ReachabilityController):
+    def __new__(cls, controllers : Iterable[ReachabilityController]):
+        if len(controllers) == 1:
+            return next(controllers)
+        else:
+            return super().__new__(cls)
+    def __init__(self, controllers : Iterable[ReachabilityController]):
+        self.controllers = controllers
+    #override
+    def reachable(self, *args, **kwargs):
+        return any(controller.reachable(*args, **kwargs) for controller in self.controllers)
+
+
 if __name__ == "__main__":
     """ Generate a dataset of reachability samples or load from an existing one.
 
@@ -549,8 +563,8 @@ if __name__ == "__main__":
     parser.add_argument('--image-plot', action=argparse.BooleanOptionalAction, help='Show image of samples taken')
     parser.add_argument('-w', '--wall-colors', help='how to color the walls', choices=['1color', '3colors', 'patterns'], default='1color')
     parser.add_argument('--re',
-        choices=['view_overlap', 'network', 'distance', 'simulation'], default='view_overlap',
-        help='The reachability estimator to generate ground truth reachability values',
+        default='view_overlap',
+        help='The reachability estimator to generate ground truth reachability values. Choices: view_overlap, network, distance, simulation or combining multiple with | (OR)',
     )
     parser.add_argument('--gen', '--generate-point-pairs',
         choices=['same_traj', 'diff_traj', 'maybe_diff_traj', 'random', 'random_circle'], default='same_traj',
@@ -558,7 +572,10 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    re = ReachabilityController.factory(controller_type=args.re)
+    re = CompositeReachabilityEstimator([
+        ReachabilityController.factory(controller_type=controller_type)
+        for controller_type in args.re.split('|')
+    ])
 
     if args.wall_colors == '1color':
         textures = [ os.path.join( 'yellow_wall.png') ]
