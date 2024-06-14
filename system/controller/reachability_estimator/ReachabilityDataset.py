@@ -8,16 +8,16 @@ import bisect
 import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
+    import sys, os
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
 from system.plotting.plotResults import plotStartGoalDataset
-from system.bio_model.bc_network import bcActivityForLidar, BoundaryCellNetwork, HDCActivity, BoundaryCellActivity
+from system.bio_model.bc_network import bcActivityForLidar, BoundaryCellNetwork, HDCActivity
 from system.controller.reachability_estimator.types import Sample
-from system.controller.simulation.pybullet_environment import types, LidarReading
 
 import sys
 import os
-from typing import Tuple, Literal, Optional
+from typing import Literal, Optional
 from dataclasses import dataclass
 
 boundaryCellEncoder = BoundaryCellNetwork.load()
@@ -267,6 +267,6 @@ if __name__ == '__main__':
     filenames = [os.path.join(path, fn) for fn in filenames]
     combine_datasets(new_file, filenames, "/")
 
-    dataset = H5Dataset(new_file, external_link=False)
+    dataset = ReachabilityDataset(new_file, external_link=False)
     dataset.display_sample(0)
     dataset.display_dataset()
