@@ -14,7 +14,7 @@ import itertools
 import bisect
 import random
 import matplotlib.pyplot as plt
-from typing import Tuple, Iterator, Dict, Optional, Protocol, Callable
+from typing import Tuple, Iterator, Dict, Optional, Callable, Set
 
 import sys
 import os
@@ -88,12 +88,12 @@ class TrajectoriesDataset(data.Dataset):
         self.hd5_files = sorted(list(hd5_files))
 
         # open hd5 files
-        maps = []
+        maps : Set(types.AllowedMapName) = set()
         fds = []
         for fn in self.hd5_files:
             try:
                 fds.append(h5py.File(fn, 'r'))
-                maps.append(fds[-1].attrs["map_type"])
+                maps.update(fds[-1].attrs["map_type"].split(','))
             except:
                 print('unable to open', fn)
                 raise
@@ -125,13 +125,12 @@ class TrajectoriesDataset(data.Dataset):
                        for dset_idx, traj_id in self.traj_ids}
 
         self.map_names = maps
-        map_name_set = set(maps)
         self.layout = MapLayout(self.map_names[0])
 
         traj_ids_per_map = {_: [] for _ in self.map_names}
         for dset_idx, traj_id in self.traj_ids:
             map_name = traj_id_map[(dset_idx, traj_id)]
-            if map_name in map_name_set:
+            if map_name in self.map_names:
                 traj_ids_per_map[map_name].append((dset_idx, traj_id))
         self.traj_ids_per_map = traj_ids_per_map
 
@@ -425,10 +424,6 @@ def create_and_save_reachability_samples(
     rd : dataset to draw positions from
     """
 
-    env_model = samples.env_model()
-    print_debug("env_model: ", env_model)
-    f.attrs.create('map_type', env_model)
-
     dtype = Sample.dtype
 
     try:
@@ -449,16 +444,19 @@ def create_and_save_reachability_samples(
 
     sum_r = 0
     buffer = []
+    map_names = set()
 
     for i in (bar := tqdm(range(start_index, nr_samples), initial=start_index, total=nr_samples)):
         reachable = None
         while reachable is None:
             try:
                 sample, path_l, map_name = next(samples)
-            except ValueError:
+            except (ValueError, AssertionError):
                 tqdm.write(f"Error at sample {i}")
                 continue
 
+            if map_name not in map_names:
+                map_names.add(map_name)
             env = envs[map_name]
 
             if True: #try:
@@ -482,6 +480,7 @@ def create_and_save_reachability_samples(
             f.flush()
             bar.set_description(f"percentage reachable: {sum_r / (i-start_index+1)}")
             buffer = []
+    f.attrs.create('map_type', ','.join(env_model))
     return f
 
 
@@ -587,6 +586,15 @@ if __name__ == "__main__":
         filename = os.path.join(get_path(), "data", "reachability", args.basename + suffix + args.extension)
         filename = os.path.realpath(filename)
         f = h5py.File(filename, 'a')
+        for attribute, value in [
+            ('reachability_estimator', args.re),
+            ('sample_generator', args.gen),
+            ('wall_colors', args.wall_colors),
+        ]:
+            if attribute in f.attrs:
+                assert f.attrs[attribute] == value
+            else:
+                f.attrs.create(attribute, value)
 
         create_and_save_reachability_samples(
             samples, f,
