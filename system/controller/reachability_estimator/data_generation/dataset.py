@@ -14,7 +14,7 @@ import itertools
 import bisect
 import random
 import matplotlib.pyplot as plt
-from typing import Tuple, Iterator, Dict, Optional, Callable, Set, Iterable
+from typing import Tuple, Iterator, Dict, Optional, Callable, Set, List
 
 import sys
 import os
@@ -527,9 +527,9 @@ def display_samples(hf : h5py.File, imageplot=False):
 
 
 class CompositeReachabilityEstimator(ReachabilityController):
-    def __new__(cls, controllers : Iterable[ReachabilityController]):
+    def __new__(cls, controllers : List[ReachabilityController]):
         if len(controllers) == 1:
-            return next(controllers)
+            return controllers[0]
         else:
             return super().__new__(cls)
     def __init__(self, controllers : Iterable[ReachabilityController]):
