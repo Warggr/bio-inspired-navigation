@@ -476,18 +476,30 @@ class Robot:
         #rayFromPoint = self.position
 
         if obstacles:
-            point, obstacle_vector = self.calculate_obstacle_vector()
+            if self.env.visualize:
+                p.removeAllUserDebugItems()
 
-            if np.linalg.norm(np.array(goal_vector)) > 0:
-                normed_goal_vector = np.array(goal_vector) / np.linalg.norm(np.array(goal_vector))  # normalize goal_vector to a standard length of 1
+            BACKOFF_DISTANCE = 0.4
+            collision_data, _ = self.env.lidar(tactile_cone=np.radians(90), num_ray_dir=5, blind_spot_cone=0, agent_pos_orn=self.lidar_sensor_position, ray_length=BACKOFF_DISTANCE, draw_debug_lines=True)
+            if any(distance != -1 for distance in collision_data.distances):
+                goal_vector = - np.array(self.heading_vector())
             else:
-                normed_goal_vector = np.array([0.0, 0.0])
+                point, obstacle_vector = self.calculate_obstacle_vector()
+                #print(f"{self.position=}, {obstacle_vector=}, {goal_vector=}")
+                self.env.add_debug_line(self.position, np.array(self.position) + obstacle_vector, color=(1, 0, 0), width=3)
+                self.env.add_debug_line(self.position, np.array(self.position) + goal_vector, color=(0, 0, 0), width=3)
 
-            # combine goal and obstacle vector
-            multiple = 1 if vectors_in_one_direction(normed_goal_vector, obstacle_vector) else -1
-            if not intersect(self.position, normed_goal_vector, point, obstacle_vector * multiple):
-                multiple = 0
-            goal_vector = normed_goal_vector * combine + obstacle_vector * multiple
+                if np.linalg.norm(np.array(goal_vector)) > 0:
+                    normed_goal_vector = np.array(goal_vector) / np.linalg.norm(np.array(goal_vector))  # normalize goal_vector to a standard length of 1
+                else:
+                    normed_goal_vector = np.array([0.0, 0.0])
+
+                # combine goal and obstacle vector
+                multiple = 1 if vectors_in_one_direction(normed_goal_vector, obstacle_vector) else -1
+                if not intersect(self.position, normed_goal_vector, point, obstacle_vector * multiple):
+                    multiple = 0
+                goal_vector = normed_goal_vector * combine + obstacle_vector * multiple
+                print(f"base: {normed_goal_vector}, {combine=}, {multiple=}, combined: {goal_vector}", end='\r')
             self.env.add_debug_line(self.position, np.array(self.position) + goal_vector, color=(0, 0, 1), width=3)
 
         gains = self.compute_gains(goal_vector)
@@ -515,6 +527,10 @@ class Robot:
         linear_v, _ = p.getBaseVelocity(self.ID)
         return linear_v[0], linear_v[1]
 
+    def heading_vector(self) -> types.Vector2D:
+        _, current_angle = self.position_and_angle
+        return [np.cos(current_angle), np.sin(current_angle)]
+
     @property
     def lidar_sensor_position(self) -> types.PositionAndOrientation:
         linkWorldPosition, linkWorldOrientation, *_ignored_data = p.getLinkState(self.ID, 0) # position of chassis compared to base
@@ -534,13 +550,9 @@ class Robot:
 
     def compute_gains(self, goal_vector) -> Tuple[float, float]:
         """ computes the motor gains resulting from (inhibited) goal vector"""
-        _, current_angle = self.position_and_angle
-        current_heading = [np.cos(current_angle), np.sin(current_angle)]
-        diff_angle = compute_angle(current_heading, goal_vector) / np.pi
-
-        # threshold for turning: turning too sharply is not biologically accurate
-        if abs(diff_angle) > math.radians(30 / math.pi):
-            diff_angle = math.copysign(math.radians(30 / math.pi), diff_angle)
+        current_heading = self.heading_vector()
+        diff_angle = compute_angle(current_heading, goal_vector)
+        assert not np.isnan(diff_angle), (current_heading, goal_vector)
 
         gain = min(np.linalg.norm(goal_vector) * 5, 1)
         assert gain is not None
@@ -549,11 +561,25 @@ class Robot:
         if gain < 0.5:
             gain = 0
 
-        # For biologically inspired movement: only adjust course slightly
-        # TODO Johanna: Future Work: This restricts robot movement too severely
-        v_left = self.max_speed * (1 - diff_angle * 2) * gain
-        v_right = self.max_speed * (1 + diff_angle * 2) * gain
+        backwards = False
+        if abs(diff_angle) > math.radians(90):
+            backwards = True
+            diff_angle = -diff_angle + np.pi if diff_angle > 0 else -diff_angle - np.pi
 
+        # threshold for turning: turning too sharply is not biologically accurate
+        if abs(diff_angle) > math.radians(30):
+            diff_angle = math.copysign(math.radians(30), diff_angle)
+            v_right = self.max_speed * diff_angle * 2 * gain / np.pi
+            v_left = - v_right
+        else:
+            # For biologically inspired movement: only adjust course slightly
+            # TODO Johanna: Future Work: This restricts robot movement too severely
+            v_left = self.max_speed * (1 - diff_angle / np.pi * 2) * gain
+            v_right = self.max_speed * (1 + diff_angle / np.pi * 2) * gain
+
+        if backwards:
+            [v_left, v_right] = [-v_left, -v_right]
+        assert not np.isnan(v_left) and not np.isnan(v_right)
         return [v_left, v_right]
 
     def keyboard_simulation(self):
@@ -602,7 +628,27 @@ class Robot:
         self.env.step()
         self.save_snapshot(current_goal_vector)
 
+    def calculate_simple_normal_vector(self, lidar_data: Optional[Tuple[LidarReading, List[Vector2D]]] = None) -> Vector2D:
+        if lidar_data is None:
+            lidar_data = self.env.lidar(tactile_cone=120, num_ray_dir=21, blind_spot_cone=0, agent_pos_orn=self.lidar_sensor_position)
+        lidar, hit_points = lidar_data
+        hit_points = np.array(hit_points)
+        hit_points = hit_points[np.array(lidar.distances) != -1]
 
+        normal_vector : Vector2D = np.array([0.0, 0.0], dtype=float)
+        if len(hit_points) == 0:
+            return normal_vector
+
+        height = hit_points[0, 2] # they should all have the same height anyway
+        hit_points = hit_points[:, :2]
+        hit_points_egocentric = hit_points - self.position
+
+        for vector in hit_points_egocentric:
+            distance = np.linalg.norm(vector)
+            normal_vector += vector * (-1) / distance**2
+
+        self.env.add_debug_line([*self.position, height], [*(self.position + normal_vector), height], (0, 0, 1))
+        return normal_vector
 
     def calculate_obstacle_vector(self, lidar_data : Optional[Tuple[LidarReading, List[Vector2D]]] = None) -> Tuple[Vector2D, Vector2D]:
         """
@@ -668,8 +714,7 @@ class Robot:
             i += 1
             normed_goal_vector = np.array(goal_vector) / np.linalg.norm(np.array(goal_vector))
 
-            _, current_angle = self.position_and_angle
-            current_heading = [np.cos(current_angle), np.sin(current_angle)]
+            current_heading = self.heading_vector()
             diff_angle = compute_angle(current_heading, normed_goal_vector) / np.pi
 
             gain = min(np.linalg.norm(normed_goal_vector) * 5, 1)
