@@ -43,7 +43,7 @@ import pybullet_data
 import numpy as np
 import math
 import itertools
-from typing import List, Optional, Any, Tuple, Iterable, Callable
+from typing import List, Optional, Any, Tuple, Callable
 from random import Random
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../.."))
@@ -60,7 +60,7 @@ except AttributeError:
     from system.polyfill import batched
     itertools.batched = batched
 
-def closest_subsegment(values : List[float]) -> (int, int):
+def closest_subsegment(values : List[float]) -> Tuple[int, int]:
     values = np.array(values)
     if not np.any(values >= 0):
         return -1, -1
@@ -207,7 +207,7 @@ class PybulletEnvironment:
     def dimensions(self):
         return environment_dimensions(self.env_model)
 
-    def __load_walls(self, model_folder, textures : str | Callable[int, str] | List[str], nb_batches = None) -> int:
+    def __load_walls(self, model_folder, textures : str | Callable[int, str] | List[str], nb_batches = None) -> List[int]:
         MAXIMUM_BATCH_SIZE = 16 # bullet doesn't accept multibodies with >16 bodies
 
         wall_dir = os.path.join(model_folder, "walls")
@@ -590,7 +590,7 @@ class Robot:
             self._step(gains, None)
             self.env.camera()
 
-    def _step(self, gains : [float, float], current_goal_vector : Vector2D):
+    def _step(self, gains : Tuple[float, float], current_goal_vector : Optional[Vector2D]):
         # change speed
         p.setJointMotorControlArray(bodyUniqueId=self.ID,
                             jointIndices=[4, 6],
@@ -694,7 +694,7 @@ class Robot:
         p.removeBody(self.ID)
 
 class DatasetCollector:
-    DataPoint = Tuple[types.Vector2D, types.Angle, types.Vector2D, float, types.Vector2D]
+    DataPoint = Tuple[types.Vector2D, types.Angle, types.Vector2D, float, Optional[types.Vector2D]]
     class Index: # Namespace
         POSITION = 0
         ANGLE = 1
@@ -717,7 +717,7 @@ class DatasetCollector:
             self.images : list[Image] = [] 
 
 
-    def append(self, position : types.Vector2D, angle : types.Angle, speed : types.Vector2D, goal_vector : types.Vector2D):
+    def append(self, position : types.Vector2D, angle : types.Angle, speed : types.Vector2D, goal_vector : Optional[types.Vector2D]):
         self.data.append((
             np.array(position),
             angle,
@@ -739,7 +739,7 @@ class DatasetCollector:
     def __len__(self):
         return len(self.data)
 
-    def get_observations(self, deltaT = 3) -> List[any]: # TODO: how is this different from a types.Image?
+    def get_observations(self, deltaT = 3) -> List[Any]: # TODO: how is this different from a types.Image?
         # observations with context length k=10 and delta T = 3
         return self.images
         # observations = self.images[::3][-1:]
@@ -768,7 +768,7 @@ if __name__ == "__main__":
         env_model = "Savinov_val3"
 
     random = Random(0)
-    with PybulletEnvironment(env_model, visualize=True, realtime=True, start=[-0.5, 0],
+    with PybulletEnvironment(env_model, visualize=True, realtime=True, start=(-0.5, 0),
         wall_kwargs={
             'textures': lambda i: random.choice(all_possible_textures)
         }

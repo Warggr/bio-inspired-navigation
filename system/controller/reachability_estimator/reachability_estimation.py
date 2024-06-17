@@ -10,21 +10,23 @@
 import numpy
 import torch
 import numpy as np
-import tabulate
+# import tabulate
 
-import sys
 import os
 from abc import ABC, abstractmethod
-from typing import Type, Dict, Self
+from typing import Tuple, List
 import system.controller.reachability_estimator.networks as networks
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.bio_model.place_cell_model import PlaceCell
-from system.controller.reachability_estimator.types import ReachabilityController, PlaceInfo, types
+import system.types as types
+from system.controller.reachability_estimator.types import ReachabilityController, PlaceInfo
 
 try:
     from typing import override
 except ImportError:
     from system.polyfill import override
+
+Batch = networks.Batch
 
 def reachability_estimator_factory(type: str = 'distance', /, debug: bool = False, **kwargs) -> 'ReachabilityEstimator':
     """ Returns an instance of the reachability estimator interface
@@ -84,7 +86,7 @@ class ReachabilityEstimator(ReachabilityController):
         reachability_factor = self.reachability_factor(start, goal)
         return reachability_factor >= self.threshold_reachable
 
-    def get_reachability(self, start : PlaceInfo, goal : PlaceInfo) -> (bool, float):
+    def get_reachability(self, start : PlaceInfo, goal : PlaceInfo) -> Tuple[bool, float]:
         """ Determines whether two nodes are reachable based on the reachability threshold
 
         returns:
@@ -192,9 +194,6 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
 
     def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo) -> float:
         """ Predicts reachability value between two locations """
-        # types.Image format, returned by env.camera, has size (64x64x4) (channels last)
-        # while the NN expects (4x64x64) (channels first)
-
         args = [
             start.img, goal.img,
             start.spikings, goal.spikings,
@@ -203,10 +202,10 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         args = [ [arg] for arg in args ] # reachability_factor_batch expects batches / lists for each param
         return self.reachability_factor_batch(*args)[0]
 
-    def reachability_factor_batch(self, starts: [numpy.ndarray | torch.Tensor], goals: [numpy.ndarray | torch.Tensor],
-        src_spikings: [numpy.ndarray | torch.Tensor], goal_spikings: [numpy.ndarray | torch.Tensor],
-        src_lidar: numpy.ndarray, goal_lidar: numpy.ndarray,
-    ) -> [float]:
+    def reachability_factor_batch(self, starts: Batch[types.Image], goals: Batch[types.Image],
+        src_spikings: Batch[types.Spikings], goal_spikings: Batch[types.Spikings],
+        src_lidar: Batch[types.LidarReading], goal_lidar: Batch[types.LidarReading],
+    ) -> networks.Batch[float]:
         """ Predicts reachability for multiple location pairs
 
         arguments:
@@ -222,9 +221,9 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         """
 
         def get_prediction(
-            src_batch: [numpy.ndarray | torch.Tensor], dst_batch: [numpy.ndarray | torch.Tensor],
-            src_spikings: [numpy.ndarray], goal_spikings: [numpy.ndarray],
-            src_lidar: [numpy.ndarray], goal_lidar: [numpy.ndarray],
+            src_batch: Batch[types.Image], dst_batch: Batch[types.Image],
+            src_spikings: Batch[types.Spikings], goal_spikings: Batch[types.Spikings],
+            src_lidar: Batch[types.LidarReading], goal_lidar: Batch[types.LidarReading],
         ) -> networks.Batch[networks.Model.Prediction]:
             """ Helper function, main logic for predicting reachability for multiple location pairs """
             with torch.no_grad():
@@ -264,7 +263,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         assert len(starts) == len(goals)
         n = len(starts)
 
-        results : [networks.Model.Prediction] = []
+        results : List[networks.Model.Prediction] = []
         n_remaining = n
         batch_size = min(self.batch_size, len(starts))
         while n_remaining > 0:

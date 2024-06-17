@@ -254,7 +254,7 @@ class TrajectoriesDataset(data.Dataset):
 
         return map_name, src_sample, dst_sample, path_l
 
-    def _draw_sample_same_traj_multiple_tries(self, idx) -> (str, WaypointInfo, WaypointInfo, float):
+    def _draw_sample_same_traj_multiple_tries(self, idx) -> Tuple[str, WaypointInfo, WaypointInfo, float]:
         while True:
             result = self._draw_sample_same_traj(idx)
             if result is not None:
@@ -262,7 +262,7 @@ class TrajectoriesDataset(data.Dataset):
             else:
                 idx = (idx + self.rng.randint(1000)) % len(self)
 
-    def _draw_sample_diff_traj(self, idx) -> (str, WaypointInfo, WaypointInfo, float):
+    def _draw_sample_diff_traj(self, idx) -> Tuple[str, WaypointInfo, WaypointInfo, float]:
         """ Draw a source and goal sample from two different trajectories on the same map.
         
         returns:
@@ -292,7 +292,7 @@ class TrajectoriesDataset(data.Dataset):
             path_l = path_length(waypoints)
             return map_name, src_sample, dst_sample, path_l
 
-    def _draw_sample(self, idx, diff_traj_prob = 0.1) -> (str, WaypointInfo, WaypointInfo, float):
+    def _draw_sample(self, idx, diff_traj_prob = 0.1) -> Tuple[str, WaypointInfo, WaypointInfo, float]:
         # choose with probability p from same/different trajectory
         p = self.rng.uniform(0.0, 1.0)
 
@@ -306,6 +306,7 @@ class TrajectoriesDataset(data.Dataset):
             self.parent = parent
             self.parent_function = parent_function
             # parent_function is a method of parent which can return samples
+        def __iter__(self): return self
         def __next__(self) -> Tuple[Sample, float, str]:
             random_idx = random.randint(0, len(self.parent)-1)
             self.parent._init_once(random_idx)
@@ -366,7 +367,7 @@ class RandomSamples:
                 if self.map.suitable_position_for_robot(p):
                     break
             result.append(p)
-        return result
+        return tuple(result)
 
     def points_to_sample(self, p1 : Vector2D, p2 : Vector2D) -> Tuple[Sample, float, str]:
         waypoints = self.map.find_path(p1, p2)

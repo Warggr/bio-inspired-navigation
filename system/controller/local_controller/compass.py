@@ -1,5 +1,5 @@
 from system.types import Vector2D
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod, abstractmethod
 import numpy as np
 from typing import Optional
 
@@ -19,9 +19,9 @@ class Compass(ABC):
         """
         self.goal_pos = goal_pos
 
-    @abstractproperty
     @property
-    def arrival_threshold(self):
+    @abstractmethod
+    def arrival_threshold(self) -> float:
         ...
 
     @abstractmethod

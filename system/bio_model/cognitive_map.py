@@ -25,6 +25,7 @@ from system.bio_model.place_cell_model import PlaceCell, PlaceCellNetwork
 from system.controller.reachability_estimator.reachability_estimation import reachability_estimator_factory, \
     ReachabilityEstimator
 
+from typing import List
 
 def get_path_top() -> str:
     """ returns path to the folder of the current file """
@@ -69,7 +70,7 @@ class CognitiveMapInterface(ABC):
         """
         pass
 
-    def find_path(self, start: PlaceCell, goal: PlaceCell) -> [PlaceCell]:
+    def find_path(self, start: PlaceCell, goal: PlaceCell) -> List[PlaceCell]:
         """ Returns a path in the graph from start to goal nodes"""
         try:
             path = nx.shortest_path(self.node_network, source=start, target=goal)
@@ -263,7 +264,7 @@ class CognitiveMap(CognitiveMapInterface):
             self.print_debug("connecting finished")
 
     def track_vector_movement(self, pc_firing: [float], created_new_pc: bool, pc: PlaceCell, lidar: [float] = None, **kwargs):
-        """Keeps track of curren/t place cell firing and creation of new place cells"""
+        """Keeps track of current place cell firing and creation of new place cells"""
 
         # get the currently active place cell
         idx_pc_active = np.argmax(pc_firing)

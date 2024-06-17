@@ -21,11 +21,9 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from torchmetrics import MeanSquaredError
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, Iterable, Tuple, Self, TypeVar, Generic
+from typing import Dict, Tuple, List
 
-T = TypeVar('T')
-class Batch(Generic[T]): # only used for type hints - doesn't actually do anything
-    pass
+Batch = List # only used for type hints - doesn't actually do anything
 
 class AutoAdamOptimizer: # Sentinel value
     pass

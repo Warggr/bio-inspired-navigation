@@ -5,7 +5,7 @@ import numpy as np
 
 p = Path('system/controller/reachability_estimator/data/reachability')
 datasets = p.glob('dataset*.hd5*')
-datasets = filter(lambda f : not f.is_symlink(), datasets)
+datasets = filter(lambda f: not f.is_symlink(), datasets)
 for d in datasets:
     f = h5py.File(d)
     dset = f['positions']

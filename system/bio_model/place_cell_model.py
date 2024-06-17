@@ -23,7 +23,7 @@ if __name__ == "__main__":
 
 from system.plotting.plotHelper import add_environment, TUM_colors
 from system.types import Vector2D
-from typing import Optional
+from typing import Optional, List
 
 def get_path_top():
     """ returns path to topological data folder """
@@ -147,7 +147,7 @@ class PlaceCellNetwork:
         pc = PlaceCell(*args, **kwargs)
         self.place_cells.append(pc)
 
-    def in_range(self, reach: [float]) -> bool:
+    def in_range(self, reach: List[float]) -> bool:
         """ Determine whether one value meets the threshold """
         return any(reach_value > self.reach_estimator.threshold_same for reach_value in reach)
 

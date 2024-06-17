@@ -32,7 +32,7 @@ def print_debug(*params):
         print(*params)
 
 
-def waypoint_movement(path: [PlaceCell], env_model: str, gc_network: GridCellNetwork, pc_network: PlaceCellNetwork,
+def waypoint_movement(path: List[Vector2D], env_model: str, gc_network: GridCellNetwork, pc_network: PlaceCellNetwork,
                       cognitive_map: CognitiveMapInterface):
     """ Navigates the agent on the given path and builds the cognitive map.
         The local controller navigates the path analytically and updates the pc_network and the cognitive_map.

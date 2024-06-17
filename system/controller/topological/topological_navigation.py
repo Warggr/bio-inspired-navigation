@@ -190,7 +190,7 @@ class TopologicalNavigation(object):
 
 
 if __name__ == "__main__":
-    """ 
+    """
     Test navigation through the maze.
     The exploration should be completed before running this script. 
     """

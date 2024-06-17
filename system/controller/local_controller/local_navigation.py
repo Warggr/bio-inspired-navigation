@@ -27,7 +27,6 @@ from system.types import WaypointInfo, types
 
 import system.plotting.plotResults as plot
 import numpy as np
-from abc import abstractmethod
 from typing import Optional, List
 
 plotting = True  # if True: plot everything
@@ -49,17 +48,17 @@ class GoalVectorCache(Compass):
     def goal_pos(self):
         return self.impl.goal_pos
 
-    def reset(self, new_goal : Vector2D):
+    def reset(self, new_goal: Vector2D):
         self.impl.reset(new_goal)
         self.goal_vector = None
 
-    def __init__(self, impl : Compass, update_fraction = 0.5):
+    def __init__(self, impl: Compass, update_fraction=0.5):
         # intentionally don't call super().__init__() because we don't really need it
-        self.nr_ofsteps = 0 # we just need this line
+        self.nr_ofsteps = 0  # we just need this line
         self.impl = impl
-        self.update_fraction = update_fraction # how often the goal vector is recalculated
+        self.update_fraction = update_fraction  # how often the goal vector is recalculated
         self.goal_vector = None  # egocentric goal vector after last update
-        self.distance_to_goal_original = None # distance to goal after last recalculation
+        self.distance_to_goal_original = None  # distance to goal after last recalculation
 
     def calculate_goal_vector(self) -> Vector2D:
         if self.goal_vector is None:
@@ -68,7 +67,7 @@ class GoalVectorCache(Compass):
 
         return self.goal_vector
 
-    def update_position(self, robot : Robot):
+    def update_position(self, robot: Robot):
         distance_to_goal = np.linalg.norm(self.goal_vector)  # current length of goal vector
 
         if (
@@ -101,20 +100,20 @@ class GcCompass(Compass):
         **kwargs
     ):
         if mode == "pod":
-            return GoalVectorCache( PodGcCompass(pod_network, gc_network, *args, **kwargs) )
+            return GoalVectorCache(PodGcCompass(pod_network, gc_network, *args, **kwargs))
         if mode == "linear_lookahead":
-            return GoalVectorCache( LinearLookaheadGcCompass(arena_size, gc_network, *args, **kwargs) )
+            return GoalVectorCache(LinearLookaheadGcCompass(arena_size, gc_network, *args, **kwargs))
         elif mode == "combo":
             return ComboGcCompass(pod_network, gc_network, *args, **kwargs)
         else:
-            return ValueError(f"Unknown mode: {mode}. Expected one of: analytical, pod, linear_lookahead, combo")
+            raise ValueError(f"Unknown mode: {mode}. Expected one of: analytical, pod, linear_lookahead, combo")
 
 
 class PodGcCompass(GcCompass):
     arrival_threshold = 0.5
 
-    def __init__(self, pod_network : 'PhaseOffsetDetectorNetwork', *args, **kwargs):
-        if pod_network is None: # TODO Pierre this is ugly
+    def __init__(self, pod_network: Optional['PhaseOffsetDetectorNetwork'], *args, **kwargs):
+        if pod_network is None:  # TODO Pierre this is ugly
             pod_network = PhaseOffsetDetectorNetwork(16, 9, 40)
         super().__init__(*args, **kwargs)
         self.pod_network = pod_network
@@ -135,7 +134,7 @@ class LinearLookaheadGcCompass(GcCompass):
 
 
 class ComboGcCompass(GcCompass):
-    def __init__(self, pod_network : 'PhaseOffsetDetectorNetwork', gc_network : GridCellNetwork, *args, **kwargs):
+    def __init__(self, pod_network : Optional['PhaseOffsetDetectorNetwork'], gc_network : GridCellNetwork, *args, **kwargs):
         super().__init__(gc_network, *args, **kwargs)
         # self.gc_network = gc_network # already done by the super().__init__
         self.pod_network = pod_network
@@ -227,7 +226,7 @@ def setup_gc_network(dt) -> GridCellNetwork:
 def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : GridCellNetwork, target_gc_spiking=None,
     step_limit=float('inf'), plot_it=False,
                       collect_data_freq=False, collect_data_reachable=False, exploration_phase=False,
-    pc_network: PlaceCellNetwork = None, cognitive_map: CognitiveMapInterface = None,
+    pc_network: Optional[PlaceCellNetwork] = None, cognitive_map: Optional[CognitiveMapInterface] = None,
     *nav_args, **nav_kwargs
 ):
     """
