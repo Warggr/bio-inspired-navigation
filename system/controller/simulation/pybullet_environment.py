@@ -450,7 +450,7 @@ class Robot:
         self.data_collector = DatasetCollector(frame_limit=frame_limit, collectImages=build_data_set)
 
         goal_vector=compass.calculate_goal_vector() if compass else np.array([0, 0])
-        self.save_position_and_speed(goal_vector=goal_vector)  # save initial configuration
+        self.save_snapshot(goal_vector=goal_vector)  # save initial configuration
 
         self.mapping = 1.5  # see local_navigation experiments
 
@@ -495,9 +495,6 @@ class Robot:
         self._step(gains, goal_vector)
         #print(f'{self.position=}')
 
-        if self.buildDataSet:
-            self.data_collector.images.append(self.env.camera())
-
     @property
     def position_and_angle(self) -> Tuple[types.Vector2D, types.Angle]:
         # Possible improvement: check if retrieving last value from data_collector is faster
@@ -526,10 +523,12 @@ class Robot:
         angle = p.getEulerFromQuaternion(linkWorldOrientation)[2]
         return linkWorldPosition, angle
 
-    def save_position_and_speed(self, goal_vector : types.Vector2D):
+    def save_snapshot(self, goal_vector : Optional[types.Vector2D]):
         position, angle = self.position_and_angle
         linear_v = self.xy_speed
         self.data_collector.append(position, angle, linear_v, goal_vector)
+        if self.buildDataSet:
+            self.data_collector.images.append(self.env.camera((position, angle)))
 
     def compute_gains(self, goal_vector) -> Tuple[float, float]:
         """ computes the motor gains resulting from (inhibited) goal vector"""
@@ -598,11 +597,11 @@ class Robot:
                             targetVelocities=gains,
                             forces=[10, 10])
         self.env.step()
+        self.save_snapshot(current_goal_vector)
 
         #print("  new position:", self.position)
         #print("  new speed:", self.xy_speed)
 
-        self.save_position_and_speed(current_goal_vector)
 
     ''' Calculates the obstacle_vector from the ray distances'''
     def calculate_obstacle_vector(self, lidar_data : Optional[Tuple[LidarReading, List[Vector2D]]] = None):
