@@ -17,9 +17,12 @@ from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.controller.simulation.pybullet_environment import PybulletEnvironment
 from system.controller.local_controller.local_navigation import vector_navigation, setup_gc_network
 from system.controller.local_controller.compass import AnalyticalCompass
-from system.bio_model.place_cell_model import PlaceCellNetwork, PlaceCell
+from system.bio_model.place_cell_model import PlaceCellNetwork
 from system.bio_model.cognitive_map import LifelongCognitiveMap, CognitiveMapInterface
 import system.plotting.plotResults as plot
+
+from typing import List
+from system.types import Vector2D
 
 plotting = True  # if True: plot paths
 debug = True  # if True: print debug output

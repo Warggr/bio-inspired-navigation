@@ -258,10 +258,11 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
     robot = env.robot
     assert robot is not None
 
+    # TODO Pierre: do this before the call
     if gc_network and (target_gc_spiking is not None):
         gc_network.set_as_target_state(target_gc_spiking)
 
-    robot.nr_ofsteps = 0
+    # robot.nr_ofsteps = 0
     goal_vector = compass.calculate_goal_vector()
     robot.turn_to_goal(goal_vector)
 

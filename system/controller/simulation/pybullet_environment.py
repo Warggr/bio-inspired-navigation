@@ -340,10 +340,11 @@ class PybulletEnvironment:
         if self.visualize:
             time.sleep(self.dt / 5)
 
-        # position, angle = p.getBasePositionAndOrientation(self.robot.ID)
-        # linear_v, _ = p.getBaseVelocity(self.robot.ID)
-        # print("  new position:", position)
-        # print("  new speed:", linear_v)
+    def step_forever(self, slowdown = 1):
+        while True:
+            p.stepSimulation()
+            if self.visualize:
+                time.sleep(self.dt * slowdown / 5)
 
     def detect_maze_agent_contact(self):
         """ true, if the robot is in contact with the maze """
@@ -490,6 +491,7 @@ class Robot:
             self.env.add_debug_line(self.position, np.array(self.position) + goal_vector, color=(0, 0, 1), width=3)
 
         gains = self.compute_gains(goal_vector)
+        assert not np.any(np.isnan(gains))
 
         #print(f'Step({gains=})', end='\t')
         self._step(gains, goal_vector)
@@ -541,6 +543,7 @@ class Robot:
             diff_angle = math.copysign(math.radians(30 / math.pi), diff_angle)
 
         gain = min(np.linalg.norm(goal_vector) * 5, 1)
+        assert gain is not None
 
         # If close to the goal do not move
         if gain < 0.5:
@@ -599,12 +602,16 @@ class Robot:
         self.env.step()
         self.save_snapshot(current_goal_vector)
 
-        #print("  new position:", self.position)
-        #print("  new speed:", self.xy_speed)
 
 
-    ''' Calculates the obstacle_vector from the ray distances'''
-    def calculate_obstacle_vector(self, lidar_data : Optional[Tuple[LidarReading, List[Vector2D]]] = None):
+    def calculate_obstacle_vector(self, lidar_data : Optional[Tuple[LidarReading, List[Vector2D]]] = None) -> Tuple[Vector2D, Vector2D]:
+        """
+        Calculates the obstacle_vector from the ray distances.
+
+        Returns:
+            p: the first point on the obstacle line
+            v: the direction vector of the obstacle
+        """
         if lidar_data is None:
             lidar_data = self.env.lidar(tactile_cone=120, num_ray_dir=21, blind_spot_cone=0, agent_pos_orn=self.lidar_sensor_position, ray_length=1)
         lidar, hit_points = lidar_data
@@ -682,7 +689,7 @@ class Robot:
             else:
                 v_left = 0
 
-            gains = [v_left, -v_left]
+            gains = (v_left, -v_left)
 
             self._step(gains, goal_vector)
 

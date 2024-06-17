@@ -95,6 +95,7 @@ class TopologicalNavigation(object):
 
         compass = Compass.factory(self.method, gc_network=self.gc_network, pod_network=self.pod)
 
+        # TODO Pierre: make env required, use "with Robot"
         if env is None:
             env = PybulletEnvironment(self.env_model, build_data_set=True, start=src_pos)
         else:
