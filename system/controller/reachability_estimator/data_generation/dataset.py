@@ -533,7 +533,7 @@ class CompositeReachabilityEstimator(ReachabilityController):
             return controllers[0]
         else:
             return super().__new__(cls)
-    def __init__(self, controllers : Iterable[ReachabilityController]):
+    def __init__(self, controllers : List[ReachabilityController]):
         self.controllers = controllers
     #override
     def reachable(self, *args, **kwargs):

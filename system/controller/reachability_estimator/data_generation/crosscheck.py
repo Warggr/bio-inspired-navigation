@@ -58,13 +58,13 @@ if __name__ == "__main__":
     """
     import argparse
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('re_types',
         nargs=2,
         choices=['view_overlap', 'network', 'distance', 'simulation'],
         help='RE algorithms to compare',
     )
-    parser.add_argument('-n', '--num-samples', type=int, default=400)
+    parser.add_argument('-n', '--num-samples', type=int, default=400, help='Number of samples on which to test')
     parser.add_argument('-w', '--wall-colors', help='how to color the walls', choices=['1color', '3colors', 'patterns'], default='1color')
     parser.add_argument('--gen', '--generate-point-pairs',
         choices=['same_traj', 'diff_traj', 'maybe_diff_traj', 'random', 'random_circle'], default='same_traj',
