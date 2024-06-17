@@ -32,6 +32,8 @@ def compute_angle(vec_1 : Vector2D, vec_2 : Vector2D) -> Angle:
     dot_product = np.dot(unit_vector_1, unit_vector_2)
     dot_product = np.clip(dot_product, -1, 1) # it should be already, but due to numerical instabilities it might be e.g. -1.00002
     angle = np.arccos(dot_product)
+    if angle == np.radians(180):
+        return angle
 
     vec = np.cross([vec_1[0], vec_1[1], 0], [vec_2[0], vec_2[1], 0])
 
