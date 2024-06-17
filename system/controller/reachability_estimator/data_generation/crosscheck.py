@@ -1,5 +1,7 @@
+import os
+
 if __name__ == "__main__":
-    import sys, os
+    import sys
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 from system.controller.reachability_estimator.types import ReachabilityController
 from dataset import SampleGenerator, get_path, TrajectoriesDataset
@@ -76,6 +78,7 @@ if __name__ == "__main__":
     if args.wall_colors == '1color':
         textures = [ os.path.join( 'yellow_wall.png') ]
     elif args.wall_colors == '3colors':
+        from system.controller.simulation.pybullet_environment import all_possible_textures
         textures = all_possible_textures[:args.wall_colors]
     elif args.wall_colors == 'patterns':
         textures = lambda i : f'pattern-{i+1}.png'
@@ -89,8 +92,10 @@ if __name__ == "__main__":
             samples = rd.iterate(mode=args.gen)
         else:
             if args.gen == 'random':
+                from system.controller.reachability_estimator.data_generation.dataset import RandomSamples
                 samples = RandomSamples(env_cache["Savinov_val3"])
             elif args.gen == 'random_circle':
+                from system.controller.reachability_estimator.data_generation.dataset import RandomSamplesWithLimitedDistance
                 samples = RandomSamplesWithLimitedDistance(env_cache["Savinov_val3"])
             else: raise ValueError(args.gen)
 
