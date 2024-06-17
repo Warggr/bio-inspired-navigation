@@ -183,6 +183,7 @@ def create_gc_spiking(start : Vector2D, goal : Vector2D) -> types.Spikings:
 
     with PybulletEnvironment("plane", start=start) as env:
         robot = env.robot
+        assert robot is not None
 
         # Grid-Cell Initialization
         gc_network = setup_gc_network(env.dt)
@@ -255,6 +256,7 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
 
     data : List[WaypointInfo] = []
     robot = env.robot
+    assert robot is not None
 
     if gc_network and (target_gc_spiking is not None):
         gc_network.set_as_target_state(target_gc_spiking)
@@ -275,12 +277,17 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
     while n < step_limit and not goal_reached:
         if True: #try:
             goal_reached = compass.step(robot, *nav_args, **nav_kwargs)
+            # TODO: feature suggestion: attach "nav step hooks" to the robot
+            # so that we could run gc_network.track_movement and e.g. buildDataSet automatically
+            if robot.buildDataSet:
+                assert len(robot.data_collector.images) != 0
             gc_network.track_movement(robot.xy_speed)
         #except compass.RobotStuck:
         #    break
 
         if pc_network is not None and cognitive_map is not None:
             observations = robot.data_collector.get_observations()
+            assert len(observations) != 0
             [firing_values, created_new_pc] = pc_network.track_movement(gc_network, observations,
                                                                         robot.position, exploration_phase)
 

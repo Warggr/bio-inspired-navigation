@@ -53,6 +53,8 @@ class Compass(ABC):
         if np.linalg.norm(goal_vector) == 0:
             return True
         robot.navigation_step(goal_vector, *args, **kwargs)
+        if robot.buildDataSet:
+            assert len(robot.data_collector.images) > 0
         self.update_position(robot)
         return self.reached_goal()
 

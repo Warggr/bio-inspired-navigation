@@ -741,6 +741,7 @@ class DatasetCollector:
 
     def get_observations(self, deltaT = 3) -> List[Any]: # TODO: how is this different from a types.Image?
         # observations with context length k=10 and delta T = 3
+        assert len(self.images) != 0
         return self.images
         # observations = self.images[::3][-1:]
         # return [np.transpose(observation[2], (2, 0, 1)) for observation in observations]
