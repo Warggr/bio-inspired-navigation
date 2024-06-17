@@ -270,7 +270,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
             batch_indices = slice(n - n_remaining, n - n_remaining + batch_size)
             batch_args = [
                 batch[batch_indices] if batch is not None else None
-                for batch in [starts, goals, src_spikings, goal_spikings, src_distances]
+                for batch in [starts, goals, src_spikings, goal_spikings, src_lidar, goal_lidar]
             ] # TODO Pierre: this is ugly
             results.append(
                 get_prediction(*batch_args)[0]

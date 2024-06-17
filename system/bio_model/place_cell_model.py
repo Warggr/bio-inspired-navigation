@@ -206,7 +206,7 @@ class PlaceCellNetwork:
 
 
 if __name__ == '__main__':
-    from system.controller.local_controller.local_navigation import setup_gc_network, vector_navigation
+    from system.controller.local_controller.local_navigation import setup_gc_network, vector_navigation, ComboGcCompass
     from system.bio_model.cognitive_map import LifelongCognitiveMap
     from system.controller.local_controller.decoder.phase_offset_detector import PhaseOffsetDetectorNetwork
     from system.controller.simulation.pybullet_environment import PybulletEnvironment
@@ -227,10 +227,11 @@ if __name__ == '__main__':
     to = random.choice(list(cognitive_map.node_network.nodes))
     env = PybulletEnvironment(env_model, visualize=False, mode="combo", build_data_set=True,
                               start=list(fr.env_coordinates))
+    compass = ComboGcCompass(pod, gc_network, goal_pos=to.pos)
     gc_network.set_as_current_state(fr.gc_connections)
-    stop, pc = vector_navigation(env, list(to.env_coordinates), gc_network, to.gc_connections, model="combo",
+    stop, pc = vector_navigation(env, compass, gc_network, to.gc_connections, model="combo",
                                  obstacles=True, exploration_phase=False, pc_network=pc_network,
-                                 pod=pod, cognitive_map=cognitive_map, plot_it=True, step_limit=1000)
+                                 cognitive_map=cognitive_map, plot_it=True, step_limit=1000)
 
     fig, ax = plt.subplots()
 

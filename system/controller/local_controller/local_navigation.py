@@ -164,7 +164,7 @@ class ComboGcCompass(GcCompass):
         goal_reached = self.impl.reached_goal()
         if goal_reached and type(self.impl) == PodGcCompass:
             # switch from pod to linear lookahead
-            self.impl = LinearLookaheadGcCompass(gc_network=self.gc_network, goal_pos=self.impl.goal_pos)
+            self.impl = LinearLookaheadGcCompass(arena_size=robot.env.arena_size, gc_network=self.gc_network, goal_pos=self.impl.goal_pos)
             self.impl = GoalVectorCache(self.impl)
             self.impl.update_position(robot)
             goal_vector = self.impl.calculate_goal_vector()
@@ -317,7 +317,7 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
         return goal_reached, [sample_after_turn, first_goal_vector]
 
     if not last_pc and not exploration_phase and pc_network:
-        pc_network.create_new_pc(gc_network.consolidate_gc_spiking(), observations, env.xy_coordinates[-1])
+        pc_network.create_new_pc(gc_network.consolidate_gc_spiking(), observations, robot.position)
         last_pc = pc_network.place_cells[-1]
     return goal_reached, last_pc
 
