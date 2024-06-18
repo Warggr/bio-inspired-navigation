@@ -14,7 +14,7 @@ import numpy as np
 
 import os
 from abc import ABC, abstractmethod
-from typing import Tuple, List
+from typing import Iterable, Self, Tuple, List
 import system.controller.reachability_estimator.networks as networks
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.bio_model.place_cell_model import PlaceCell
@@ -192,19 +192,37 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         re.backbone = backbone
         return re
 
+    dtype = np.dtype([
+        ('src_image', (np.int32, (64, 64, 4))),
+        ('dst_image', (np.int32, (64, 64, 4))),
+        ('src_spikings', (np.float32, (6, 1600))),
+        ('dst_spikings', (np.float32, (6, 1600))),
+        ('src_lidar', (np.float32, types.LidarReading.DEFAULT_NUMBER_OF_ANGLES)),
+        ('dst_lidar', (np.float32, types.LidarReading.DEFAULT_NUMBER_OF_ANGLES)),
+    ])
+
+    @classmethod
+    def to_batch(cls, p: PlaceInfo, q: PlaceInfo):
+        args = (
+            p.img, q.img,
+            p.spikings, q.spikings,
+            p.lidar, q.lidar,
+        )
+        return np.array([args], dtype=cls.dtype)
+
+    def is_same_batch(self, p: PlaceInfo, q: Iterable[PlaceInfo]) -> Batch[bool]:
+        batches: List[Batch['NetworkReachabilityEstimator.dtype']] = [self.to_batch(p, qi) for qi in q]
+        if batches == []: return []
+        args_batch = np.concatenate(batches, axis=0)
+        return self.reachability_factor_batch(args_batch) >= self.threshold_same
+
     def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo) -> float:
         """ Predicts reachability value between two locations """
-        args = [
-            start.img, goal.img,
-            start.spikings, goal.spikings,
-            start.lidar, goal.lidar,
-        ]
-        args = [ [arg] for arg in args ] # reachability_factor_batch expects batches / lists for each param
-        return self.reachability_factor_batch(*args)[0]
+        args = self.to_batch(start, goal)
+        return self.reachability_factor_batch(args)[0]
 
-    def reachability_factor_batch(self, starts: Batch[types.Image], goals: Batch[types.Image],
-        src_spikings: Batch[types.Spikings], goal_spikings: Batch[types.Spikings],
-        src_lidar: Batch[types.LidarReading], goal_lidar: Batch[types.LidarReading],
+    def reachability_factor_batch(self,
+        data : np.ndarray['NetworkReachabilityEstimator.dtype']
     ) -> networks.Batch[float]:
         """ Predicts reachability for multiple location pairs
 
@@ -221,32 +239,18 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         """
 
         def get_prediction(
-            src_batch: Batch[types.Image], dst_batch: Batch[types.Image],
-            src_spikings: Batch[types.Spikings], goal_spikings: Batch[types.Spikings],
-            src_lidar: Batch[types.LidarReading], goal_lidar: Batch[types.LidarReading],
+            data: Batch['NetworkReachabilityEstimator.dtype']
         ) -> networks.Batch[networks.Model.Prediction]:
+            src_batch, goal_batch = data['src_image'], data['dst_image']
+            src_spikings, goal_spikings = data['src_spikings'], data['dst_spikings']
+            src_lidar, goal_lidar = data['src_lidar'], data['dst_lidar']
+
             """ Helper function, main logic for predicting reachability for multiple location pairs """
             with torch.no_grad():
-                if isinstance(src_batch[0], np.ndarray):
-                    src_batch = np.array(src_batch)
-                    if self.config.with_grid_cell_spikings:
-                        src_spikings = np.array(src_spikings)
-                elif isinstance(src_batch[0], torch.Tensor):
-                    if not isinstance(src_batch, torch.Tensor):
-                        src_batch = torch.stack(src_batch)
-                else:
-                    raise RuntimeError('Unsupported datatype: %s' % type(src_batch[0]))
-                if isinstance(dst_batch[0][0], np.ndarray):
-                    dst_batch = np.array(dst_batch)
-                    if self.config.with_grid_cell_spikings:
-                        goal_spikings = np.array(goal_spikings)
-                elif isinstance(dst_batch[0][0], torch.Tensor):
-                    if not isinstance(dst_batch, torch.Tensor):
-                        dst_batch = torch.stack(dst_batch)
-                else:
-                    raise RuntimeError('Unsupported datatype: %s' % type(dst_batch[0]))
-
                 additional_info = {}
+                if self.config.images:
+                    additional_info['batch_src_images'] = torch.from_numpy(src_batch).float()
+                    additional_info['batch_dst_images'] = torch.from_numpy(goal_batch).float()
                 if self.config.with_grid_cell_spikings:
                     additional_info['batch_src_spikings'] = torch.from_numpy(src_spikings).float()
                     additional_info['batch_dst_spikings'] = torch.from_numpy(goal_spikings).float()
@@ -255,28 +259,19 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
                     additional_info['batch_dst_lidar'] = torch.from_numpy(goal_lidar).float()
 
                 return self.backbone.get_prediction(
-                    torch.from_numpy(src_batch).float(),
-                    torch.from_numpy(dst_batch).float(),
                     **additional_info
                 )
 
-        assert len(starts) == len(goals)
-        n = len(starts)
+        n = len(data)
 
-        results : List[networks.Model.Prediction] = []
+        results : np.ndarray[float] = np.array([])
         n_remaining = n
-        batch_size = min(self.batch_size, len(starts))
+        batch_size = min(self.batch_size, n)
         while n_remaining > 0:
-            batch_indices = slice(n - n_remaining, n - n_remaining + batch_size)
-            batch_args = [
-                batch[batch_indices] if batch is not None else None
-                for batch in [starts, goals, src_spikings, goal_spikings, src_lidar, goal_lidar]
-            ] # TODO Pierre: this is ugly
-            results.append(
-                get_prediction(*batch_args)[0]
-            )
+            predictions = get_prediction(data[n-n_remaining:n-n_remaining+batch_size])[0]
+            results = np.concatenate([results, predictions], axis=0)
             n_remaining -= batch_size
-        return torch.cat(results, dim=0).data.cpu().numpy()
+        return results
 
     def get_connectivity_probability(self, reachability_factor):
         """ Converts output of the network into connectivity factor """

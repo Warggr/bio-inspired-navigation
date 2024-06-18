@@ -486,7 +486,10 @@ class LifelongCognitiveMap(CognitiveMapInterface):
     def is_mergeable(self, p: PlaceCell) -> (bool, [bool]):
         """ Helper function. Checks if the waypoint p is mergeable with the existing graph"""
         mergeable_values = [self.reach_estimator.is_same(p, q) for q in self.node_network.nodes]
-        return any(self.reach_estimator.is_same(p, q) for q in self.node_network.nodes), mergeable_values
+        try:
+            return np.any(self.reach_estimator.is_same_batch(p, self.node_network.nodes)), mergeable_values
+        except AttributeError:
+            return any(self.reach_estimator.is_same(p, q) for q in self.node_network.nodes), mergeable_values
 
     def postprocess_vector_navigation(self, node_p: PlaceCell, node_q: PlaceCell, observation_p: PlaceCell,
                                       observation_q: PlaceCell, success: bool):
