@@ -358,6 +358,8 @@ class PybulletEnvironment:
 
     def add_debug_line(self, start, end, color, width=1, height=None):
         """ add line into visualization """
+        if not DEBUG:
+            return
         if len(start) == 2 or height:
             height = height or 1
             start = [*start, height]; end = [*end, height]
@@ -368,6 +370,7 @@ class PybulletEnvironment:
         self,
         agent_pos_orn : Optional[types.PositionAndOrientation] = None,
         ray_length = WHISKER_LENGTH,
+        draw_debug_lines = False,
         **angle_args
     ) -> Tuple[LidarReading, List[Vector2D]]:
         """
@@ -376,7 +379,7 @@ class PybulletEnvironment:
         returns: (distances, angles, hitpoints)
         """
 
-        if self.visualize:
+        if self.visualize and draw_debug_lines:
             p.removeAllUserDebugItems()  # removes raylines
 
         ray_return = []
@@ -407,14 +410,15 @@ class PybulletEnvironment:
             hit_object_uid = hit[0]
 
             if hit_object_uid < 0:
-                #if i == 0:
-                #    self.add_debug_line(start, end, (0, 0, 0))
+                if draw_debug_lines:
+                    self.add_debug_line(start, end, (0, 0, 0))
                 ray_return.append(-1)
             else:
                 if self.robot:
                     assert hit_object_uid != self.robot.ID
                 hitPosition = hit[3]
-                self.add_debug_line(start, end, rayHitColor)
+                if draw_debug_lines:
+                    self.add_debug_line(start, end, rayHitColor)
                 distance = math.sqrt((hitPosition[0] - start[0]) ** 2 + (hitPosition[1] - start[1]) ** 2)
                 assert 0 <= distance and distance <= 1
                 ray_return.append(distance)
