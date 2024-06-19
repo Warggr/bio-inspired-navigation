@@ -201,7 +201,7 @@ def create_gc_spiking(start : Vector2D, goal : Vector2D) -> types.Spikings:
             if np.linalg.norm(goal_vector) == 0:
                 break
             robot.navigation_step(goal_vector, obstacles=False)
-            compass.update_position(robot.position)
+            compass.update_position(robot)
             gc_network.track_movement(robot.xy_speed)
             reached_goal = compass.reached_goal()
 
