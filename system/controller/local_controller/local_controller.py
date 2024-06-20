@@ -1,0 +1,106 @@
+import numpy as np
+from system.utils import normalize
+from system.controller.simulation.math_utils import vectors_in_one_direction, intersect, compute_angle
+
+from abc import ABC
+from system.types import Vector2D
+from typing import Optional, List, Callable
+
+ResetGoalHook = Callable[[Vector2D, 'Robot'], None]
+TransformGoalHook = Callable[[Vector2D, 'Robot'], Vector2D]
+
+class LocalController(ABC):
+    """
+    Class that performs navigation.
+    """
+    def __init__(
+        self, robot : 'Robot', compass : 'Compass',
+        on_reset_goal : List[ResetGoalHook] = [],
+        transform_goal_vector : List[TransformGoalHook] = [],
+    ):
+        """
+        Parameters:
+        robot   -- the robot to move
+        compass -- indicates the direction of the goal
+        """
+
+        self.robot = robot
+        self.compass = compass
+
+        self.on_reset_goal = on_reset_goal
+        self.transform_goal_vector = transform_goal_vector
+
+    @staticmethod
+    def default(robot: 'Robot', compass: 'Compass', obstacles=True):
+        return LocalController(robot, compass, on_reset_goal=[ TurnToGoal() ], transform_goal_vector=([ObstacleAvoidance()] if obstacles else []))
+
+    def reset_goal(self, new_goal : Vector2D):
+        self.compass.reset(new_goal)
+        for hook in self.on_reset_goal:
+            hook(new_goal, self.robot)
+
+    def step(self) -> bool:
+        goal_vector = self.compass.calculate_goal_vector()
+        if np.linalg.norm(goal_vector) == 0:
+            return True
+
+        for hook in self.transform_goal_vector:
+            goal_vector = hook(goal_vector, self.robot)
+
+        self.robot.navigation_step(goal_vector)
+        self.compass.update_position(self.robot)
+        return self.compass.reached_goal()
+
+
+class ObstacleAvoidance:
+    def __init__(
+        self,
+        combine = 1.5,
+        num_ray_dir = 21,
+        tactile_cone = 120,
+        ray_length = 1,
+    ):
+        self.combine = combine
+        self.lidar_kwargs = dict(tactile_cone=tactile_cone, num_ray_dir=num_ray_dir, ray_length=ray_length)
+
+    def __call__(self, goal_vector : Vector2D, robot: 'Robot') -> Vector2D:
+        lidar = robot.env.lidar(**self.lidar_kwargs, blind_spot_cone=0, agent_pos_orn=robot.lidar_sensor_position)
+        point, obstacle_vector = robot.calculate_obstacle_vector(lidar)
+        #print(f"{self.position=}, {obstacle_vector=}, {goal_vector=}")
+        robot.env.add_debug_line(robot.position, np.array(robot.position) + obstacle_vector, color=(1, 0, 0), width=3)
+        robot.env.add_debug_line(robot.position, np.array(robot.position) + goal_vector, color=(0, 0, 0), width=3)
+
+        normed_goal_vector = normalize(goal_vector)
+
+        # combine goal and obstacle vector
+        multiple = 1 if vectors_in_one_direction(normed_goal_vector, obstacle_vector) else -1
+        if not intersect(robot.position, normed_goal_vector, point, obstacle_vector * multiple):
+            multiple = 0
+        goal_vector = normed_goal_vector * self.combine + obstacle_vector * multiple
+        robot.env.add_debug_line(robot.position, np.array(robot.position) + goal_vector, color=(0, 0, 1), width=3)
+        return goal_vector
+
+
+class ObstacleBackoff:
+    def __init__(self, backoff_distance = 0.4):
+        self.backoff_distance = backoff_distance
+    def __call__(self, goal_vector: Vector2D, robot: 'Robot') -> Optional[Vector2D]:
+        collision_data, _ = robot.env.lidar(
+            tactile_cone=np.radians(40),
+            num_ray_dir=5,
+            blind_spot_cone=0,
+            agent_pos_orn=robot.lidar_sensor_position,
+            ray_length=self.backoff_distance,
+            draw_debug_lines=True
+        )
+        if any(distance != -1 for distance in collision_data.distances):
+            return - np.array(robot.heading_vector())
+        else:
+            return goal_vector
+
+
+class TurnToGoal:
+    def __init__(self, tolerance = 0.05):
+        self.tolerance = tolerance
+    def __call__(self, goal_vector : Vector2D, robot: 'Robot'):
+        robot.turn_to_goal(goal_vector, tolerance=self.tolerance)

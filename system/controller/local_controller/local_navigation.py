@@ -23,6 +23,7 @@ from system.controller.simulation.math_utils import Vector2D
 from system.bio_model.grid_cell_model import GridCellNetwork
 from system.controller.simulation.pybullet_environment import PybulletEnvironment, Robot
 from system.controller.local_controller.compass import Compass, AnalyticalCompass
+from system.controller.local_controller.local_controller import LocalController, ObstacleAvoidance, TurnToGoal
 from system.types import WaypointInfo, types
 from system.utils import normalize
 
@@ -224,12 +225,11 @@ def setup_gc_network(dt) -> GridCellNetwork:
     return gc_network
 
 
-def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : GridCellNetwork, target_gc_spiking=None,
+def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : GridCellNetwork, controller: Optional[LocalController] = None, target_gc_spiking=None,
     step_limit=float('inf'), plot_it=False,
                       collect_data_freq=False, collect_data_reachable=False, collect_nr_steps=False, exploration_phase=False,
     pc_network: Optional[PlaceCellNetwork] = None, cognitive_map: Optional[CognitiveMapInterface] = None,
     goal_pos: Optional[Vector2D] = None,
-    *nav_args, **nav_kwargs
 ) -> Tuple[bool, Any]:
     """
     Agent navigates towards goal.
@@ -237,6 +237,7 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
     arguments:
     env                    --  running PybulletEnvironment
     compass                --  A Compass pointing to the goal
+    controller             --  An algorithm for local control and obstacle avoidance
     gc_network             --  grid cell network used for navigation (pod, linear_lookahead, combo)
                                or grid cell spiking generation (analytical)
     gc_spiking             --  grid cell spikings at the goal (pod, linear_lookahead, combo)
@@ -261,6 +262,9 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
     robot = env.robot
     assert robot is not None
 
+    if controller is None:
+        controller = LocalController.default(robot, compass)
+
     # TODO Pierre: do this before the call
     if gc_network and (target_gc_spiking is not None):
         gc_network.set_as_target_state(target_gc_spiking)
@@ -278,15 +282,13 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
     end_state = ""  # for plotting
     last_pc = None
     while n < step_limit and not goal_reached:
-        if True: #try:
-            goal_reached = compass.step(robot, *nav_args, **nav_kwargs)
-            # TODO: feature suggestion: attach "nav step hooks" to the robot
-            # so that we could run gc_network.track_movement and e.g. buildDataSet automatically
-            if robot.buildDataSet:
-                assert len(robot.data_collector.images) != 0
-            gc_network.track_movement(robot.xy_speed)
-        #except compass.RobotStuck:
-        #    break
+        goal_reached = controller.step()
+
+        # TODO: feature suggestion: attach "nav step hooks" to the robot
+        # so that we could run gc_network.track_movement and e.g. buildDataSet automatically
+        if robot.buildDataSet:
+            assert len(robot.data_collector.images) != 0
+        gc_network.track_movement(robot.xy_speed)
 
         if pc_network is not None and cognitive_map is not None:
             observations = robot.data_collector.get_observations()
@@ -532,13 +534,11 @@ if __name__ == "__main__":
 
                 compass = AnalyticalCompass(start_pos=start, goal_pos=goal)
                 with PybulletEnvironment(env_model, start=start) as env:
+                    controller = LocalController.default(env.robot, compass, obstacles=(True if trial == 0 else False))
                     env.mapping = mapping
-                    env.combine = combine
-                    env.num_ray_dir = num_ray_dir
-                    env.tactile_cone = cone
 
-                    over, nr_steps_this_trial = vector_navigation(env, compass, collect_nr_steps=True, gc_network=gc_network, target_gc_spiking=target_spiking,
-                                            plot_it=True, step_limit=10000, obstacles=(True if trial == 0 else False))
+                    over, nr_steps_this_trial = vector_navigation(env, compass, collect_nr_steps=True, gc_network=gc_network, controller=controller, target_gc_spiking=target_spiking,
+                                            plot_it=True, step_limit=10000)
                     # assert over == 1
                     print(trial, over, mapping, combine, num_ray_dir, cone)
 

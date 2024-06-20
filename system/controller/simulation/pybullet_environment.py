@@ -468,50 +468,17 @@ class Robot:
         self.env.robot = None
         self.delete()
 
-    def navigation_step(self, goal_vector : Vector2D, obstacles=True, combine=1.5):
-        """ One navigation step for the agent.
-            Calculate obstacle vector.
-            Combine into movement vector and simulate movement.
-
-        arguments:
-        obstacles   -- if true use obstacle avoidance
-        combine     -- factor for combining obstacle avoidance and goal vector. See local_navigation experiments
+    def navigation_step(self, goal_vector : Vector2D):
+        """ One navigation step for the agent. Moves towards goal_vector.
         """
-        #rayFromPoint = self.position
 
-        if obstacles:
-            if self.env.visualize:
-                p.removeAllUserDebugItems()
-
-            BACKOFF_DISTANCE = 0.4
-            collision_data, _ = self.env.lidar(tactile_cone=np.radians(90), num_ray_dir=5, blind_spot_cone=0, agent_pos_orn=self.lidar_sensor_position, ray_length=BACKOFF_DISTANCE, draw_debug_lines=True)
-            if any(distance != -1 for distance in collision_data.distances):
-                goal_vector = - np.array(self.heading_vector())
-            else:
-                point, obstacle_vector = self.calculate_obstacle_vector()
-                #print(f"{self.position=}, {obstacle_vector=}, {goal_vector=}")
-                self.env.add_debug_line(self.position, np.array(self.position) + obstacle_vector, color=(1, 0, 0), width=3)
-                self.env.add_debug_line(self.position, np.array(self.position) + goal_vector, color=(0, 0, 0), width=3)
-
-                if np.linalg.norm(np.array(goal_vector)) > 0:
-                    normed_goal_vector = np.array(goal_vector) / np.linalg.norm(np.array(goal_vector))  # normalize goal_vector to a standard length of 1
-                else:
-                    normed_goal_vector = np.array([0.0, 0.0])
-
-                # combine goal and obstacle vector
-                multiple = 1 if vectors_in_one_direction(normed_goal_vector, obstacle_vector) else -1
-                if not intersect(self.position, normed_goal_vector, point, obstacle_vector * multiple):
-                    multiple = 0
-                goal_vector = normed_goal_vector * combine + obstacle_vector * multiple
-                print(f"base: {normed_goal_vector}, {combine=}, {multiple=}, combined: {goal_vector}", end='\r')
-            self.env.add_debug_line(self.position, np.array(self.position) + goal_vector, color=(0, 0, 1), width=3)
+        if self.env.visualize:
+            p.removeAllUserDebugItems()
 
         gains = self.compute_gains(goal_vector)
         assert not np.any(np.isnan(gains))
 
-        #print(f'Step({gains=})', end='\t')
         self._step(gains, goal_vector)
-        #print(f'{self.position=}')
 
     @property
     def position_and_angle(self) -> Tuple[types.Vector2D, types.Angle]:
@@ -708,18 +675,19 @@ class Robot:
         direction_vector = direction_vector * 1.5 / min(lidar[start_index:end_index + 1])
         return hit_points[0], direction_vector
 
-    def turn_to_goal(self, goal_vector : Vector2D):
+    def turn_to_goal(self, goal_vector : Vector2D, tolerance : types.Angle = 0.05):
         """ Agent turns to face in goal vector direction """
 
         i = 0
         MAX_ITERATIONS = 1000
         diff_angle = None
-        while i < MAX_ITERATIONS and (diff_angle is None or abs(diff_angle) > 0.05):
+        while i < MAX_ITERATIONS and (diff_angle is None or abs(diff_angle) > tolerance):
             i += 1
             normed_goal_vector = np.array(goal_vector) / np.linalg.norm(np.array(goal_vector))
 
             current_heading = self.heading_vector()
             diff_angle = compute_angle(current_heading, normed_goal_vector) / np.pi
+            #print("Turning in place, diff_angle is", diff_angle, end="...\r")
 
             gain = min(np.linalg.norm(normed_goal_vector) * 5, 1)
 
@@ -728,7 +696,7 @@ class Robot:
                 break
 
             # If large difference in heading, do an actual turn
-            if abs(diff_angle) > 0.05 and gain > 0:
+            if abs(diff_angle) > tolerance and gain > 0:
                 max_speed = self.max_speed / 2
                 direction = np.sign(diff_angle)
                 if direction > 0:
