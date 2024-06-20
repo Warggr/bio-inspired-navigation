@@ -202,7 +202,7 @@ def create_gc_spiking(start : Vector2D, goal : Vector2D) -> types.Spikings:
         xy_speed = ROBOT_MAX_SPEED * normalize(goal_vector)
 
         robot_position += xy_speed * dt
-        history.append(robot_position)
+        history.append(np.array(robot_position))
         compass.current_pos = robot_position
         gc_network.track_movement(xy_speed)
 
