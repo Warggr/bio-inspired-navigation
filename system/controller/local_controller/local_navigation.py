@@ -24,10 +24,11 @@ from system.bio_model.grid_cell_model import GridCellNetwork
 from system.controller.simulation.pybullet_environment import PybulletEnvironment, Robot
 from system.controller.local_controller.compass import Compass, AnalyticalCompass
 from system.types import WaypointInfo, types
+from system.utils import normalize
 
 import system.plotting.plotResults as plot
 import numpy as np
-from typing import Optional, List
+from typing import Optional, List, Tuple, Any
 
 plotting = True  # if True: plot everything
 debug = os.getenv('DEBUG', False)  # if True: print debug output
@@ -112,7 +113,7 @@ class GcCompass(Compass):
 class PodGcCompass(GcCompass):
     arrival_threshold = 0.5
 
-    def __init__(self, pod_network: Optional['PhaseOffsetDetectorNetwork'], *args, **kwargs):
+    def __init__(self, pod_network: Optional['PhaseOffsetDetectorNetwork'] = None, *args, **kwargs):
         if pod_network is None:  # TODO Pierre this is ugly
             pod_network = PhaseOffsetDetectorNetwork(16, 9, 40)
         super().__init__(*args, **kwargs)
@@ -134,12 +135,11 @@ class LinearLookaheadGcCompass(GcCompass):
 
 
 class ComboGcCompass(GcCompass):
-    def __init__(self, pod_network : Optional['PhaseOffsetDetectorNetwork'], gc_network : GridCellNetwork, *args, **kwargs):
+    def __init__(self, gc_network : GridCellNetwork, pod_network : Optional['PhaseOffsetDetectorNetwork'] = None, *args, **kwargs):
         super().__init__(gc_network, *args, **kwargs)
         # self.gc_network = gc_network # already done by the super().__init__
-        self.pod_network = pod_network
-
         compass = PodGcCompass(pod_network, gc_network, *args, **kwargs)
+        self.pod_network = compass.pod_network
         compass = GoalVectorCache(compass)
         self.impl = compass
 
@@ -181,33 +181,33 @@ def create_gc_spiking(start : Vector2D, goal : Vector2D) -> types.Spikings:
     navigation this would have happened in the exploration phase.
     """
 
-    with PybulletEnvironment("plane", start=start) as env:
-        robot = env.robot
-        assert robot is not None
+    # Grid-Cell Initialization
+    dt = 1e-2
+    gc_network = setup_gc_network(dt)
 
-        # Grid-Cell Initialization
-        gc_network = setup_gc_network(env.dt)
+    compass = AnalyticalCompass(start_pos=start, goal_pos=goal)
+    robot_position = np.array(start, dtype=float)
+    history : List[Vector2D] = [ robot_position ]
 
-        compass = AnalyticalCompass(start_pos=robot.position, goal_pos=goal)
-        robot.turn_to_goal(compass.calculate_goal_vector())
+    i = 0
+    while not compass.reached_goal():
+        i += 1
+        if i == 5000:
+            raise AssertionError("Agent should not get caught in a loop in an empty plane.")
 
-        i = 0
-        while True:
-            i += 1
-            if i == 5000:
-                raise AssertionError("Agent should not get caught in a loop in an empty plane.")
+        goal_vector = compass.calculate_goal_vector()
+        if np.linalg.norm(goal_vector) == 0:
+            break
+        ROBOT_MAX_SPEED = 5.5 # see pybullet_environment.py
+        xy_speed = ROBOT_MAX_SPEED * normalize(goal_vector)
 
-            goal_vector = compass.calculate_goal_vector()
-            if np.linalg.norm(goal_vector) == 0:
-                break
-            robot.navigation_step(goal_vector, obstacles=False)
-            compass.update_position(robot)
-            gc_network.track_movement(robot.xy_speed)
-            reached_goal = compass.reached_goal()
+        robot_position += xy_speed * dt
+        history.append(robot_position)
+        compass.current_pos = robot_position
+        gc_network.track_movement(xy_speed)
 
-            if reached_goal:
-                if plotting: plot.plotTrajectoryInEnvironment(env)
-                return gc_network.consolidate_gc_spiking()
+    if plotting: plot.plotTrajectoryInEnvironment(env_model="plane", xy_coordinates=history)
+    return gc_network.consolidate_gc_spiking()
 
 
 def setup_gc_network(dt) -> GridCellNetwork:
@@ -226,10 +226,11 @@ def setup_gc_network(dt) -> GridCellNetwork:
 
 def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : GridCellNetwork, target_gc_spiking=None,
     step_limit=float('inf'), plot_it=False,
-                      collect_data_freq=False, collect_data_reachable=False, exploration_phase=False,
+                      collect_data_freq=False, collect_data_reachable=False, collect_nr_steps=False, exploration_phase=False,
     pc_network: Optional[PlaceCellNetwork] = None, cognitive_map: Optional[CognitiveMapInterface] = None,
+    goal_pos: Optional[Vector2D] = None,
     *nav_args, **nav_kwargs
-):
+) -> Tuple[bool, Any]:
     """
     Agent navigates towards goal.
 
@@ -246,11 +247,13 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
     exploration_phase      -- track movement for cognitive map and place cell model (this is a misnomer and also used in the navigation phase)
     pc_network             -- place cell network
     cognitive_map          -- cognitive map object
+    goal_pos               --  The true location of the goal - for plotting & reporting
     All remaining arguments are passed to the Robot.navigation_step() function
 
     Returns: (depending on the arguments):
     goal_reached : bool, data : List[WaypointInfo] if collect_data_freq
     goal_reached : bool, ???  if collect_data_reachable
+    goal_reached : bool, nr_steps : int if collect_nr_steps
     goal_reached : bool, last_pc : PlaceCell else
     """
 
@@ -274,7 +277,6 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
     goal_reached = False
     end_state = ""  # for plotting
     last_pc = None
-    assert compass.goal_pos is not None
     while n < step_limit and not goal_reached:
         if True: #try:
             goal_reached = compass.step(robot, *nav_args, **nav_kwargs)
@@ -306,13 +308,11 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
             data.append((*robot.position_and_angle, spiking))
 
         n += 1
-        #if n % 100 == 0:
-            #print("Vector nav step", n)
 
-    assert compass.goal_pos is not None
     if goal_reached:
-        end_state = "Agent reached the goal. Actual distance: " + str(
-                np.linalg.norm(np.array(compass.goal_pos) - robot.position)) + "."
+        end_state = "Agent reached the goal."
+        if goal_pos:
+            end_state += f"Actual distance: {np.linalg.norm(np.array(goal_pos) - robot.position)}."
     else:
         end_state = "Agent got stuck"
 
@@ -323,6 +323,8 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
         return goal_reached, data
     if collect_data_reachable:
         return goal_reached, [sample_after_turn, first_goal_vector]
+    if collect_nr_steps:
+        return goal_reached, n
 
     if not last_pc and not exploration_phase and pc_network:
         pc_network.create_new_pc(gc_network.consolidate_gc_spiking(), observations, robot.position)
@@ -355,6 +357,9 @@ if __name__ == "__main__":
     none_parser.add_argument('goal', type=parse_vector, nargs='?', default=[-8, -0.5], help='Goal position in the form x,y')
 
     vector_nav_parser = experiments.add_parser('vector_navigation')
+    vector_nav_parser.add_argument('decoder', choices=['pod', 'linear_lookahead', 'combo'], help='decoder')
+    vector_nav_parser.add_argument('simplicity', choices=['simple', 'generate_gc'])
+    vector_nav_parser.add_argument('-d', '--goal-distance', help='distance to the goal', type=int, default=15)
     """
     Test the local controller with different decoders
 
@@ -411,76 +416,69 @@ if __name__ == "__main__":
             # initialize grid cell network and create target spiking
             gc_network = setup_gc_network(dt)
 
-            # 1) CHOOSE THE DECODER YOU WANT TO TEST
-            model = "pod"
-            # model = "linear_lookahead"
-            # model = "combo"
-
-            env = PybulletEnvironment(env_model, dt=dt, start=[0, 0])
-
-            # changes the update fraction and arrival threshold according to the chosen model
-            if model == "pod":
-                env.pod_arrival_threshold = 0.2
-            elif model == "linear_lookahead":
-                update_fraction = 0.2
+            start : Vector2D = np.array([0.0, 0.0])
 
             """Picks a location at circular edge of environment"""
-            # 2) CHOOSE THE DISTANCE TO THE GOAL
-            distance = 15  # goal distance
+            distance = args.goal_distance
             angle = np.random.uniform(0, 2 * np.pi)
-            goal = env.xy_coordinates[0] + np.array([np.cos(angle), np.sin(angle)]) * distance
+            goal = start + np.array([np.cos(angle), np.sin(angle)]) * distance
 
-            start = np.array([0, 0])
-
-            # 3) CHOOSE WHETHER TO PERFORM
-
-            # 3A) A SIMPLE RETURN TO START
-            simple = True
-            if simple:
-                """ navigate ~ 15 m away from the start position """
-                target_spiking = gc_network.consolidate_gc_spiking()
-                vector_navigation(env, goal, gc_network, model="analytical")
-                start_time = time.time()
-                vector_navigation(env, list(start), gc_network, target_gc_spiking=target_spiking, model=model, step_limit=8000,
-                                  plot_it=False)
-                trial_time = time.time() - start_time
-                """------------------------------------------------------------------------------------------"""
-            else:
-                # 3B) GENERATING THE GOAL SPIKINGS, NAVIGATING TO THE GOAL, THEN RETURN TO START
-                """ alternatively: generate spiking at goal then navigate there before returning to the start """
-                start_spiking = gc_network.consolidate_gc_spiking()
-                target_spiking = create_gc_spiking(start, goal)
-                env = PybulletEnvironment(env_model, model, start=list(start))
-
+            with PybulletEnvironment(env_model, dt=dt, start=start) as env:
+                model = args.decoder
+                # changes the update fraction and arrival threshold according to the chosen model
+                compass : Compass
                 if model == "pod":
-                    env.pod_arrival_threshold = 0.2
+                    compass = PodGcCompass(gc_network=gc_network)
+                    compass.arrival_threshold = 0.2
                 elif model == "linear_lookahead":
+                    compass = LinearLookaheadGcCompass(gc_network=gc_network, arena_size=env.arena_size)
                     update_fraction = 0.2
+                elif model == "combo":
+                    compass = ComboGcCompass(gc_network=gc_network)
+                else: assert False, f"unrecognized model {model}"
 
-                start_time = time.time()
-                vector_navigation(env, list(goal), gc_network, target_gc_spiking=target_spiking, model=model, step_limit=8000,
-                                  plot_it=False)
-                actual_error_goal = np.linalg.norm(env.xy_coordinates[-1] - env.goal_pos)
-                actual_error_goal_array.append(actual_error_goal)
-                env.nr_ofsteps = 0
-                vector_navigation(env, list(start), gc_network, target_gc_spiking=start_spiking, model=model, step_limit=8000,
-                                  plot_it=False)
+                # 3) CHOOSE WHETHER TO PERFORM
 
-                trial_time = time.time() - start_time
-                """------------------------------------------------------------------------------------------"""
+                # 3A) A SIMPLE RETURN TO START
+                if args.simplicity == 'simple':
+                    """ navigate ~ 15 m away from the start position """
+                    target_spiking = gc_network.consolidate_gc_spiking()
+                    vector_navigation(env, AnalyticalCompass(start_pos=start, goal_pos=goal), gc_network)
+                    start_time = time.time()
+                    gc_network.set_as_target_state(target_spiking)
+                    vector_navigation(env, compass, gc_network, step_limit=8000, plot_it=False)
+                    trial_time = time.time() - start_time
+                    """------------------------------------------------------------------------------------------"""
+                else:
+                    # 3B) GENERATING THE GOAL SPIKINGS, NAVIGATING TO THE GOAL, THEN RETURN TO START
+                    """ alternatively: generate spiking at goal then navigate there before returning to the start """
+                    start_spiking = gc_network.consolidate_gc_spiking()
+                    target_spiking = create_gc_spiking(start, goal)
+
+                    start_time = time.time()
+                    gc_network.set_as_target_state(target_spiking)
+                    vector_navigation(env, compass, gc_network, step_limit=8000, plot_it=False)
+                    actual_error_goal = np.linalg.norm(env.robot.position - goal)
+                    actual_error_goal_array.append(actual_error_goal)
+                    # TODO Pierre: env.nr_ofsteps = 0
+                    compass.reset(new_goal=start)
+                    gc_network.set_as_target_state(start_spiking)
+                    vector_navigation(env, compass, gc_network, step_limit=8000, plot_it=False)
+
+                    trial_time = time.time() - start_time
+                    """------------------------------------------------------------------------------------------"""
+                final_position = env.robot.position
 
             # Decoding Error
-            error = np.linalg.norm((env.xy_coordinates[-1] + env.goal_vector) - env.goal_pos)
+            error = np.linalg.norm((final_position + compass.calculate_goal_vector()) - goal)
             error_array.append(error)
 
             # Navigation Error
-            actual_error = np.linalg.norm(env.xy_coordinates[-1] - env.goal_pos)
+            actual_error = np.linalg.norm(final_position - goal)
             actual_error_array.append(actual_error)
 
             time_array.append(trial_time)
             print(trial_time)
-
-            env.end_simulation()
 
             progress_str = "Progress: " + str(int((i + 1) * 100 / nr_trials)) + "% | Latest error: " + str(error)
             print(progress_str)
@@ -532,19 +530,19 @@ if __name__ == "__main__":
                     gc_network = None
                     target_spiking = None
 
-                env = PybulletEnvironment(env_model, "analytical", start=start)
+                compass = AnalyticalCompass(start_pos=start, goal_pos=goal)
+                with PybulletEnvironment(env_model, start=start) as env:
+                    env.mapping = mapping
+                    env.combine = combine
+                    env.num_ray_dir = num_ray_dir
+                    env.tactile_cone = cone
 
-                env.mapping = mapping
-                env.combine = combine
-                env.num_ray_dir = num_ray_dir
-                env.tactile_cone = cone
-
-                over, _ = vector_navigation(env, goal, gc_network=gc_network, target_gc_spiking=target_spiking, model=model,
+                    over, nr_steps_this_trial = vector_navigation(env, compass, collect_nr_steps=True, gc_network=gc_network, target_gc_spiking=target_spiking,
                                             plot_it=True, step_limit=10000, obstacles=(True if trial == 0 else False))
-                # assert over == 1
-                print(trial, over, mapping, combine, num_ray_dir, cone)
+                    # assert over == 1
+                    print(trial, over, mapping, combine, num_ray_dir, cone)
 
-                nr_steps += env.nr_ofsteps
+                    nr_steps += nr_steps_this_trial
 
             # save all combinations that passed all three tests and how many time steps the agent took in total
             working_combinations.append((nr_ofrays, cone, mapping, combine, nr_steps))
