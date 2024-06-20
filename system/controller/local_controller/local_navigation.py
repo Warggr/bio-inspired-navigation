@@ -106,7 +106,7 @@ class GcCompass(Compass):
         if mode == "linear_lookahead":
             return GoalVectorCache(LinearLookaheadGcCompass(arena_size, gc_network, *args, **kwargs))
         elif mode == "combo":
-            return ComboGcCompass(pod_network, gc_network, *args, **kwargs)
+            return ComboGcCompass(gc_network, pod_network, *args, **kwargs)
         else:
             raise ValueError(f"Unknown mode: {mode}. Expected one of: analytical, pod, linear_lookahead, combo")
 
@@ -153,7 +153,6 @@ class ComboGcCompass(GcCompass):
             self.impl.reset(new_goal)
 
     def calculate_goal_vector(self, *args, **kwargs):
-        # TODO this often returns 0,0 for some reason
         return self.impl.calculate_goal_vector(*args, **kwargs)
 
     @property
@@ -533,7 +532,7 @@ if __name__ == "__main__":
                     target_spiking = None
 
                 compass = AnalyticalCompass(start_pos=start, goal_pos=goal)
-                with PybulletEnvironment(env_model, start=start) as env:
+                with PybulletEnvironment(env_model, start=start, visualize=args.visualize) as env:
                     controller = LocalController.default(env.robot, compass, obstacles=(True if trial == 0 else False))
                     env.mapping = mapping
 

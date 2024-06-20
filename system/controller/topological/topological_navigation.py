@@ -232,7 +232,7 @@ if __name__ == "__main__":
                 start_index, goal_index = random.integers(0, len(tj.cognitive_map.node_network.nodes), size=2)
                 assert len(tj.cognitive_map.node_network.nodes) > 1
 
-            success = tj.navigate(start_ind=start_index, goal_ind=goal_index, cognitive_map_filename=map_file_after_lifelong_learning, env=env, combine=10)
+            success = tj.navigate(start_ind=start_index, goal_ind=goal_index, cognitive_map_filename=map_file_after_lifelong_learning, env=env, combine=1.5)
             if success:
                 successful += 1
             tj.cognitive_map.draw()

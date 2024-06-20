@@ -203,10 +203,13 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
 
     @classmethod
     def to_batch(cls, p: PlaceInfo, q: PlaceInfo):
+        # For some reason the images saved by Anna didn't have the shape I expected
+        p_imgs = p.img.transpose(1, 3).transpose(2, 3)
+        q_imgs = q.img.transpose(1, 3).transpose(2, 3)
         args = (
-            p.img, q.img,
+            p_imgs, q_imgs,
             p.spikings, q.spikings,
-            p.lidar, q.lidar,
+            p.lidar, getattr(q, 'lidar', -1 * np.ones(types.LidarReading.DEFAULT_NUMBER_OF_ANGLES)),
         )
         return np.array([args], dtype=cls.dtype)
 

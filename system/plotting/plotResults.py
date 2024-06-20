@@ -22,16 +22,12 @@ import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
 
-import sys
-import os
-
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-
 from system.plotting.helper import compute_theta, compute_axis_limits
 from system.plotting.plotHelper import *
 
 # from plotting.plotThesis import add_cognitive_map
 
+from typing import Optional
 
 colors = [(1, 0, 0, c) for c in np.linspace(0, 1, 100)]
 cmapred = mcolors.LinearSegmentedColormap.from_list('mycmap', colors, N=10)
@@ -92,7 +88,7 @@ def plotTrajectory(xy_coordinates):
     plt.show()
 
 
-def plotTrajectoryInEnvironment(env : 'PybulletEnvironment', title="", xy_coordinates=None, env_model=None, cognitive_map=None, path=None,
+def plotTrajectoryInEnvironment(env : Optional['PybulletEnvironment'] = None, title="", xy_coordinates=None, env_model=None, cognitive_map=None, path=None,
                                 goal=None, trajectory=True, start=None, end=None):
     if not xy_coordinates:
         xy_coordinates = env.robot.data_collector.xy_coordinates

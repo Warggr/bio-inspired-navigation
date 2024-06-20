@@ -138,6 +138,9 @@ class PybulletEnvironment:
 
         base_position = [0, 0.05]  # [0, 0.05] ensures that it actually starts at origin
 
+        self.planeID = None
+        self.mazeID : List[int] = []
+
         # environment choices
         if env_model == "Savinov_val3":
             base_position = [-2, 0.05]
@@ -156,10 +159,10 @@ class PybulletEnvironment:
             p.resetDebugVisualizerCamera(cameraDistance=4.5, cameraYaw=0, cameraPitch=-70,
                                          cameraTargetPosition=[0, 0, 0])
             urdfRootPath = pybullet_data.getDataPath()
-            p.loadURDF(os.path.join(urdfRootPath, "plane.urdf"))
+            self.planeID = p.loadURDF(os.path.join(urdfRootPath, "plane.urdf"))
         elif "obstacle" in env_model:
             plane = resource_path(self.env_model, "plane.urdf")
-            p.loadURDF(plane)
+            self.planeID = p.loadURDF(plane)
         else:
             raise ValueError("No matching env_model found.")
 
@@ -172,9 +175,6 @@ class PybulletEnvironment:
             all_wall_kwargs = { 'textures': resource_path("textures", "walls", "yellow_wall.png") }
             all_wall_kwargs.update(wall_kwargs)
             self.mazeID = self.__load_walls(resource_path(self.env_model), **all_wall_kwargs)
-        else:
-            self.planeID = None
-            self.mazeID = []
 
         p.setGravity(0, 0, -9.81)
 
