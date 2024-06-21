@@ -21,7 +21,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from torchmetrics import MeanSquaredError
 from abc import ABC, abstractmethod
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Type
 
 Batch = List # only used for type hints - doesn't actually do anything
 

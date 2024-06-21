@@ -342,7 +342,7 @@ def assert_conforms_to_type(data, dtype):
 from system.controller.local_controller.local_navigation import setup_gc_network
 
 def random_coordinates(xmin, xmax, ymin, ymax):
-    return np.array([ random.uniform(xmin, ymin), random.uniform(ymin, ymax) ])
+    return np.array([ random.uniform(xmin, xmax), random.uniform(ymin, ymax) ])
 
 def in_rect(x : Vector2D, rect):
     xmin, xmax, ymin, ymax = rect
