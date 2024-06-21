@@ -29,7 +29,7 @@ from system.utils import normalize
 
 import system.plotting.plotResults as plot
 import numpy as np
-from typing import Optional, List, Tuple, Any
+from typing import Callable, Optional, List, Tuple, Any
 
 plotting = True  # if True: plot everything
 debug = os.getenv('DEBUG', False)  # if True: print debug output
@@ -248,7 +248,6 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
     pc_network             -- place cell network
     cognitive_map          -- cognitive map object
     goal_pos               --  The true location of the goal - for plotting & reporting
-    All remaining arguments are passed to the Robot.navigation_step() function
 
     Returns: (depending on the arguments):
     goal_reached : bool, data : List[WaypointInfo] if collect_data_freq
@@ -332,6 +331,37 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
         last_pc = pc_network.place_cells[-1]
     return goal_reached, last_pc
 
+from tqdm import tqdm
+import random
+from system.controller.simulation.environment.map_occupancy import MapLayout
+from system.controller.simulation.environment_config import environment_dimensions
+
+def random_coordinates(xmin, xmax, ymin, ymax):
+    return np.array([ random.uniform(xmin, xmax), random.uniform(ymin, ymax) ])
+
+def random_points(env : PybulletEnvironment) -> Tuple[Vector2D, Vector2D]:
+    map = MapLayout(env.env_model)
+
+    result = []
+    for i in range(2):
+        i = 0
+        while True:
+            i += 1
+            p = random_coordinates(*environment_dimensions(env.env_model))
+            print(f"[i={i}]Trying", p, "...")
+            if map.suitable_position_for_robot(p):
+                break
+        result.append(p)
+    return tuple(result)
+
+def randomPointsTest(Controller: Callable[[Robot, tuple[Vector2D, Vector2D]], LocalController], visualize=False):
+    with PybulletEnvironment(env_model="Savinov_val3", visualize=visualize, contains_robot=False) as env:
+        for _ in tqdm(range(100)):
+            start, goal = random_points(env)
+            with Robot(env, base_position=start) as robot:
+                controller = Controller(robot, (start, goal))
+                vector_navigation(env, controller.compass, gc_network=None, controller=controller)
+
 
 if __name__ == "__main__":
     """ Test the local controller's ability of vector navigation with obstacle avoidance. """
@@ -384,6 +414,8 @@ if __name__ == "__main__":
         2A) test a range of parameter values in different combinations              
         2B) choose a few combinations to test
     """
+    random_nav_parser = experiments.add_parser('random_nav')
+
     main_parser.add_argument('--visualize', action='store_true')
     args = main_parser.parse_args()
 
@@ -533,7 +565,7 @@ if __name__ == "__main__":
 
                 compass = AnalyticalCompass(start_pos=start, goal_pos=goal)
                 with PybulletEnvironment(env_model, start=start, visualize=args.visualize) as env:
-                    controller = LocalController.default(env.robot, compass, obstacles=(True if trial == 0 else False))
+                    controller = LocalController(env.robot, compass, transform_goal_vector=([] if trial == 0 else [ObstacleBackoff, ObstacleAvoidance]), on_reset_goal=[TurnToGoal])
                     env.mapping = mapping
 
                     over, nr_steps_this_trial = vector_navigation(env, compass, collect_nr_steps=True, gc_network=gc_network, controller=controller, target_gc_spiking=target_spiking,
@@ -579,3 +611,7 @@ if __name__ == "__main__":
         if not os.path.exists(directory):
             os.makedirs(directory)
         np.save("experiments/working_combinations", working_combinations)
+
+    elif args.experiment == "random_nav":
+        controller = lambda robot, startandgoal: LocalController.default(robot, compass=AnalyticalCompass(*startandgoal))
+        randomPointsTest(controller, visualize=args.visualize)
