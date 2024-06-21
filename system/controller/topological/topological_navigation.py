@@ -23,6 +23,7 @@ from system.controller.simulation.pybullet_environment import PybulletEnvironmen
 from system.bio_model.cognitive_map import LifelongCognitiveMap, CognitiveMapInterface
 from system.bio_model.place_cell_model import PlaceCellNetwork, PlaceCell
 from system.controller.local_controller.compass import Compass, AnalyticalCompass
+from system.controller.local_controller.local_controller import LocalController
 from system.controller.local_controller.local_navigation import vector_navigation, setup_gc_network, PodGcCompass, LinearLookaheadGcCompass
 import system.plotting.plotResults as plot
 from system.types import Vector2D
@@ -119,8 +120,9 @@ class TopologicalNavigation(object):
             compass.reset(new_goal=goal_pos)
             assert compass.goal_pos is not None
             goal_spiking = path[i + 1].gc_connections
-            stop, pc = vector_navigation(env, compass, self.gc_network, goal_spiking,
-                                         obstacles=True, exploration_phase=False, pc_network=self.pc_network,
+            controller = LocalController.default(env.robot, compass, obstacles=True)
+            stop, pc = vector_navigation(env, compass, self.gc_network, target_gc_spiking=goal_spiking,
+                                         controller=controller, exploration_phase=False, pc_network=self.pc_network,
                                          cognitive_map=self.cognitive_map, plot_it=False,
                                          step_limit=self.step_limit, *nav_args, **nav_kwargs)
             self.cognitive_map.postprocess_vector_navigation(node_p=path[i], node_q=path[i + 1],
@@ -232,7 +234,7 @@ if __name__ == "__main__":
                 start_index, goal_index = random.integers(0, len(tj.cognitive_map.node_network.nodes), size=2)
                 assert len(tj.cognitive_map.node_network.nodes) > 1
 
-            success = tj.navigate(start_ind=start_index, goal_ind=goal_index, cognitive_map_filename=map_file_after_lifelong_learning, env=env, combine=1.5)
+            success = tj.navigate(start_ind=start_index, goal_ind=goal_index, cognitive_map_filename=map_file_after_lifelong_learning, env=env)
             if success:
                 successful += 1
             tj.cognitive_map.draw()
