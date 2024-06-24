@@ -25,8 +25,8 @@ from typing import Dict, Tuple, List, Type
 
 Batch = List # only used for type hints - doesn't actually do anything
 
-class AutoAdamOptimizer: # Sentinel value
-    pass
+def AutoAdamOptimizer(net): # Sentinel value
+    return torch.optim.Adam(net.parameters(), lr=3.0e-4, eps=1.0e-5)
 
 class NNModuleWithOptimizer:
     __slots__ = ('net', 'opt')
@@ -411,6 +411,17 @@ class FCLayers(nn.Module):
         x = self.fc3(x)
         return x
 
+ImageForTorch = 'np.array[float, (4, 64, 64)]'
+def transpose_image(img : 'Image') -> ImageForTorch:
+    #assert img.shape[1:] == (64, 64, 4) # that's the format returned by env.camera() and used in the rest of the code
+    img = img.transpose(1, 3).transpose(2, 3) # reorder 0123 -> 0321 -> 0312, i.e. channels first
+    #assert img.shape[1:] == (4, 64, 64)
+    return img
+
+def untranspose_image(img: ImageForTorch) -> 'Image':
+    """ Inverse of transpose_image """
+    img = img.transpose(2, 3).transpose(1, 3) # 0312 -> 0321 -> 0123, i.e. channels last
+    return img
 
 class ImagePairEncoderV2(nn.Module):
     def __init__(self, init_scale=1.0, bias=True, no_weight_init=False):
@@ -444,10 +455,7 @@ class ImagePairEncoderV2(nn.Module):
                     yield layer
 
     def forward(self, src_imgs, dst_imgs):
-        assert src_imgs.shape[1:] == (64, 64, 4) # that's the format returned by env.camera() and used in the rest of the code
-        src_imgs = src_imgs.transpose(1, 3).transpose(2, 3) # reorder 0123 -> 0321 -> 0312, i.e. batch size first
-        dst_imgs = dst_imgs.transpose(1, 3).transpose(2, 3)
-        assert src_imgs.shape[1:] == (4, 64, 64)
+        src_imgs, dst_imgs = transpose_image(src_imgs), transpose_image(dst_imgs)
 
         x = torch.cat([src_imgs, dst_imgs, src_imgs - dst_imgs], dim=1)
         x = self.layers(x)

@@ -82,7 +82,7 @@ def load_model(filepath, step=None, load_to_cpu=False):
     '''
     :param filepath: The path to the model file, without .{epoch} extension
     :param step: if None. Load the latest.
-    :return: the saved state dict
+    :return: a tuple (state, epoch) with `epoch` the latest epoch found and `saved` the saved state dict at that epoch
     '''
     import torch
     if not step:
@@ -105,6 +105,6 @@ def load_model(filepath, step=None, load_to_cpu=False):
     if not os.path.isfile(path):
         raise ValueError(path + ' is not a valid path')
     if load_to_cpu:
-        return torch.load(path, map_location=lambda storage, location: storage)
+        return torch.load(path, map_location=lambda storage, location: storage), step
     else:
-        return torch.load(path)
+        return torch.load(path), step

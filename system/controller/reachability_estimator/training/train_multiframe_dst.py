@@ -30,8 +30,7 @@ from system.controller.reachability_estimator.training.utils import load_model
 DATA_STORAGE_FOLDER = os.path.join(os.path.dirname(__file__), "..", "data", "models")
 
 def _load_weights(model_file, nets : Model, **kwargs) -> int:
-    state = load_model( model_file, load_to_cpu=True, **kwargs)
-    epoch = int(state['epoch'])
+    state, epoch = load_model( model_file, load_to_cpu=True, **kwargs)
 
     for name, net in nets.nets.items():
         if name == "img_encoder" and 'conv1.weight' in state['nets'][name].keys(): # Backwards compatibility
