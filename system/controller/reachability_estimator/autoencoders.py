@@ -74,3 +74,8 @@ class ImageAutoencoder(nn.Module):
             }
         }
         torch.save(state, model_file)
+
+    def load_state_dict(self, state):
+        self.encoder.load_state_dict(state['nets']['encoder'])
+        self.decoder.load_state_dict(state['nets']['decoder'])
+        self.optimizer.load_state_dict(state['optimizer'])

@@ -61,14 +61,11 @@ def train(
     model_filename = model_filename + model_suffix
     model_file = os.path.join(model_dir, model_filename)
 
-    optimizer = AutoAdamOptimizer(nets)
-
     epoch = 0
     if resume:
         try:
             state, epoch = load_model(model_file)
-            nets.load_state_dict(state['nets'])
-            optimizer.load_state_dict(state['opts'])
+            nets.load_state_dict(state)
 
             torch.manual_seed(231239 + epoch)
             print('loaded saved state. epoch: %d' % epoch)
@@ -81,7 +78,7 @@ def train(
 
     # Scheduler: takes care of learning rate decay
     scheduler = torch.optim.lr_scheduler.StepLR(
-        optimizer,
+        nets.optimizer,
         step_size=hyperparams.lr_decay_epoch,
         gamma=hyperparams.lr_decay_rate,
         last_epoch=last_epoch,
