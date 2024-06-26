@@ -459,6 +459,8 @@ class Robot:
 
         self.mapping = 1.5  # see local_navigation experiments
 
+        self.navigation_hooks : List[Callable[[Vector2D], None]] = []
+
     def __enter__(self):
         assert self.env.robot is None
         self.env.robot = self
@@ -479,6 +481,8 @@ class Robot:
         assert not np.any(np.isnan(gains))
 
         self._step(gains, goal_vector)
+        for hook in self.navigation_hooks:
+            hook(self.xy_speed)
 
     @property
     def position_and_angle(self) -> Tuple[types.Vector2D, types.Angle]:

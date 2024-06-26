@@ -260,6 +260,9 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
     robot = env.robot
     assert robot is not None
 
+    if gc_network is not None:
+        robot.navigation_hooks.append(gc_network.track_movement)
+
     if controller is None:
         controller = LocalController.default(robot, compass)
 
@@ -289,7 +292,6 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
         # so that we could run gc_network.track_movement and e.g. buildDataSet automatically
         if robot.buildDataSet:
             assert len(robot.data_collector.images) != 0
-        gc_network.track_movement(robot.xy_speed)
 
         if pc_network is not None and cognitive_map is not None:
             observations = robot.data_collector.get_observations()
@@ -328,6 +330,9 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
         return goal_reached, [sample_after_turn, first_goal_vector]
     if collect_nr_steps:
         return goal_reached, n
+
+    if gc_network is not None:
+        robot.navigation_hooks.remove(gc_network.track_movement)
 
     if not last_pc and not exploration_phase and pc_network:
         pc_network.create_new_pc(gc_network.consolidate_gc_spiking(), observations, robot.position)
