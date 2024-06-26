@@ -55,7 +55,7 @@ def log_performance(
 
 
 def train(
-    nets : ImageAutoencoder, dataset : Dataset[Image],
+    nets: ImageAutoencoder, dataset: Dataset[Image],
     resume = False,
     hyperparams : Hyperparameters = Hyperparameters(),
     n_dataset_worker = 0,

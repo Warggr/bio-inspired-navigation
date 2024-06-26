@@ -88,7 +88,7 @@ class TrajectoriesDataset(data.Dataset):
         self.hd5_files = sorted(list(hd5_files))
 
         # open hd5 files
-        maps : Set(types.AllowedMapName) = set()
+        maps : set[types.AllowedMapName] = set()
         fds = []
         for fn in self.hd5_files:
             try:
@@ -176,7 +176,7 @@ class TrajectoriesDataset(data.Dataset):
                         for fn in self.hd5_files]
             self.opened = True
 
-    def _locate_sample(self, idx):
+    def _locate_sample(self, idx) -> tuple[int, int, int]:
         traj_idx = bisect.bisect_right(self.traj_len_cumsum, idx)
         dataset_idx, traj_id = self.traj_ids[traj_idx]
 
@@ -356,7 +356,7 @@ class RandomSamples:
     def env_model(self):
         return self.env.env_model
 
-    def points(self) -> Tuple[Vector2D, Vector2D]:
+    def points(self) -> tuple[Vector2D, Vector2D]:
         result = []
         for i in range(2):
             i = 0
@@ -403,7 +403,7 @@ class RandomSamplesWithLimitedDistance(RandomSamples):
             p1 = random_coordinates(*dims)
             if not self.map.suitable_position_for_robot(p1):
                 continue
-            for j in range(100):
+            for _ in range(100):
                 r = np.sqrt(random.uniform(0, self.r_max**2)) # sqrt ensures that the samples are drawn uniformly from the circle
                 theta = random.uniform(-np.pi, np.pi)
                 distance = np.array([ np.cos(theta), np.sin(theta) ]) * r

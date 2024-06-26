@@ -21,7 +21,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from torchmetrics import MeanSquaredError
 from abc import ABC, abstractmethod
-from typing import Dict, Tuple, List, Type
+from typing import Dict, List, Type
 
 from .types import Batch, Prediction, transpose_image
 

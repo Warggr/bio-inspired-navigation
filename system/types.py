@@ -1,4 +1,4 @@
-from typing import Tuple, Iterable, List
+from typing import Sized, Tuple, Iterable, List, Protocol
 import numpy as np
 
 Angle = float # assumed to be in radians
@@ -28,8 +28,10 @@ class LidarReading:
 
 assert LidarReading.DEFAULT_NUMBER_OF_ANGLES == len(list(LidarReading.angles(0)))
 
+class Vector2D(Sized, Iterable[float], Protocol):
+    #def __getitem__(self, index : int) -> float: ...
+    pass
 
-Vector2D = Tuple[float, float]
 Vector3D = Tuple[float, float, float]
 Spikings = 'np.ndarray[float, (40, 40, 6)]' # TODO: actual non-string type hint
 Image = 'np.ndarray[float, (64, 64, 4)]'
@@ -42,7 +44,7 @@ class types:
     Spikings = Spikings
     Angle = Angle
     Image = Image
-    PositionAndOrientation = Tuple[Vector3D, Angle]
+    PositionAndOrientation = Tuple[Vector2D, Angle]
     AllowedMapName = AllowedMapName
     LidarReading = LidarReading
 

@@ -13,7 +13,7 @@ if __name__ == "__main__":
 
 from system.plotting.plotResults import plotStartGoalDataset
 from system.bio_model.bc_network import bcActivityForLidar, BoundaryCellNetwork, HDCActivity
-from system.controller.reachability_estimator.types import Sample
+from system.controller.reachability_estimator.types import Sample, Prediction, ModelInput
 
 import sys
 import os
@@ -63,7 +63,6 @@ class ReachabilityDataset(torch.utils.data.Dataset):
 
     def __init__(self, filename, external_link=False, sample_config : SampleConfig = SampleConfig(), dirname = DATA_STORAGE_FOLDER):
         self.file_path = os.path.join(dirname, filename)
-        self.dataset = None
         self.externalLink = external_link
         self.dataset = h5py.File(self.file_path, 'r')
         self.config = sample_config
@@ -78,14 +77,14 @@ class ReachabilityDataset(torch.utils.data.Dataset):
         else:
             self.dataset_len = len(self.dataset['positions'])
 
-    def sample(self, index):
+    def sample(self, index) -> tuple[Sample, bool]:
         if self.externalLink:
             tup = self.dataset[str(self._get_link_index(index))][self.keys[index]][()]
         else:
             tup = self.dataset['positions'][index]
         return Sample.from_tuple(tup)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index) -> tuple[ModelInput, Prediction]:
         sample, reachability = self.sample(index)
 
         reachability = torch.tensor(reachability).clamp(0.0, 1.0) # make it a tensor of float

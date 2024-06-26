@@ -42,7 +42,7 @@ class Sample:
         )
 
     @staticmethod
-    def from_tuple(tup : Tuple) -> (Self, bool):
+    def from_tuple(tup : tuple) -> tuple[Self, bool]:
         (
             src_img, dst_img,
             reachable,

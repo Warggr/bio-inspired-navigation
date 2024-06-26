@@ -510,7 +510,7 @@ class Robot:
         linkWorldPosition[2] += 0.1 # safety margin; TODO this could be removed once we put the correct 3D orientation
         # TODO maybe the orientation needs to be turned?
         angle = p.getEulerFromQuaternion(linkWorldOrientation)[2]
-        return linkWorldPosition, angle
+        return tuple(linkWorldPosition), angle
 
     def save_snapshot(self, goal_vector : Optional[types.Vector2D]):
         position, angle = self.position_and_angle
@@ -551,7 +551,7 @@ class Robot:
         if backwards:
             [v_left, v_right] = [-v_left, -v_right]
         assert not np.isnan(v_left) and not np.isnan(v_right)
-        return [v_left, v_right]
+        return (v_left, v_right)
 
     def keyboard_simulation(self):
         """ Control the agent with your keyboard. SPACE ends the simulation."""

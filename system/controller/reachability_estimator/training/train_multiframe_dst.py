@@ -26,6 +26,7 @@ if __name__ == "__main__":
 from system.controller.reachability_estimator.networks import Model
 from system.controller.reachability_estimator.ReachabilityDataset import ReachabilityDataset, SampleConfig
 from system.controller.reachability_estimator.training.utils import load_model
+from system.controller.reachability_estimator.types import Prediction
 
 DATA_STORAGE_FOLDER = os.path.join(os.path.dirname(__file__), "..", "data", "models")
 
@@ -116,11 +117,10 @@ def process_batch(item : Batch, train_device : TrainDevice):
     ground_truth = [ data.to(device=train_device, non_blocking=True) for data in ground_truth ]
     return model_args, ground_truth
 
-Result = (float, 'Vector2D', float)
-LossFunction = Callable[(Result, Result), torch.Tensor]
+LossFunction = Callable[[Prediction, Prediction], torch.Tensor]
 
 def make_loss_function(position_loss_weight = 0.6, angle_loss_weight = 0.3) -> LossFunction:
-    def loss_function(prediction : Result, truth : Result, return_details = False) -> torch.Tensor:
+    def loss_function(prediction : Prediction, truth : Prediction, return_details = False) -> torch.Tensor:
         reachability_prediction, position_prediction, angle_prediction = prediction
         reachability, position, angle = truth
 

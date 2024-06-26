@@ -84,7 +84,7 @@ class ObstacleAvoidance:
 class ObstacleBackoff:
     def __init__(self, backoff_distance = 0.4):
         self.backoff_distance = backoff_distance
-    def __call__(self, goal_vector: Vector2D, robot: 'Robot') -> Optional[Vector2D]:
+    def __call__(self, goal_vector: Vector2D, robot: 'Robot') -> Vector2D:
         collision_data, _ = robot.env.lidar(
             tactile_cone=np.radians(40),
             num_ray_dir=5,

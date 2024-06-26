@@ -10,7 +10,7 @@
 import os
 import glob
 import tabulate
-import numpy as np
+from typing import Any
 
 
 def pprint_dict(x):
@@ -78,7 +78,7 @@ def module_weights_stats(module):
     ]
     return tabulate.tabulate(data, headers, tablefmt='psql')
 
-def load_model(filepath, step=None, load_to_cpu=False):
+def load_model(filepath, step=None, load_to_cpu=False) -> tuple[dict[str, Any], int]:
     '''
     :param filepath: The path to the model file, without .{epoch} extension
     :param step: if None. Load the latest.
