@@ -23,7 +23,7 @@ from system.controller.simulation.math_utils import Vector2D
 from system.bio_model.grid_cell_model import GridCellNetwork
 from system.controller.simulation.pybullet_environment import PybulletEnvironment, Robot
 from system.controller.local_controller.compass import Compass, AnalyticalCompass
-from system.controller.local_controller.local_controller import LocalController, ObstacleAvoidance, TurnToGoal
+from system.controller.local_controller.local_controller import LocalController, ObstacleAvoidance, ObstacleBackoff, TurnToGoal, RobotStuck
 from system.types import WaypointInfo, types
 from system.utils import normalize
 
@@ -280,7 +280,10 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
     end_state = ""  # for plotting
     last_pc = None
     while n < step_limit and not goal_reached:
-        goal_reached = controller.step()
+        try:
+            goal_reached = controller.step()
+        except RobotStuck:
+            break
 
         # TODO: feature suggestion: attach "nav step hooks" to the robot
         # so that we could run gc_network.track_movement and e.g. buildDataSet automatically

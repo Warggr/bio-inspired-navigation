@@ -9,6 +9,12 @@ from typing import Optional, List, Callable
 ResetGoalHook = Callable[[Vector2D, 'Robot'], None]
 TransformGoalHook = Callable[[Vector2D, 'Robot'], Vector2D]
 
+class Hook:
+    def on_reset_goal(self, new_goal: Vector2D, robot: 'Robot'):
+        pass
+    def transform_goal_vector(self, goal_vector: Vector2D, robot: 'Robot') -> Vector2D:
+        return goal_vector
+
 class LocalController(ABC):
     """
     Class that performs navigation.
@@ -17,6 +23,7 @@ class LocalController(ABC):
         self, robot : 'Robot', compass : 'Compass',
         on_reset_goal : List[ResetGoalHook] = [],
         transform_goal_vector : List[TransformGoalHook] = [],
+        hooks: list[Hook] = [],
     ):
         """
         Parameters:
@@ -27,12 +34,12 @@ class LocalController(ABC):
         self.robot = robot
         self.compass = compass
 
-        self.on_reset_goal = on_reset_goal
-        self.transform_goal_vector = transform_goal_vector
+        self.on_reset_goal = on_reset_goal + [hook.on_reset_goal for hook in hooks]
+        self.transform_goal_vector = transform_goal_vector + [hook.transform_goal_vector for hook in hooks]
 
     @staticmethod
     def default(robot: 'Robot', compass: 'Compass', obstacles=True):
-        return LocalController(robot, compass, on_reset_goal=[ TurnToGoal() ], transform_goal_vector=([ObstacleAvoidance()] if obstacles else []))
+        return LocalController(robot, compass, on_reset_goal=[ TurnToGoal() ], transform_goal_vector=([ObstacleAvoidance()] if obstacles else []), hooks=[StuckDetector()])
 
     def reset_goal(self, new_goal : Vector2D):
         self.compass.reset(new_goal)
@@ -98,6 +105,25 @@ class ObstacleBackoff:
         else:
             return goal_vector
 
+
+class RobotStuck(Exception):
+    pass
+
+class StuckDetector(Hook):
+    def __init__(self, stuck_threshold = 200):
+        self.stuck_threshold = stuck_threshold
+        self.nr_ofsteps = 0
+        self.previous_position = None
+    def on_reset_goal(self, new_goal, robot):
+        self.nr_ofsteps = 0
+    def transform_goal_vector(self, goal_vector: Vector2D, robot: 'Robot') -> Vector2D:
+        self.nr_ofsteps += 1
+        if self.nr_ofsteps % 20 == 0:
+            print(self.nr_ofsteps, np.linalg.norm(robot.position - self.previous_position))
+        if self.nr_ofsteps >= self.stuck_threshold and np.linalg.norm(robot.position - self.previous_position) < 0.1:
+            raise RobotStuck()
+        self.previous_position = robot.position
+        return goal_vector
 
 class TurnToGoal:
     def __init__(self, tolerance = 0.05):
