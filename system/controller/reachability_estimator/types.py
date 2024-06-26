@@ -103,3 +103,20 @@ class ReachabilityController(ABC):
         except KeyError:
             pass
         raise ValueError("Controller type not found: " + controller_type)
+
+ModelInput = list['torch.Tensor']
+Prediction = tuple[float, types.Vector2D, types.Angle]
+
+ImageForTorch = 'np.array[float, (4, 64, 64)]'
+def transpose_image(img : types.Image) -> ImageForTorch:
+    assert img.shape[1:] == (64, 64, 4) # that's the format returned by env.camera() and used in the rest of the code
+    img = img.transpose(1, 3).transpose(2, 3) # reorder 0123 -> 0321 -> 0312, i.e. channels first
+    assert img.shape[1:] == (4, 64, 64)
+    return img
+
+def untranspose_image(img: ImageForTorch) -> types.Image:
+    """ Inverse of transpose_image """
+    img = img.transpose(2, 3).transpose(1, 3) # 0312 -> 0321 -> 0123, i.e. channels last
+    return img
+
+Batch = list # only used for type hints - doesn't actually do anything

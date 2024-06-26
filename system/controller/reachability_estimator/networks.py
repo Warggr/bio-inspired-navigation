@@ -23,7 +23,7 @@ from torchmetrics import MeanSquaredError
 from abc import ABC, abstractmethod
 from typing import Dict, Tuple, List, Type
 
-Batch = List # only used for type hints - doesn't actually do anything
+from .types import Batch, Prediction, transpose_image
 
 def AutoAdamOptimizer(net): # Sentinel value
     return torch.optim.Adam(net.parameters(), lr=3.0e-4, eps=1.0e-5)
@@ -32,13 +32,11 @@ class NNModuleWithOptimizer:
     __slots__ = ('net', 'opt')
     def __init__(self, net : nn.Module, opt : torch.optim.Optimizer|None = AutoAdamOptimizer):
         if opt is AutoAdamOptimizer:
-            opt = torch.optim.Adam(net.parameters(), lr=3.0e-4, eps=1.0e-5)
+            opt = AutoAdamOptimizer(net)
         self.net = net
         self.opt = opt
 
 class Model(ABC):
-    Prediction = Tuple[float, types.Vector2D, types.Angle]
-
     """ Interface for networks """
     def __init__(self, nets : Dict[str, NNModuleWithOptimizer]):
         self.nets = { name: val.net for name, val in nets.items() }
@@ -50,7 +48,7 @@ class Model(ABC):
         batch_transformation=None,
         batch_src_spikings=None, batch_dst_spikings=None,
         batch_src_distances=None, batch_dst_distances=None,
-    ) -> Batch['Model.Prediction']:
+    ) -> Batch[Prediction]:
         ...
 
     @staticmethod
@@ -88,10 +86,11 @@ class Siamese(Model):
         super().__init__(nets)
 
     def get_prediction(self,
-        src_batch, dst_batch,
+        batch_src_images=None, batch_dst_images=None,
         batch_transformation=None,
-        batch_src_spikings=None, batch_dst_spikings=None
-    ) -> Batch[Model.Prediction]:
+        batch_src_spikings=None, batch_dst_spikings=None,
+        batch_src_distances=None, batch_dst_distances=None
+    ) -> Batch[Prediction]:
         return get_grid_cell(batch_src_spikings, batch_dst_spikings), None, None
 
 
@@ -126,7 +125,7 @@ class CNN(Model):
         batch_transformation=None,
         batch_src_spikings=None, batch_dst_spikings=None,
         batch_src_distances=None, batch_dst_distances=None,
-    ) -> Model.Prediction:
+    ) -> Batch[Prediction]:
         # Extract features
         all_x = []
 
@@ -203,7 +202,7 @@ class ResNet(Model):
         batch_transformation=None,
         batch_src_spikings=None, batch_dst_spikings=None,
         batch_src_distances=None, batch_dst_distances=None,
-    ) -> Batch[Model.Prediction]:
+    ) -> Batch[Prediction]:
         # Extract features
         src_features = self.nets['res_net'](src_batch.view(batch_size, c, h, w))
         dst_features = self.nets['res_net'](dst_batch.view(batch_size, c, h, w))
@@ -224,7 +223,7 @@ compare_mse = MeanSquaredError()
 module_weights = torch.FloatTensor([32, 16, 8, 4, 2, 1])
 
 
-def get_grid_cell(batch_src_spikings, batch_dst_spikings) -> [float]:
+def get_grid_cell(batch_src_spikings, batch_dst_spikings) -> Batch[Prediction]:
     """
     Calculate the similarity between two arrays of grid cell modules using Structural Similarity Index (SSIM)
     with weighted aggregation.
@@ -410,18 +409,6 @@ class FCLayers(nn.Module):
         x = F.relu(x)
         x = self.fc3(x)
         return x
-
-ImageForTorch = 'np.array[float, (4, 64, 64)]'
-def transpose_image(img : 'Image') -> ImageForTorch:
-    #assert img.shape[1:] == (64, 64, 4) # that's the format returned by env.camera() and used in the rest of the code
-    img = img.transpose(1, 3).transpose(2, 3) # reorder 0123 -> 0321 -> 0312, i.e. channels first
-    #assert img.shape[1:] == (4, 64, 64)
-    return img
-
-def untranspose_image(img: ImageForTorch) -> 'Image':
-    """ Inverse of transpose_image """
-    img = img.transpose(2, 3).transpose(1, 3) # 0312 -> 0321 -> 0123, i.e. channels last
-    return img
 
 class ImagePairEncoderV2(nn.Module):
     def __init__(self, init_scale=1.0, bias=True, no_weight_init=False):

@@ -14,13 +14,25 @@ from system.controller.reachability_estimator.training.utils import load_model
 from system.controller.reachability_estimator.training.train_multiframe_dst import DATA_STORAGE_FOLDER, Hyperparameters, TrainDevice
 from system.controller.reachability_estimator.networks import AutoAdamOptimizer, NNModuleWithOptimizer
 from system.controller.reachability_estimator.autoencoders import ImageAutoencoder
+from system.controller.reachability_estimator.ReachabilityDataset import ReachabilityDataset
 from system.types import Image
 from typing import Any
+
+
+class ImageDataset(Dataset[Image]):
+    def __init__(self, dataset: ReachabilityDataset):
+        self.dataset = dataset
+    def __len__(self):
+        return len(self.dataset)
+    def __getitem__(self, idx) -> Image:
+        sample, _ = self.dataset.sample(idx)
+        return sample.src.img
+
 
 def eval_performance(
     nets: ImageAutoencoder,
     loader: DataLoader[Image],
-    loss_function,
+    loss_function = nn.MSELoss(),
 ) -> dict[str, float]:
     with torch.no_grad():
         log_loss = 0
@@ -145,23 +157,38 @@ def train(
         log_performance(latest_metrics, writer, hyperparams.max_epochs)
 
 if __name__ == "__main__":
-    from system.controller.reachability_estimator.ReachabilityDataset import ReachabilityDataset
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('mode', choices=['train', 'validate'], help='mode')
+    parser.add_argument('code_dim', help='The dimension of the encoding', type=int, default=16)
+    parser.add_argument('-e', '--epochs', type=int, default=25)
+    args = parser.parse_args()
 
     dataset_features = '-3colors'
 
     dataset = ReachabilityDataset(filename='dataset' + dataset_features + ".hd5")
-
-    class ImageDataset(Dataset[Image]):
-        def __init__(self, dataset: ReachabilityDataset):
-            self.dataset = dataset
-        def __len__(self):
-            return len(self.dataset)
-        def __getitem__(self, idx) -> Image:
-            sample, _ = self.dataset.sample(idx)
-            return sample.src.img
-
     dataset = ImageDataset(dataset)
 
-    net = ImageAutoencoder()
+    net = ImageAutoencoder(args.code_dim)
 
-    train(net, dataset, resume=True)
+    match args.mode:
+        case 'train':
+            hyperparameters = Hyperparameters(
+                max_epochs=args.epochs,
+            )
+
+            train(net, dataset, resume=True, model_suffix=f'{args.code_dim}')
+        case 'validate':
+            model_filename = 'autoencoder' + str(args.code_dim)
+            model_file = os.path.join(DATA_STORAGE_FOLDER, model_filename)
+
+            state, epoch = load_model(model_file)
+            net.load_state_dict(state)
+
+            loader = DataLoader(dataset, batch_size=64)
+
+            metrics = eval_performance(net, loader)
+            for key, value in metrics.items():
+                print(f"{key}\t{value}")
+        case _: raise AssertionError

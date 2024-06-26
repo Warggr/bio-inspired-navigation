@@ -1,12 +1,16 @@
 import torch
 import torch.nn as nn
+import math
 
-from .networks import transpose_image, untranspose_image
+from .types import transpose_image, untranspose_image
 from system.types import Image
 
 class ImageEncoder(nn.Module):
-    def __init__(self, bias=True):
+    def __init__(self, code_dim = 16, fc_2_dim=None, bias=True):
         super().__init__()
+        self.code_dim = code_dim
+        if fc_2_dim is None:
+            fc_2_dim = int(math.sqrt(400 * code_dim)) # geometric average
         self.layers = nn.Sequential(
             # 4 x 64 x 64
             nn.Conv2d(4, 8, kernel_size=5, stride=2, bias=bias),
@@ -19,9 +23,9 @@ class ImageEncoder(nn.Module):
             nn.ReLU(),
             nn.Flatten(),
             # 16 x 5 x 5
-            nn.Linear(16 * 5 * 5, 32),
+            nn.Linear(16 * 5 * 5, fc_2_dim),
             nn.ReLU(),
-            nn.Linear(32, 16),
+            nn.Linear(fc_2_dim, code_dim),
             nn.ReLU(),
         )
 
@@ -31,12 +35,14 @@ class ImageEncoder(nn.Module):
 
 
 class ImageDecoder(nn.Module):
-    def __init__(self, bias=True):
+    def __init__(self, code_dim = 16, fc_2_dim=None, bias=True):
         super().__init__()
+        if fc_2_dim is None:
+            fc_2_dim = int(math.sqrt(400 * code_dim)) # geometric average
         self.layers = nn.Sequential(
-            nn.Linear(16, 32),
+            nn.Linear(code_dim, fc_2_dim),
             nn.ReLU(),
-            nn.Linear(32, 400),
+            nn.Linear(fc_2_dim, 400),
             nn.ReLU(),
             nn.Unflatten(1, (16, 5, 5)),
             nn.ConvTranspose2d(16, 12, kernel_size=5, stride=2, bias=bias),
@@ -51,12 +57,12 @@ class ImageDecoder(nn.Module):
         return untranspose_image(x)
 
 class ImageAutoencoder(nn.Module):
-    def __init__(self, init_scale=1.0, bias=True):
+    def __init__(self, code_dim=16, fc_2_dim=None, bias=True):
         super().__init__()
-        self.encoder = ImageEncoder(bias)
-        self.decoder = ImageDecoder(bias)
+        self.encoder = ImageEncoder(code_dim, fc_2_dim, bias)
+        self.decoder = ImageDecoder(code_dim, fc_2_dim, bias)
 
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=3e-3, weight_decay=1e-5)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=5e-3, weight_decay=0)
 
     def forward(self, x : Image) -> Image:
         code = self.encoder.forward(x)
