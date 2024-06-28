@@ -25,12 +25,14 @@ from typing import Dict, List, Type
 
 from .types import Batch, Prediction, transpose_image
 
-def AutoAdamOptimizer(net): # Sentinel value
-    return torch.optim.Adam(net.parameters(), lr=3.0e-4, eps=1.0e-5)
+def AutoAdamOptimizer(net=None, lr=3.0e-4, eps=1.0e-5):
+    if net is None:
+        return lambda net: AutoAdamOptimizer(net, lr, eps)
+    return torch.optim.Adam(net.parameters(), lr=lr, eps=eps)
 
 class NNModuleWithOptimizer:
     __slots__ = ('net', 'opt')
-    def __init__(self, net : nn.Module, opt : torch.optim.Optimizer|None = AutoAdamOptimizer):
+    def __init__(self, net : nn.Module, opt : torch.optim.Optimizer = AutoAdamOptimizer):
         if opt is AutoAdamOptimizer:
             opt = AutoAdamOptimizer(net)
         self.net = net
@@ -95,7 +97,7 @@ class Siamese(Model):
 
 
 class CNN(Model):
-    def __init__(self, config : 'SampleConfig', with_conv_layer=True):
+    def __init__(self, config : 'SampleConfig', with_conv_layer=True, **optimizer_kwargs):
         self.with_conv_layer = with_conv_layer
         self.sample_config = config
         # Defining the NN and optimizers
@@ -103,20 +105,22 @@ class CNN(Model):
         nets = initialize_regressors({})
         input_dim = 0
 
+        opt = AutoAdamOptimizer(**optimizer_kwargs)
+
         if self.sample_config.images:
             input_dim += 512
-            nets["img_encoder"] = NNModuleWithOptimizer( ImagePairEncoderV2(init_scale=1.0))
+            nets["img_encoder"] = NNModuleWithOptimizer(ImagePairEncoderV2(init_scale=1.0), opt=opt)
         if self.sample_config.with_dist:
             input_dim += 3
         if self.sample_config.with_grid_cell_spikings:
             input_dim += 1
         if self.with_conv_layer:
-            nets["conv_encoder"] = NNModuleWithOptimizer( ConvEncoder(init_scale=1.0, input_dim=512, no_weight_init=False))
+            nets["conv_encoder"] = NNModuleWithOptimizer( ConvEncoder(init_scale=1.0, input_dim=512, no_weight_init=False), opt=opt)
         if self.sample_config.lidar:
             one_lidar_input_dim = 52 if self.sample_config.lidar == 'raw_lidar' else BoundaryCellActivity.size
-            nets["lidar_encoder"] = NNModuleWithOptimizer( LidarEncoder(2*one_lidar_input_dim, 10) )
+            nets["lidar_encoder"] = NNModuleWithOptimizer( LidarEncoder(2*one_lidar_input_dim, 10), opt=opt)
             input_dim += 10
-        nets["fully_connected"] = NNModuleWithOptimizer( FCLayers(init_scale=1.0, input_dim=input_dim, no_weight_init=False))
+        nets["fully_connected"] = NNModuleWithOptimizer( FCLayers(init_scale=1.0, input_dim=input_dim, no_weight_init=False), opt=opt)
 
         super().__init__(nets)
 

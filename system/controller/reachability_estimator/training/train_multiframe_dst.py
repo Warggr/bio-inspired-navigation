@@ -195,8 +195,10 @@ class Hyperparameters:
     batch_size : int = 64
     samples_per_epoch : int = 10000
     max_epochs : int = 25
+    lr: float = 3e-4
     lr_decay_epoch : int = 1
     lr_decay_rate : float = 0.7
+    eps: float = 1e-5
 
 def train_multiframedst(
     nets : Model, dataset : ReachabilityDataset,
@@ -317,7 +319,7 @@ def train_multiframedst(
     if latest_metrics is None:
         valid_loader = DataLoader(valid_dataset, batch_size=hyperparams.batch_size, num_workers=n_dataset_worker)
         latest_metrics = tensor_log(valid_loader, train_device, writer, hyperparams.max_epochs, nets, loss_function)
-    hparams = vars(nets.sample_config) | { 'with_conv_layer': nets.with_conv_layer } | getattr(loss_function, 'hparams', {})
+    hparams = vars(nets.sample_config) | { 'with_conv_layer': nets.with_conv_layer } | vars(hyperparameters) | getattr(loss_function, 'hparams', {})
     latest_metrics = { "Final/"+key: value for key, value in latest_metrics.items() }
     print("Writing metrics:", latest_metrics)
     writer.add_hparams(hparams, latest_metrics)
@@ -361,7 +363,11 @@ if __name__ == '__main__':
 
     import argparse
 
-    parser = argparse.ArgumentParser()
+    hyperparams_parser = argparse.ArgumentParser(add_help=False)
+    for field in Hyperparameters.__dataclass_fields__.values():
+        hyperparams_parser.add_argument('--' + field.name.replace('_', '-'), help='hyperparameter ' + field.name, type=field.type, default=field.default)
+
+    parser = argparse.ArgumentParser(parents=[hyperparams_parser], formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('mode', choices=['train', 'test', 'validate'], help='mode')
     parser.add_argument('--dataset-features', nargs='+', default=[])
     parser.add_argument('--dataset-basename', help='The base name of the reachability dataset HD5 file', default='dataset')

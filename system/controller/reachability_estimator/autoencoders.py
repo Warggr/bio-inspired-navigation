@@ -57,12 +57,14 @@ class ImageDecoder(nn.Module):
         return untranspose_image(x)
 
 class ImageAutoencoder(nn.Module):
-    def __init__(self, code_dim=16, fc_2_dim=None, bias=True):
+    def __init__(self, code_dim=16, fc_2_dim=None, bias=True, optimizer_params={}):
         super().__init__()
         self.encoder = ImageEncoder(code_dim, fc_2_dim, bias)
         self.decoder = ImageDecoder(code_dim, fc_2_dim, bias)
 
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=5e-3, weight_decay=0)
+        optimizer_params = dict(lr=5e-3, weight_decay=0) | optimizer_params
+
+        self.optimizer = torch.optim.Adam(self.parameters(), **optimizer_params)
 
     def forward(self, x : Image) -> Image:
         code = self.encoder.forward(x)
