@@ -21,20 +21,22 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from torchmetrics import MeanSquaredError
 from abc import ABC, abstractmethod
-from typing import Dict, List, Type
+from typing import Callable, Dict, List, Type
 
 from .types import Batch, Prediction, transpose_image
 
-def AutoAdamOptimizer(net=None, lr=3.0e-4, eps=1.0e-5):
+from torch.optim import Optimizer
+
+def AutoAdamOptimizer(net=None, lr=3.0e-4, eps=1.0e-5) -> Optimizer|Callable[[nn.Module],Optimizer]:
     if net is None:
-        return lambda net: AutoAdamOptimizer(net, lr, eps)
+        return lambda net: torch.optim.Adam(net.parameters(), lr=lr, eps=eps)
     return torch.optim.Adam(net.parameters(), lr=lr, eps=eps)
 
 class NNModuleWithOptimizer:
     __slots__ = ('net', 'opt')
-    def __init__(self, net : nn.Module, opt : torch.optim.Optimizer = AutoAdamOptimizer):
-        if opt is AutoAdamOptimizer:
-            opt = AutoAdamOptimizer(net)
+    def __init__(self, net : nn.Module, opt : Optimizer|Callable[[nn.Module], Optimizer] = AutoAdamOptimizer):
+        if callable(opt):
+            opt = opt(net)
         self.net = net
         self.opt = opt
 

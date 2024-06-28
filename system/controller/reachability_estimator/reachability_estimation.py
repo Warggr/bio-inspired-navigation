@@ -19,7 +19,7 @@ import system.controller.reachability_estimator.networks as networks
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.bio_model.place_cell_model import PlaceCell
 import system.types as types
-from system.controller.reachability_estimator.types import ReachabilityController, PlaceInfo
+from system.controller.reachability_estimator.types import ReachabilityController, PlaceInfo, transpose_image
 
 try:
     from typing import override
@@ -203,13 +203,13 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
 
     @classmethod
     def to_batch(cls, p: PlaceInfo, q: PlaceInfo):
-        # For some reason the images saved by Anna didn't have the shape I expected
-        p_imgs = p.img.transpose(1, 3).transpose(2, 3)
-        q_imgs = q.img.transpose(1, 3).transpose(2, 3)
+        def get_lidar(p: PlaceInfo):
+            return getattr(p, 'lidar', -1 * np.ones(types.LidarReading.DEFAULT_NUMBER_OF_ANGLES))
+
         args = (
-            p_imgs, q_imgs,
+            transpose_image(p.img), transpose_image(q.img),
             p.spikings, q.spikings,
-            p.lidar, getattr(q, 'lidar', -1 * np.ones(types.LidarReading.DEFAULT_NUMBER_OF_ANGLES)),
+            get_lidar(p), get_lidar(q),
         )
         return np.array([args], dtype=cls.dtype)
 
