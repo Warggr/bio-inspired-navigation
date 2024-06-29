@@ -303,7 +303,7 @@ def train_multiframedst(
         for _, sched in net_scheds.items():
             sched.step()
 
-        if epoch % save_interval == 0 or epoch == hyperparams.max_epochs:
+        if (save_interval is not None and epoch % save_interval == 0) or epoch == hyperparams.max_epochs:
             print('saving model...')
             writer.flush()
             nets.save(epoch, hyperparams, model_file)
@@ -319,7 +319,7 @@ def train_multiframedst(
     if latest_metrics is None:
         valid_loader = DataLoader(valid_dataset, batch_size=hyperparams.batch_size, num_workers=n_dataset_worker)
         latest_metrics = tensor_log(valid_loader, train_device, writer, hyperparams.max_epochs, nets, loss_function)
-    hparams = vars(nets.sample_config) | { 'with_conv_layer': nets.with_conv_layer } | vars(hyperparameters) | getattr(loss_function, 'hparams', {})
+    hparams = vars(nets.sample_config) | { 'with_conv_layer': nets.with_conv_layer } | vars(hyperparams) | getattr(loss_function, 'hparams', {})
     latest_metrics = { "Final/"+key: value for key, value in latest_metrics.items() }
     print("Writing metrics:", latest_metrics)
     writer.add_hparams(hparams, latest_metrics)
@@ -350,6 +350,13 @@ def validate_func(net : Model, dataset : ReachabilityDataset, batch_size, train_
     writer.flush()
     print("Run info written to", writer.log_dir)
 
+def optional(typ):
+    def _parser(st):
+        if st.lower() in ['none', 'off']:
+            return None
+        return typ(st)
+    return _parser
+
 if __name__ == '__main__':
 
     """ Train or test models for the reachability estimator
@@ -367,16 +374,19 @@ if __name__ == '__main__':
     for field in Hyperparameters.__dataclass_fields__.values():
         hyperparams_parser.add_argument('--' + field.name.replace('_', '-'), help='hyperparameter ' + field.name, type=field.type, default=field.default)
 
+    model_basename = 'reachability_network'
     parser = argparse.ArgumentParser(parents=[hyperparams_parser], formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('mode', choices=['train', 'test', 'validate'], help='mode')
     parser.add_argument('--dataset-features', nargs='+', default=[])
     parser.add_argument('--dataset-basename', help='The base name of the reachability dataset HD5 file', default='dataset')
+    parser.add_argument('--tag', help=f'Network saved in `{model_basename}-{{tag}}`', default='')
     parser.add_argument('--images', help='Images are included in the dataset', action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('--spikings', help='Grid cell spikings are included in the dataset', action='store_true')
     parser.add_argument('--lidar', help='LIDAR distances are included in the dataset', choices=['raw_lidar', 'ego_bc', 'allo_bc'])
     parser.add_argument('--pair-conv', dest='with_conv_layer', help='Pair-conv neural network', action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('--dist', help='Provide the distance and angle to the reachability estimator', action='store_true')
     parser.add_argument('--resume', action='store_true', help='Continue training from last saved model')
+    parser.add_argument('--save-interval', type=optional(int))
 
     args = parser.parse_args()
 
@@ -387,8 +397,12 @@ if __name__ == '__main__':
         dist=args.dist,
     )
 
+    suffix = ''
+    if args.tag:
+        suffix += '-' + args.tag
     args.dataset_features = ''.join([ f'-{feature}' for feature in args.dataset_features ])
-    suffix = args.dataset_features + config.suffix()
+    suffix += args.dataset_features
+    suffix += config.suffix()
     if args.with_conv_layer:
         suffix += '+conv'
 
@@ -399,12 +413,15 @@ if __name__ == '__main__':
 
     # Defining the NN and optimizers
     model_kwargs = { key: getattr(args, key) for key in ['with_conv_layer'] }
+    hyperparameters = Hyperparameters(batch_size=64)
+
     nets = Model.create_from_config(backbone, config, **model_kwargs)
 
     loss_function = make_loss_function(position_loss_weight=0.6, angle_loss_weight=0.3)
     global_args = {
         'train_device': "cpu",
         'loss_function': loss_function,
+        'model_filename': model_basename,
         'model_suffix': suffix,
     }
 
@@ -414,4 +431,4 @@ if __name__ == '__main__':
         run_test_model(dataset)
     elif args.mode == "train":
         print("Training with dataset of length", len(dataset))
-        train_multiframedst(nets, dataset, resume=args.resume, hyperparams=Hyperparameters(batch_size=64), **global_args)
+        train_multiframedst(nets, dataset, save_interval=args.save_interval, resume=args.resume, hyperparams=Hyperparameters(batch_size=64), **global_args)
