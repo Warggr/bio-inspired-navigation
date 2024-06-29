@@ -34,7 +34,6 @@ class SampleConfig:
         self.lidar = lidar
         self.images = images
         self.with_dist = dist
-        assert self.images or self.lidar or self.with_grid_cell_spikings or self.with_dist, "At least one input is required"
 
     def suffix(self) -> str:
         return (''

@@ -135,8 +135,8 @@ class CNN(Model):
         # Extract features
         all_x = []
 
+        batch_size = batch_dst_images.size()[0]
         if self.sample_config.images:
-            batch_size = batch_dst_images.size()[0]
             x = self.nets['img_encoder'](batch_src_images, batch_dst_images)
 
             if self.with_conv_layer:
@@ -161,7 +161,10 @@ class CNN(Model):
             assert not torch.any(lidar_features.isnan())
             all_x.append(lidar_features)
 
-        x = torch.cat(all_x, 1)
+        if all_x:
+            x = torch.cat(all_x, 1)
+        else:
+            x = torch.Tensor(np.zeros((batch_size, 0)))
         assert not torch.any(x.isnan())
 
         # Get prediction
