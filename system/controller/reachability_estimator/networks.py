@@ -397,12 +397,12 @@ class LidarEncoder(nn.Module):
         return x
 
 class FCLayers(nn.Module):
-    def __init__(self, input_dim=512, init_scale=1.0, bias=True, no_weight_init=False):
+    def __init__(self, input_dim=512, dim2=256, dim3=32, init_scale=1.0, bias=True, no_weight_init=False):
         super(FCLayers, self).__init__()
 
-        self.fc1 = nn.Linear(input_dim, input_dim // 2, bias=bias)
-        self.fc2 = nn.Linear(input_dim // 2, input_dim // 2, bias=bias)
-        self.fc3 = nn.Linear(input_dim // 2, 4, bias=bias)
+        self.fc1 = nn.Linear(input_dim, dim2, bias=bias)
+        self.fc2 = nn.Linear(dim2, dim3, bias=bias)
+        self.fc3 = nn.Linear(dim3, 4, bias=bias)
 
         if not no_weight_init:
             for layer in (self.fc1, self.fc2, self.fc3):
