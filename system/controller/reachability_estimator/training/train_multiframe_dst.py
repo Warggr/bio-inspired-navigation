@@ -25,10 +25,8 @@ if __name__ == "__main__":
 
 from system.controller.reachability_estimator.networks import Model
 from system.controller.reachability_estimator.ReachabilityDataset import ReachabilityDataset, SampleConfig
-from system.controller.reachability_estimator.training.utils import load_model
+from system.controller.reachability_estimator.training.utils import load_model, DATA_STORAGE_FOLDER
 from system.controller.reachability_estimator.types import Prediction
-
-DATA_STORAGE_FOLDER = os.path.join(os.path.dirname(__file__), "..", "data", "models")
 
 def _load_weights(model_file, nets : Model, **kwargs) -> int:
     state, epoch = load_model( model_file, load_to_cpu=True, **kwargs)
@@ -232,6 +230,9 @@ def train_multiframedst(
             epoch = 0
             print('No saved state found. Starting from the beginning. epoch: 0')
 
+    if epoch == 0 and nets.image_encoder == 'pretrained': # TODO Pierre: this is ugly
+        nets.load_pretrained_model()
+
     # This is a direct copy of rmp_nav
     # FIXME: hack to mitigate the bug in torch 1.1.0's schedulers
     if epoch <= 1:
@@ -319,7 +320,8 @@ def train_multiframedst(
     if latest_metrics is None:
         valid_loader = DataLoader(valid_dataset, batch_size=hyperparams.batch_size, num_workers=n_dataset_worker)
         latest_metrics = tensor_log(valid_loader, train_device, writer, hyperparams.max_epochs, nets, loss_function)
-    hparams = vars(nets.sample_config) | { 'with_conv_layer': nets.with_conv_layer } | vars(hyperparams) | getattr(loss_function, 'hparams', {})
+    nets_hparams = { 'image_encoder': nets.image_encoder, 'with_conv_layer': nets.image_encoder == 'conv' } # with_conv_layer is for backwards compatibility
+    hparams = vars(nets.sample_config) | nets_hparams | vars(hyperparams) | getattr(loss_function, 'hparams', {})
     latest_metrics = { "Final/"+key: value for key, value in latest_metrics.items() }
     print("Writing metrics:", latest_metrics)
     writer.add_hparams(hparams, latest_metrics)
@@ -383,7 +385,7 @@ if __name__ == '__main__':
     parser.add_argument('--images', help='Images are included in the dataset', action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('--spikings', help='Grid cell spikings are included in the dataset', action='store_true')
     parser.add_argument('--lidar', help='LIDAR distances are included in the dataset', choices=['raw_lidar', 'ego_bc', 'allo_bc'])
-    parser.add_argument('--pair-conv', dest='with_conv_layer', help='Pair-conv neural network', action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument('--image-encoder', help='Image encoder', choices=['fc', 'conv', 'pretrained'], default='conv')
     parser.add_argument('--dist', help='Provide the distance and angle to the reachability estimator', action='store_true')
     parser.add_argument('--resume', action='store_true', help='Continue training from last saved model')
     parser.add_argument('--save-interval', type=optional(int))
@@ -403,8 +405,8 @@ if __name__ == '__main__':
     args.dataset_features = ''.join([ f'-{feature}' for feature in args.dataset_features ])
     suffix += args.dataset_features
     suffix += config.suffix()
-    if args.with_conv_layer:
-        suffix += '+conv'
+    if args.image_encoder:
+        suffix += '+' + args.image_encoder
 
     filename = args.dataset_basename + args.dataset_features + ".hd5"
     dataset = ReachabilityDataset(filename, sample_config=config)
@@ -412,10 +414,9 @@ if __name__ == '__main__':
     backbone = 'convolutional' # convolutional, res_net
 
     # Defining the NN and optimizers
-    model_kwargs = { key: getattr(args, key) for key in ['with_conv_layer'] }
     hyperparameters = Hyperparameters(batch_size=64)
 
-    nets = Model.create_from_config(backbone, config, **model_kwargs)
+    nets = Model.create_from_config(backbone, config, image_encoder=args.image_encoder)
 
     loss_function = make_loss_function(position_loss_weight=0.6, angle_loss_weight=0.3)
     global_args = {

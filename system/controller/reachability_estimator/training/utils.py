@@ -78,6 +78,8 @@ def module_weights_stats(module):
     ]
     return tabulate.tabulate(data, headers, tablefmt='psql')
 
+DATA_STORAGE_FOLDER = os.path.join(os.path.dirname(__file__), "..", "data", "models")
+
 def load_model(filepath, step=None, load_to_cpu=False) -> tuple[dict[str, Any], int]:
     '''
     :param filepath: The path to the model file, without .{epoch} extension

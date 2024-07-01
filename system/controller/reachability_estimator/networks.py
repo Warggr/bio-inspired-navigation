@@ -21,7 +21,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from torchmetrics import MeanSquaredError
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, List, Type
+from typing import Callable, Dict, Literal, Type
 
 from .types import Batch, Prediction, transpose_image
 
@@ -98,9 +98,11 @@ class Siamese(Model):
         return get_grid_cell(batch_src_spikings, batch_dst_spikings), None, None
 
 
+PRETRAINED_INPUT_DIM = 20
+
 class CNN(Model):
-    def __init__(self, config : 'SampleConfig', with_conv_layer=True, **optimizer_kwargs):
-        self.with_conv_layer = with_conv_layer
+    def __init__(self, config : 'SampleConfig', image_encoder: Literal['conv', 'fc', 'pretrained'], **optimizer_kwargs):
+        self.image_encoder = image_encoder
         self.sample_config = config
         # Defining the NN and optimizers
 
@@ -110,14 +112,19 @@ class CNN(Model):
         opt = AutoAdamOptimizer(**optimizer_kwargs)
 
         if self.sample_config.images:
-            input_dim += 512
-            nets["img_encoder"] = NNModuleWithOptimizer(ImagePairEncoderV2(init_scale=1.0), opt=opt)
+            if self.image_encoder == 'pretrained':
+                input_dim += 2*PRETRAINED_INPUT_DIM
+                #nets["img_encoder"] = None
+            else:
+                input_dim += 512
+                nets["img_encoder"] = NNModuleWithOptimizer(ImagePairEncoderV2(init_scale=1.0), opt=opt)
+                if self.image_encoder == 'conv':
+                    nets["conv_encoder"] = NNModuleWithOptimizer( ConvEncoder(init_scale=1.0, input_dim=512, no_weight_init=False), opt=opt)
+
         if self.sample_config.with_dist:
             input_dim += 3
         if self.sample_config.with_grid_cell_spikings:
             input_dim += 1
-        if self.with_conv_layer:
-            nets["conv_encoder"] = NNModuleWithOptimizer( ConvEncoder(init_scale=1.0, input_dim=512, no_weight_init=False), opt=opt)
         if self.sample_config.lidar:
             one_lidar_input_dim = 52 if self.sample_config.lidar == 'raw_lidar' else BoundaryCellActivity.size
             nets["lidar_encoder"] = NNModuleWithOptimizer( LidarEncoder(2*one_lidar_input_dim, 10), opt=opt)
@@ -125,6 +132,15 @@ class CNN(Model):
         nets["fully_connected"] = NNModuleWithOptimizer( FCLayers(init_scale=1.0, input_dim=input_dim, no_weight_init=False), opt=opt)
 
         super().__init__(nets)
+
+    def load_pretrained_model(self):
+        from system.controller.reachability_estimator.autoencoders import ImageEncoder
+        from system.controller.reachability_estimator.training.utils import load_model, DATA_STORAGE_FOLDER
+        encoder = ImageEncoder(code_dim=PRETRAINED_INPUT_DIM)
+        model, _ = load_model(filepath=os.path.join(DATA_STORAGE_FOLDER, f'autoencoder{PRETRAINED_INPUT_DIM}'))
+        encoder.load_state_dict(model['nets']['encoder'])
+        self.nets["img_encoder"] = encoder
+        self.optimizers["img_encoder"] = AutoAdamOptimizer(encoder)
 
     def get_prediction(self,
         batch_src_images=None, batch_dst_images=None,
@@ -137,12 +153,17 @@ class CNN(Model):
 
         batch_size = batch_dst_images.size()[0]
         if self.sample_config.images:
-            x = self.nets['img_encoder'](batch_src_images, batch_dst_images)
+            if self.image_encoder == 'pretrained':
+                x1 = self.nets['img_encoder'](batch_src_images)
+                x2 = self.nets['img_encoder'](batch_dst_images)
+                x = torch.cat([x1, x2], dim=1)
+            else:
+                x = self.nets['img_encoder'](batch_src_images, batch_dst_images)
 
-            if self.with_conv_layer:
-                # Convolutional Layer
-                x = self.nets['conv_encoder'](x.view(batch_size, -1, 1))
-                assert not torch.any(x.isnan())
+                if self.image_encoder == 'conv':
+                    # Convolutional Layer
+                    x = self.nets['conv_encoder'](x.view(batch_size, -1, 1))
+                    assert not torch.any(x.isnan())
             all_x.append(x)
 
         if self.sample_config.with_grid_cell_spikings:
