@@ -22,6 +22,7 @@ from torch.autograd import Variable
 from torchmetrics import MeanSquaredError
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Literal, Type
+from itertools import pairwise
 
 from .types import Batch, Prediction, transpose_image
 
@@ -101,7 +102,12 @@ class Siamese(Model):
 PRETRAINED_INPUT_DIM = 20
 
 class CNN(Model):
-    def __init__(self, config : 'SampleConfig', image_encoder: Literal['conv', 'fc', 'pretrained'], **optimizer_kwargs):
+    def __init__(self,
+        config: 'SampleConfig',
+        image_encoder: Literal['conv', 'fc', 'pretrained'],
+        hidden_fc_layers: list[int] = [256,32],
+        **optimizer_kwargs
+    ):
         self.image_encoder = image_encoder
         self.sample_config = config
         # Defining the NN and optimizers
@@ -129,7 +135,7 @@ class CNN(Model):
             one_lidar_input_dim = 52 if self.sample_config.lidar == 'raw_lidar' else BoundaryCellActivity.size
             nets["lidar_encoder"] = NNModuleWithOptimizer( LidarEncoder(2*one_lidar_input_dim, 10), opt=opt)
             input_dim += 10
-        nets["fully_connected"] = NNModuleWithOptimizer( FCLayers(init_scale=1.0, input_dim=input_dim, no_weight_init=False), opt=opt)
+        nets["fully_connected"] = NNModuleWithOptimizer( FCLayers(init_scale=1.0, input_dim=input_dim, hidden_layers=hidden_fc_layers, no_weight_init=False), opt=opt)
 
         super().__init__(nets)
 
@@ -418,27 +424,25 @@ class LidarEncoder(nn.Module):
         return x
 
 class FCLayers(nn.Module):
-    def __init__(self, input_dim=512, dim2=256, dim3=32, init_scale=1.0, bias=True, no_weight_init=False):
+    def __init__(self, input_dim, hidden_layers, output_dim=4, init_scale=1.0, bias=True, no_weight_init=False):
         super(FCLayers, self).__init__()
 
-        self.fc1 = nn.Linear(input_dim, dim2, bias=bias)
-        self.fc2 = nn.Linear(dim2, dim3, bias=bias)
-        self.fc3 = nn.Linear(dim3, 4, bias=bias)
+        fc = [ nn.Linear(input_dim, hidden_layers[0], bias=bias), nn.ReLU() ]
+        for d1, d2 in pairwise(hidden_layers):
+            fc += [ nn.Linear(d1, d2, bias=bias), nn.ReLU() ]
+        fc += [ nn.Linear(hidden_layers[-1], output_dim, bias=bias) ]
+        self.fc = nn.Sequential(*fc)
 
         if not no_weight_init:
-            for layer in (self.fc1, self.fc2, self.fc3):
-                nn.init.orthogonal_(layer.weight, init_scale)
-                if hasattr(layer, 'bias') and layer.bias is not None:
-                    with torch.no_grad():
-                        layer.bias.zero_()
+            for layer in self.fc:
+                if type(layer) == nn.Linear:
+                    nn.init.orthogonal_(layer.weight, init_scale)
+                    if hasattr(layer, 'bias') and layer.bias is not None:
+                        with torch.no_grad():
+                            layer.bias.zero_()
 
     def forward(self, x):
-        x = self.fc1(x)
-        x = F.relu(x)
-        x = self.fc2(x)
-        x = F.relu(x)
-        x = self.fc3(x)
-        return x
+        return self.fc.forward(x)
 
 class ImagePairEncoderV2(nn.Module):
     def __init__(self, init_scale=1.0, bias=True, no_weight_init=False):

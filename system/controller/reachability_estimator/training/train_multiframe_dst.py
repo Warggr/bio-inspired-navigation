@@ -386,6 +386,7 @@ if __name__ == '__main__':
     parser.add_argument('--spikings', help='Grid cell spikings are included in the dataset', action='store_true')
     parser.add_argument('--lidar', help='LIDAR distances are included in the dataset', choices=['raw_lidar', 'ego_bc', 'allo_bc'])
     parser.add_argument('--image-encoder', help='Image encoder', choices=['fc', 'conv', 'pretrained'], default='conv')
+    parser.add_argument('--hidden-fc-layers', help='Hidden FC layer dimensions as a comma-separated list', type=lambda s: [int(i) for i in s.split(',')])
     parser.add_argument('--dist', help='Provide the distance and angle to the reachability estimator', action='store_true')
     parser.add_argument('--resume', action='store_true', help='Continue training from last saved model')
     parser.add_argument('--save-interval', type=optional(int))
@@ -407,6 +408,8 @@ if __name__ == '__main__':
     suffix += config.suffix()
     if args.image_encoder:
         suffix += '+' + args.image_encoder
+    if args.hidden_fc_layers:
+        suffix += '+fc' + ','.join(map(str, args.hidden_fc_layers))
 
     filename = args.dataset_basename + args.dataset_features + ".hd5"
     dataset = ReachabilityDataset(filename, sample_config=config)
@@ -416,7 +419,7 @@ if __name__ == '__main__':
     # Defining the NN and optimizers
     hyperparameters = Hyperparameters(batch_size=64)
 
-    nets = Model.create_from_config(backbone, config, image_encoder=args.image_encoder)
+    nets = Model.create_from_config(backbone, config, image_encoder=args.image_encoder, hidden_fc_layers=args.hidden_fc_layers)
 
     loss_function = make_loss_function(position_loss_weight=0.6, angle_loss_weight=0.3)
     global_args = {
