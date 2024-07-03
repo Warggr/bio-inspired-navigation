@@ -422,7 +422,7 @@ if __name__ == '__main__':
     # Defining the NN and optimizers
     hyperparameters = Hyperparameters(batch_size=64)
 
-    nets = Model.create_from_config(backbone, config, image_encoder=args.image_encoder, hidden_fc_layers=args.hidden_fc_layers)
+    nets = Model.create_from_config(backbone, config, image_encoder=args.image_encoder, **{ key: getattr(args, key) for key in ['hidden_fc_layers'] if getattr(args, key) is not None })
 
     loss_function = make_loss_function(position_loss_weight=0.6, angle_loss_weight=0.3)
     global_args = {
