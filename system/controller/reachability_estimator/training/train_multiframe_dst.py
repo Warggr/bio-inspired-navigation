@@ -382,7 +382,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset-features', nargs='+', default=[])
     parser.add_argument('--dataset-basename', help='The base name of the reachability dataset HD5 file', default='dataset')
     parser.add_argument('--tag', help=f'Network saved in `{model_basename}-{{tag}}`', default='')
-    parser.add_argument('--images', help='Images are included in the dataset', action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument('--images', help='Images are included in the dataset', nargs='?', default=True, choices=[True, False, 'zeros', 'fixed'], type=lambda s: False if s in ['no', 'off'] else s)
     parser.add_argument('--spikings', help='Grid cell spikings are included in the dataset', action='store_true')
     parser.add_argument('--lidar', help='LIDAR distances are included in the dataset', choices=['raw_lidar', 'ego_bc', 'allo_bc'])
     parser.add_argument('--image-encoder', help='Image encoder', choices=['fc', 'conv', 'pretrained'], default='conv')
@@ -392,6 +392,9 @@ if __name__ == '__main__':
     parser.add_argument('--save-interval', type=optional(int))
 
     args = parser.parse_args()
+
+    if args.images is None:
+        args.images = True # --images means --images=True but I don't know how to make argparse do that automatically
 
     config = SampleConfig(
         grid_cell_spikings=args.spikings,

@@ -27,7 +27,7 @@ class SampleConfig:
     def __init__(self,
         grid_cell_spikings=False,
         lidar: Optional[Literal['raw_lidar', 'ego_bc', 'allo_bc']]=None,
-        images = True,
+        images: bool|Literal['zeros', 'fixed'] = True,
         dist = False,
     ):
         self.with_grid_cell_spikings = grid_cell_spikings
@@ -39,7 +39,7 @@ class SampleConfig:
         return (''
             + ('+spikings' if self.with_grid_cell_spikings else '')
             + (f'+lidar--{self.lidar}' if self.lidar else '')
-            + ('+noimages' if not self.images else '')
+            + ('+noimages' if not self.images else '' if self.images is True else f'+{self.images}images')
             + ('+dist' if self.with_dist else '')
         )
 
@@ -76,6 +76,9 @@ class ReachabilityDataset(torch.utils.data.Dataset):
         else:
             self.dataset_len = len(self.dataset['positions'])
 
+        if self.config.images == 'fixed':
+            self.fixed_image = self.sample(0)[0].src.img
+
     def sample(self, index) -> tuple[Sample, bool]:
         if self.externalLink:
             tup = self.dataset[str(self._get_link_index(index))][self.keys[index]][()]
@@ -94,7 +97,11 @@ class ReachabilityDataset(torch.utils.data.Dataset):
         None_tensor = torch.tensor(torch.nan) # we can't use None because it has to be a tensor to be collated into batches by the dataloader
         model_args = []
 
-        if self.config.images:
+        if self.config.images == 'zeros':
+            model_args += [torch.zeros((64, 64, 4), dtype=float), torch.zeros((64, 64, 4), dtype=float)]
+        elif self.config.images == 'fixed':
+            model_args += [torch.tensor(self.fixed_image).float(), torch.tensor(self.fixed_image).float()]
+        elif self.config.images:
             model_args += [torch.tensor(sample.src.img).float(), torch.tensor(sample.dst.img).float()]
         else:
             model_args += [ None_tensor, None_tensor ]
