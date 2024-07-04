@@ -98,7 +98,7 @@ class ReachabilityDataset(torch.utils.data.Dataset):
         model_args = []
 
         if self.config.images == 'zeros':
-            model_args += [torch.zeros((64, 64, 4), dtype=float), torch.zeros((64, 64, 4), dtype=float)]
+            model_args += [torch.zeros((64, 64, 4), dtype=torch.float32), torch.zeros((64, 64, 4), dtype=torch.float32)]
         elif self.config.images == 'fixed':
             model_args += [torch.tensor(self.fixed_image).float(), torch.tensor(self.fixed_image).float()]
         elif self.config.images:
