@@ -23,6 +23,8 @@ class PlaceInfo:
     img : types.Image
     lidar : types.LidarReading
 
+    def __repr__(self):
+        return f"PlaceInfo(pos={self.pos}, angle={self.angle=}, { 'lidar=...' if hasattr(self, 'lidar') else 'no lidar' })"
 
 @dataclass
 class Sample:
@@ -110,13 +112,21 @@ Prediction = tuple[float, types.Vector2D, types.Angle]
 ImageForTorch = 'np.array[float, (4, 64, 64)]'
 def transpose_image(img : types.Image) -> ImageForTorch:
     assert img.shape[1:] == (64, 64, 4) # that's the format returned by env.camera() and used in the rest of the code
-    img = img.transpose(1, 3).transpose(2, 3) # reorder 0123 -> 0321 -> 0312, i.e. channels first
+    try: # for torch.Tensors
+        img = img.transpose(1, 3).transpose(2, 3) # reorder 0123 -> 0321 -> 0312, i.e. channels first
+    except ValueError: # for np.ndarrays
+        img = img.transpose(0, 3, 1, 2)
     assert img.shape[1:] == (4, 64, 64)
     return img
 
 def untranspose_image(img: ImageForTorch) -> types.Image:
     """ Inverse of transpose_image """
-    img = img.transpose(2, 3).transpose(1, 3) # 0312 -> 0321 -> 0123, i.e. channels last
+    assert img.shape[1:] == (4, 64, 64)
+    try: # for torch.Tensors
+        img = img.transpose(2, 3).transpose(1, 3) # 0312 -> 0321 -> 0123, i.e. channels last
+    except ValueError: # for np.arrays
+        img = img.transpose(0, 2, 3, 1)
+    assert img.shape[1:] == (64, 64, 4)
     return img
 
 Batch = list # only used for type hints - doesn't actually do anything

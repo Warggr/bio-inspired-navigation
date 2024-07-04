@@ -180,13 +180,20 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
 
         # self.print_debug(backbone.nets)
 
+        nets_state = state_dict['nets']
         for name, net in backbone.nets.items():
             if name == "img_encoder" and 'conv1.weight' in state_dict['nets'][name].keys(): # Backwards compatibility
                 for i in range(4):
                     for value_type in ['bias', 'weight']:
-                        state_dict['nets'][name][f'layers.{2*i}.{value_type}'] = state_dict['nets'][name][f'conv{i+1}.{value_type}']
-                        del state_dict['nets'][name][f'conv{i+1}.{value_type}']
-            net.load_state_dict(state_dict['nets'][name])
+                        nets_state[name][f'layers.{2*i}.{value_type}'] = nets_state[name][f'conv{i+1}.{value_type}']
+                        del nets_state[name][f'conv{i+1}.{value_type}']
+            elif name == "fully_connected" and 'fc1.weight' in nets_state[name].keys():
+                for i in range(net.nb_fc):
+                    for value_type in ['bias', 'weight']:
+                        nets_state[name][f'fc.{2*i}.{value_type}'] = nets_state[name][f'fc{i+1}.{value_type}']
+                        del nets_state[name][f'fc{i+1}.{value_type}']
+
+            net.load_state_dict(nets_state[name])
             net.train(False)
 
         re.backbone = backbone
@@ -207,7 +214,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
             return getattr(p, 'lidar', -1 * np.ones(types.LidarReading.DEFAULT_NUMBER_OF_ANGLES))
 
         args = (
-            transpose_image(p.img), transpose_image(q.img),
+            p.img, q.img,
             p.spikings, q.spikings,
             get_lidar(p), get_lidar(q),
         )
@@ -243,7 +250,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
 
         def get_prediction(
             data: Batch['NetworkReachabilityEstimator.dtype']
-        ) -> networks.Batch[networks.Model.Prediction]:
+        ) -> networks.Batch[Prediction]:
             src_batch, goal_batch = data['src_image'], data['dst_image']
             src_spikings, goal_spikings = data['src_spikings'], data['dst_spikings']
             src_lidar, goal_lidar = data['src_lidar'], data['dst_lidar']
