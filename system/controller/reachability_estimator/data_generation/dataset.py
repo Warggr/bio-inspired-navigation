@@ -67,6 +67,8 @@ def place_info(
 
 SampleGenerator = Iterator[Tuple[Sample, float, str]]
 
+TrajId = tuple[int, int]
+
 class TrajectoriesDataset(data.Dataset):
     '''
     Generate data for the reachability estimator training.
@@ -120,7 +122,6 @@ class TrajectoriesDataset(data.Dataset):
             else:
                 return s.decode('ascii')
 
-        TrajId = Tuple[int, int]
         # Map (dataset_idx, traj_id) to its corresponding map
         traj_id_map : Dict[TrajId, types.AllowedMapName]
         traj_id_map = {(dset_idx, traj_id): maybe_decode(fds[dset_idx].attrs['map_type'])
@@ -302,7 +303,7 @@ class TrajectoriesDataset(data.Dataset):
             return self._draw_sample_same_traj_multiple_tries(idx)
 
     class _Iterator:
-        def __init__(self, parent : 'TrajectoriesDataset', parent_function : Callable[int, Tuple[str, WaypointInfo, WaypointInfo, float]]):
+        def __init__(self, parent: 'TrajectoriesDataset', parent_function: Callable[[int], Tuple[str, WaypointInfo, WaypointInfo, float]]):
             self.parent = parent
             self.parent_function = parent_function
             # parent_function is a method of parent which can return samples

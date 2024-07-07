@@ -39,7 +39,7 @@ def waypoint_movement(path: List[Vector2D], env_model: str, gc_network: GridCell
                       cognitive_map: CognitiveMapInterface):
     """ Navigates the agent on the given path and builds the cognitive map.
         The local controller navigates the path analytically and updates the pc_network and the cognitive_map.
-    
+
     arguments:
     path: [PlaceCell]                    -- path to follow
     env_model: str                       -- environment model

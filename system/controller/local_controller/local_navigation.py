@@ -315,14 +315,14 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
         n += 1
 
     if goal_reached:
-        end_state = "Agent reached the goal."
-        if goal_pos:
+        end_state = f"Agent reached the goal. Perceived distance: {np.linalg.norm(goal_vector)}."
+        if goal_pos is not None:
             end_state += f"Actual distance: {np.linalg.norm(np.array(goal_pos) - robot.position)}."
     else:
         end_state = "Agent got stuck"
 
     if plot_it:
-        plot.plotTrajectoryInEnvironment(env, title=end_state)
+        plot.plotTrajectoryInEnvironment(env, title=end_state, end=goal_pos)
 
     if collect_data_freq:
         return goal_reached, data

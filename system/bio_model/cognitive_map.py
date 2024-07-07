@@ -25,7 +25,7 @@ from system.bio_model.place_cell_model import PlaceCell, PlaceCellNetwork
 from system.controller.reachability_estimator.reachability_estimation import reachability_estimator_factory, \
     ReachabilityEstimator
 
-from typing import List
+from typing import Optional
 
 def get_path_top() -> str:
     """ returns path to the folder of the current file """
@@ -36,9 +36,16 @@ def get_path_top() -> str:
 def sample_normal(m, s):
     return np.random.normal(m, s)
 
+from functools import wraps
+def report(fun):
+    @wraps(fun)
+    def _wrapper(*args, **kwargs):
+        print('Calling', fun.__name__)
+        return fun(*args, **kwargs)
+    return _wrapper
 
 class CognitiveMapInterface(ABC):
-    def __init__(self, reachability_estimator: ReachabilityEstimator, load_data_from: str = None, debug: bool = True):
+    def __init__(self, reachability_estimator: ReachabilityEstimator, load_data_from: Optional[str] = None, debug = True):
         """ Abstract base class defining the interface for cognitive map implementations.
 
         arguments:
@@ -60,7 +67,7 @@ class CognitiveMapInterface(ABC):
         self.prior_idx_pc_firing = None
 
     @abstractmethod
-    def track_vector_movement(self, pc_firing: [float], created_new_pc: bool, pc: PlaceCell, **kwargs):
+    def track_vector_movement(self, pc_firing: list[float], created_new_pc: bool, pc: PlaceCell, **kwargs):
         """ Abstract function used to incorporate changes to the map after each vector navigation
 
         arguments:
@@ -70,7 +77,7 @@ class CognitiveMapInterface(ABC):
         """
         pass
 
-    def find_path(self, start: PlaceCell, goal: PlaceCell) -> List[PlaceCell]:
+    def find_path(self, start: PlaceCell, goal: PlaceCell) -> Optional[list[PlaceCell]]:
         """ Returns a path in the graph from start to goal nodes"""
         try:
             path = nx.shortest_path(self.node_network, source=start, target=goal)
@@ -118,19 +125,22 @@ class CognitiveMapInterface(ABC):
         self.node_network.add_edge(p, q, weight=w, **kwargs)
         self.node_network.add_edge(q, p, weight=w, **kwargs)
 
-    def save(self, filename: str, relative_folder: str = "data/cognitive_map"):
+    def save(self, filename: str, absolute_path=False):
         """ Stores the current state of the node_network to the file
 
         arguments:
         filename: str        -- filename of the snapshot
         relative_folder: str -- relative folder (counting from the folder of the current file) of the snapshot file
         """
-        directory = os.path.join(get_path_top(), "data/cognitive_map")
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-        nx.write_gpickle(self.node_network, os.path.join(directory, filename))
+        relative_folder: str = "data/cognitive_map"
+        if not absolute_path:
+            directory = os.path.join(get_path_top(), relative_folder)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+            filename = os.path.join(directory, filename)
+        nx.write_gpickle(self.node_network, filename)
 
-    def load(self, filename: str, relative_folder: str = "data/cognitive_map"):
+    def load(self, filename: str, absolute_path=False):
         """ Loads the state of the node_network from the file
 
         arguments:
@@ -138,10 +148,13 @@ class CognitiveMapInterface(ABC):
         relative_folder: str -- relative folder (counting from the folder of the current file) of the snapshot file
         """
 
-        directory = os.path.join(get_path_top(), relative_folder)
-        #if not os.path.exists(directory):
-        #    raise ValueError("cognitive map not found")
-        self.node_network = nx.read_gpickle(os.path.join(directory, filename))
+        relative_folder: str = "data/cognitive_map"
+        if not absolute_path:
+            directory = os.path.join(get_path_top(), relative_folder)
+            #if not os.path.exists(directory):
+            #    raise ValueError("cognitive map not found")
+            filename = os.path.join(directory, filename)
+        self.node_network = nx.read_gpickle(filename)
         if self.debug:
             self.draw()
 
@@ -291,15 +304,14 @@ class CognitiveMap(CognitiveMapInterface):
 
             self.prior_idx_pc_firing = idx_pc_active
 
-    def save(self, relative_folder="data/cognitive_map", filename=None):
-        CognitiveMapInterface.save(self, filename, relative_folder=relative_folder)
-        directory = os.path.join(get_path_top(), relative_folder)
+    def save(self, *args, **kwargs):
+        CognitiveMapInterface.save(self, *args, **kwargs)
 
         if self.connection[1] == "delayed":
             self.update_reachabilities()
-            nx.write_gpickle(self.node_network, os.path.join(directory, filename))
+            CognitiveMapInterface.save(self, *args, **kwargs)
 
-    def test_place_cell_network(self, env, gc_network, from_data=False):
+    def test_place_cell_network(self, env: 'PybulletEnvironment', gc_network, from_data=False):
         """ Test the drift error of place cells stored in the cognitive map """
         from system.controller.local_controller.local_navigation import find_new_goal_vector
 
@@ -422,7 +434,7 @@ class LifelongCognitiveMap(CognitiveMapInterface):
         self.min_node_degree_for_deletion = 4
         self.max_number_unique_neighbors_for_deletion = 2
 
-    def track_vector_movement(self, pc_firing: [float], created_new_pc: bool, pc: PlaceCell, **kwargs) -> PlaceCell:
+    def track_vector_movement(self, pc_firing: list[float], created_new_pc: bool, pc: PlaceCell, **kwargs) -> Optional[PlaceCell]:
         """ Incorporate changes to the map after each vector navigation tryout. Adds nodes during exploration phase and
             edges during navigation.
 
@@ -453,7 +465,7 @@ class LifelongCognitiveMap(CognitiveMapInterface):
             return pc_network.place_cells[self.prior_idx_pc_firing]
         return None
 
-    def process_add_edge(self, pc_firing: [float], pc_network: PlaceCellNetwork):
+    def process_add_edge(self, pc_firing: list[float], pc_network: PlaceCellNetwork):
         """ Helper function. Decides if a new edge should be added between the last active node and the
             current active node
 
@@ -479,11 +491,11 @@ class LifelongCognitiveMap(CognitiveMapInterface):
                                                        mu=0.5,
                                                        sigma=self.sigma)
 
-    def is_connectable(self, p: PlaceCell, q: PlaceCell) -> (bool, float):
+    def is_connectable(self, p: PlaceCell, q: PlaceCell) -> tuple[bool, float]:
         """ Helper function. Checks if two waypoints p and q are connectable."""
         return self.reach_estimator.get_reachability(p, q)
 
-    def is_mergeable(self, p: PlaceCell) -> (bool, [bool]):
+    def is_mergeable(self, p: PlaceCell) -> tuple[bool, list[bool]]:
         """ Helper function. Checks if the waypoint p is mergeable with the existing graph"""
         mergeable_values = [self.reach_estimator.is_same(p, q) for q in self.node_network.nodes]
         try:

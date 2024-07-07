@@ -4,7 +4,7 @@ from system.controller.simulation.math_utils import vectors_in_one_direction, in
 
 from abc import ABC
 from system.types import Vector2D
-from typing import Optional, List, Callable
+from typing import List, Callable
 
 ResetGoalHook = Callable[[Vector2D, 'Robot'], None]
 TransformGoalHook = Callable[[Vector2D, 'Robot'], Vector2D]

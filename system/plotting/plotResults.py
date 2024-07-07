@@ -88,7 +88,7 @@ def plotTrajectory(xy_coordinates):
     plt.show()
 
 
-def plotTrajectoryInEnvironment(env : Optional['PybulletEnvironment'] = None, title="", xy_coordinates=None, env_model=None, cognitive_map=None, path=None,
+def plotTrajectoryInEnvironment(env: Optional['PybulletEnvironment'] = None, title="", xy_coordinates=None, env_model=None, cognitive_map=None, path=None,
                                 goal=None, trajectory=True, start=None, end=None):
     if not xy_coordinates:
         xy_coordinates = env.robot.data_collector.xy_coordinates
@@ -120,7 +120,7 @@ def plotTrajectoryInEnvironment(env : Optional['PybulletEnvironment'] = None, ti
     if start is not None:
         circle = plt.Circle((start[0], start[1]), 0.2, color=TUM_colors['TUMAccentOrange'], alpha=0.8)
         ax.add_artist(circle)
-
+    if end is not None:
         circle = plt.Circle((end[0], end[1]), 0.2, color=TUM_colors['TUMAccentOrange'], alpha=0.8)
         ax.add_artist(circle)
 

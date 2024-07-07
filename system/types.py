@@ -33,6 +33,7 @@ class Vector2D(Sized, Iterable[float], Protocol):
     pass
 
 Vector3D = Tuple[float, float, float]
+# (grid cell) spikings
 Spikings = 'np.ndarray[float, (40, 40, 6)]' # TODO: actual non-string type hint
 Image = 'np.ndarray[float, (64, 64, 4)]'
 AllowedMapName = str # TODO: an enumeration of the actual map names, i.e. Literal['Savinov_val3', ...]
