@@ -1,13 +1,5 @@
-def environment_dimensions(env_model : str):
-    if env_model == "Savinov_val3":
-        return [-9, 6, -5, 4]
-    elif env_model == "Savinov_val2":
-        return [-5, 5, -5, 5]
-    elif env_model == "Savinov_test7":
-        return [-9, 6, -4, 4]
-    elif env_model == "plane":
-        return None
-    elif "obstacle" in env_model:
-        return None
-    else:
-        raise ValueError("No matching env_model found.")
+from .environment.map_occupancy import environment_dimensions as _environment_dims_as_tuple
+
+def environment_dimensions(map_name):
+    origin, corner = _environment_dims_as_tuple(map_name)
+    return [ origin[0], corner[0], origin[1], corner[1] ]

@@ -163,6 +163,13 @@ class PybulletEnvironment:
         elif "obstacle" in env_model:
             plane = resource_path(self.env_model, "plane.urdf")
             self.planeID = p.loadURDF(plane)
+        elif env_model.startswith("linear_sunburst_map"):
+            base_position = [5.5, 0.55]
+            if env_model == "linear_sunburst_map":
+                doors_option = "plane"
+            else:
+                _, doors_option = env_model.split('.') # "plane" for default, "plane_doors", "plane_doors_individual"
+            self.planeID = p.loadURDF(resource_path("linear_sunburst_map", doors_option + ".urdf"))
         else:
             raise ValueError("No matching env_model found.")
 

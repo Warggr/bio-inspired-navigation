@@ -33,4 +33,7 @@ ${walls}: system/controller/simulation/environment/textures/walls/pattern-%.png:
 
 all-walls: ${walls}
 
+system/controller/simulation/environment/linear_sunburst_map/maze_topview_binary.png: system/controller/simulation/environment/linear_sunburst_map/plane.urdf
+	python scripts/create_occupancy_map.py linear_sunburst_map
+
 .PHONY: all-walls

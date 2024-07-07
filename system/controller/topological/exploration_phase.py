@@ -86,24 +86,60 @@ if __name__ == "__main__":
     """
     from system.controller.reachability_estimator.reachability_estimation import reachability_estimator_factory
     from system.controller.reachability_estimator.ReachabilityDataset import SampleConfig
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("env_model", default="Savinov_val3", choices=["Savinov_val3", "linear_sunburst_map"])
+    parser.add_argument("--variant")
+    args = parser.parse_args()
 
     re_type = "neural_network"
     re_weights_file = "re_mse_weights.50"
-    cognitive_map_filename = "after_exploration1.gpickle"
-    env_model = "Savinov_val3"  # only one currently supported
 
-    goals = [
-        [-2, 0], [-6, -2.5], [-4, 0.5], [-6.5, 0.5], [-7.5, -2.5], [-2, -1.5], [1, -1.5],
-        [0.5, 1.5], [2.5, -1.5], [1.5, 0], [5, -1.5], [4.5, -0.5], [-0.5, 0], [-8.5, 3],
-        [-8.5, -4], [-7.5, -3.5], [1.5, -3.5], [-6, -2.5]
-    ]
+    if args.env_model == "Savinov_val3":
+        goals = [
+            [-2, 0], [-6, -2.5], [-4, 0.5], [-6.5, 0.5], [-7.5, -2.5], [-2, -1.5], [1, -1.5],
+            [0.5, 1.5], [2.5, -1.5], [1.5, 0], [5, -1.5], [4.5, -0.5], [-0.5, 0], [-8.5, 3],
+            [-8.5, -4], [-7.5, -3.5], [1.5, -3.5], [-6, -2.5]
+        ]
+        cognitive_map_filename = "after_exploration.gpickle"
+    elif args.env_model == "linear_sunburst_map":
+        goals = [
+             [5.5, 4.5],
+             [1.5, 4.5],
+             [9.5, 4.5],
+             [9.5, 7.5],
+             [10.5, 7.5],
+             [10.5, 10],
+             [8.5, 10],
+             [8.5, 7.5],
+             [6.5, 7.5],
+             [6.5, 10],
+             [4.5, 10],
+             [4.5, 7.5],
+             [2.5, 7.5],
+             [2.5, 10],
+             [0.5, 10],
+             [0.5, 7.5],
+             [2.5, 7.5],
+             [2.5, 10],
+             [4.5, 10],
+             [4.5, 7.5],
+             [6.5, 7.5],
+             [6.5, 10],
+             [8.5, 10],
+             [8.5, 7.5],
+             [9.5, 7.5],
+        ]
+        cognitive_map_filename = "linear_sunburst.after_exploration.gpickle"
+    else:
+        raise ValueError(f"Unsupported map: {args.env_model}")
 
     gc_network = setup_gc_network(dt)
     re = reachability_estimator_factory(re_type, weights_file=re_weights_file, debug=debug, config=SampleConfig(grid_cell_spikings=True))
     pc_network = PlaceCellNetwork(reach_estimator=re)
     cognitive_map = LifelongCognitiveMap(reachability_estimator=re)
 
-    pc_network, cognitive_map = waypoint_movement(goals, env_model, gc_network, pc_network, cognitive_map)
+    pc_network, cognitive_map = waypoint_movement(goals, args.env_model, gc_network, pc_network, cognitive_map)
     cognitive_map.postprocess_topological_navigation()
     assert len(cognitive_map.node_network.nodes) > 1
 
@@ -112,5 +148,5 @@ if __name__ == "__main__":
 
     if plotting:
         cognitive_map.draw()
-        with PybulletEnvironment(env_model, dt=dt, build_data_set=True) as env:
+        with PybulletEnvironment(args.env_model, dt=dt, build_data_set=True) as env:
             plot.plotTrajectoryInEnvironment(env, goal=False, cognitive_map=cognitive_map, trajectory=False)

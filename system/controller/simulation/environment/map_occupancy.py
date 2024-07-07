@@ -41,7 +41,7 @@ else:
     from .map_occupancy_helpers.math_utils import depth_to_xy_plane, depth_to_xy, compute_normals
     from .map_occupancy_helpers import map_utils_cpp as map_cpp
 
-from typing import Tuple, List
+from typing import Optional, Tuple, List
 from system.types import Vector2D, AllowedMapName
 
 class Map(object):
@@ -545,6 +545,22 @@ class Map(object):
         return overlaps
 
 
+def environment_dimensions(env_model: AllowedMapName):
+    if env_model == "Savinov_val3":
+        return np.array([-9, -6]), np.array([6, 4])
+    elif env_model == "Savinov_val2":
+        return np.array([-5, -5]), np.array([5, 5])
+    elif env_model == "Savinov_test7":
+        return np.array([-9, -4]), np.array([6, 4])
+    elif env_model == "plane":
+        return None
+    elif "obstacle" in env_model:
+        return None
+    elif env_model == "linear_sunburst_map":
+        return np.array([0, 0]), np.array([11, 11])
+    else:
+        raise ValueError("No matching env_model found.")
+
 class MapLayout(Map):
     def __init__(self, name):
         """
@@ -554,8 +570,10 @@ class MapLayout(Map):
         
         arguments:
         name    -- environment name (Savinov_val3, Savinov_val2, Savinov_test7)
-        
+
         """
+        if name.startswith("linear_sunburst."):
+            name = "linear_sunburst_map"
         dirname = os.path.dirname(__file__)
         filepath = os.path.realpath(os.path.join(dirname, str(name) + "/maze_topview_binary.png"))
         # print(filepath)
@@ -565,17 +583,8 @@ class MapLayout(Map):
 
         '''3. Adjust the dimension and origin(i.e. coordinates of the lower left corner)
            of the maze'''
-        if name == "Savinov_val3":
-            dim = (15, 9)
-            origin = (-9, -5)
-        elif name == "Savinov_test7":
-            dim = (15, 8)
-            origin = (-9, -4)
-        elif name == "Savinov_val2":
-            dim = (10, 10)
-            origin = -5, -5
-        else:
-            raise ValueError("Error: This map does not exist " + str(name))
+        origin, corner = environment_dimensions(name)
+        dim = corner - origin
 
         # approximate actual space represented by one pixel
         res = ((dim[0] / len(img[0])) + (dim[1] / len(img))) / 2
