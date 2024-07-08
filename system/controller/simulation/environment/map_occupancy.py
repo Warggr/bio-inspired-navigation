@@ -654,7 +654,7 @@ def random_coordinates(xmin, xmax, ymin, ymax, rng=random.Random()):
 def random_points(env_model: AllowedMapName, rng: random.Random) -> Tuple[Vector2D, Vector2D]:
     map = MapLayout(env_model)
     origin, corner = environment_dimensions(env_model)
-    dimensions = [ origin[0], origin[1], corner[0], corner[1] ]
+    dimensions = [ origin[0], corner[0], origin[1], corner[1] ]
 
     result = []
     for i in range(2):
