@@ -1,6 +1,6 @@
 import numpy as np
 from system.utils import normalize
-from system.controller.simulation.math_utils import vectors_in_one_direction, intersect, compute_angle
+from system.controller.simulation.math_utils import vectors_in_one_direction, intersect
 
 from abc import ABC
 from system.types import Vector2D
@@ -20,43 +20,28 @@ class LocalController(ABC):
     Class that performs navigation.
     """
     def __init__(
-        self, robot : 'Robot', compass : 'Compass',
+        self,
         on_reset_goal : List[ResetGoalHook] = [],
         transform_goal_vector : List[TransformGoalHook] = [],
         hooks: list[Hook] = [],
     ):
-        """
-        Parameters:
-        robot   -- the robot to move
-        compass -- indicates the direction of the goal
-        """
-
-        self.robot = robot
-        self.compass = compass
-
         self.on_reset_goal = on_reset_goal + [hook.on_reset_goal for hook in hooks]
         self.transform_goal_vector = transform_goal_vector + [hook.transform_goal_vector for hook in hooks]
 
     @staticmethod
-    def default(robot: 'Robot', compass: 'Compass', obstacles=True):
-        return LocalController(robot, compass, on_reset_goal=[ TurnToGoal() ], transform_goal_vector=([ObstacleAvoidance()] if obstacles else []), hooks=[StuckDetector()])
+    def default(obstacles=True):
+        return LocalController(on_reset_goal=[ TurnToGoal() ], transform_goal_vector=([ObstacleAvoidance()] if obstacles else []), hooks=[StuckDetector()])
 
-    def reset_goal(self, new_goal : Vector2D):
-        self.compass.reset(new_goal)
+    def reset_goal(self, new_goal : Vector2D, robot: 'Robot'):
         for hook in self.on_reset_goal:
-            hook(new_goal, self.robot)
+            hook(new_goal, robot)
 
-    def step(self) -> bool:
-        goal_vector = self.compass.calculate_goal_vector()
-        if np.linalg.norm(goal_vector) == 0:
-            return True
-
+    def step(self, goal_vector: Vector2D, robot: 'Robot'):
         for hook in self.transform_goal_vector:
-            goal_vector = hook(goal_vector, self.robot)
+            goal_vector = hook(goal_vector, robot)
 
-        self.robot.navigation_step(goal_vector)
-        self.compass.update_position(self.robot)
-        return self.compass.reached_goal()
+        robot.env.add_debug_line(robot.position, np.array(robot.position) + goal_vector, color=(0, 0, 1), width=3)
+        robot.navigation_step(goal_vector)
 
 
 class ObstacleAvoidance:

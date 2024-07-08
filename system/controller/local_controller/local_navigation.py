@@ -280,7 +280,7 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
         robot.navigation_hooks.append(gc_network.track_movement)
 
     if controller is None:
-        controller = LocalController.default(robot, compass)
+        controller = LocalController.default()
 
     # TODO Pierre: do this before the call
     if gc_network and (target_gc_spiking is not None):
@@ -595,7 +595,7 @@ if __name__ == "__main__":
 
                 compass = AnalyticalCompass(start_pos=start, goal_pos=goal)
                 with PybulletEnvironment(env_model, start=start, visualize=args.visualize) as env:
-                    controller = LocalController(env.robot, compass, transform_goal_vector=([] if trial == 0 else [ObstacleBackoff, ObstacleAvoidance]), on_reset_goal=[TurnToGoal])
+                    controller = LocalController(transform_goal_vector=([] if trial == 0 else [ObstacleAvoidance()]), on_reset_goal=[TurnToGoal()], hooks=[StuckDetector()])
                     env.mapping = mapping
 
                     over, nr_steps_this_trial = vector_navigation(env, compass, collect_nr_steps=True, gc_network=gc_network, controller=controller, target_gc_spiking=target_spiking,
