@@ -14,13 +14,13 @@ import networkx as nx
 from matplotlib import pyplot as plt
 
 
-def plot_cognitive_map_path(G, path, env, color="#E37222"):
+def plot_cognitive_map_path(G, path, env_model, color="#E37222"):
     """ plot the path on the cognitive map """
     import system.plotting.plotHelper as pH  # import add_environment
 
     plt.figure()
     ax = plt.gca()
-    pH.add_environment(ax, env)
+    pH.add_environment(ax, env_model)
     pos = nx.get_node_attributes(G, 'pos')
     nx.draw_networkx_nodes(G, pos, node_color='#0065BD80', node_size=60)
     nx.draw_networkx_edges(G, pos, edge_color='#CCCCC6')

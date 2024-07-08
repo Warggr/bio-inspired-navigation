@@ -143,7 +143,9 @@ class LinearLookaheadGcCompass(GcCompass):
         self.arena_size = arena_size
 
     def calculate_goal_vector(self):
-        return perform_look_ahead_2xnr(self.gc_network, self.arena_size)
+        goal_vector, goal_info = perform_look_ahead_2xnr(self.gc_network, self.arena_size)
+        print(goal_info)
+        return goal_vector
 
 
 class ComboGcCompass(GcCompass):
@@ -158,7 +160,7 @@ class ComboGcCompass(GcCompass):
     def reset_goal(self, new_goal: Spikings):
         super().reset_goal(new_goal)
         if type(self.impl) == LinearLookaheadGcCompass:
-            self.impl = PodGcCompass(pod_network=self.pod_network, gc_network=self.impl.gc_network, goal_pos=new_pos)
+            self.impl = PodGcCompass(pod_network=self.pod_network, gc_network=self.gc_network, goal_pos=new_goal)
             self.impl = GoalVectorCache(self.impl)
         else:
             self.impl.reset_goal(new_goal)
@@ -168,7 +170,7 @@ class ComboGcCompass(GcCompass):
 
     @property
     def arrival_threshold(self):
-        return self.impl.arrival_threshold
+        return LinearLookaheadGcCompass.arrival_threshold
 
     def update_position(self, robot : Robot):
         self.impl.update_position(robot)
@@ -177,15 +179,10 @@ class ComboGcCompass(GcCompass):
             # switch from pod to linear lookahead
             self.impl = LinearLookaheadGcCompass(arena_size=robot.env.arena_size, gc_network=self.gc_network, goal_pos=self.impl.goal_pos)
             self.impl = GoalVectorCache(self.impl)
-            self.impl.update_position(robot)
-            goal_vector = self.impl.calculate_goal_vector()
-            robot.env.step_forever(4)
-            robot.turn_to_goal(goal_vector)
-            return False # Continue with the LL
-        return goal_reached
+            # robot.turn_to_goal(goal_vector)
 
 
-def create_gc_spiking(start : Vector2D, goal : Vector2D) -> types.Spikings:
+def create_gc_spiking(start : Vector2D, goal : Vector2D, gc_network_at_start: Optional[GridCellNetwork]=None, plotting=plotting) -> types.Spikings:
     """ 
     Agent navigates from start to goal accross a plane without any obstacles, using the analyticallly 
     calculated goal vector to genereate the grid cell spikings necessary for the decoders. During actual
@@ -194,11 +191,19 @@ def create_gc_spiking(start : Vector2D, goal : Vector2D) -> types.Spikings:
 
     # Grid-Cell Initialization
     dt = 1e-2
-    gc_network = setup_gc_network(dt)
+    if gc_network_at_start is None:
+        gc_network = setup_gc_network(dt)
+    else:
+        assert gc_network_at_start.dt == dt
+        gc_network_at_start.reset_s_virtual()
+        gc_network = gc_network_at_start
 
     compass = AnalyticalCompass(start_pos=start, goal_pos=goal)
     robot_position = np.array(start, dtype=float)
     history : List[Vector2D] = [ robot_position ]
+
+    if compass.reached_goal():
+        assert False, "Positions are too close to each other!"
 
     i = 0
     while not compass.reached_goal():
@@ -281,9 +286,8 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
     if gc_network and (target_gc_spiking is not None):
         gc_network.set_as_target_state(target_gc_spiking)
 
-    # robot.nr_ofsteps = 0
     goal_vector = compass.calculate_goal_vector()
-    robot.turn_to_goal(goal_vector)
+    controller.reset_goal(goal_vector, robot)
 
     if collect_data_reachable:
         sample_after_turn = (robot.data_collector[-1][0], robot.data_collector[-1][1])
@@ -358,34 +362,34 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
 
 from tqdm import tqdm
 import random
-from system.controller.simulation.environment.map_occupancy import MapLayout
-from system.controller.simulation.environment_config import environment_dimensions
 
-def random_coordinates(xmin, xmax, ymin, ymax):
-    return np.array([ random.uniform(xmin, xmax), random.uniform(ymin, ymax) ])
+class RandomTaker(Generic[T]):
+    def __init__(self, dataset: Sequence[T], seed: Optional[int] = None):
+        self.dataset = dataset
+        self.rng = random.Random()
+        self.rng.seed(seed)
+    def __iter__(self): return self
+    def __next__(self):
+        return self.rng.choice(self.dataset)
 
-def random_points(env : PybulletEnvironment) -> Tuple[Vector2D, Vector2D]:
-    map = MapLayout(env.env_model)
+from tqdm import tqdm
 
-    result = []
-    for i in range(2):
-        i = 0
-        while True:
-            i += 1
-            p = random_coordinates(*environment_dimensions(env.env_model))
-            print(f"[i={i}]Trying", p, "...")
-            if map.suitable_position_for_robot(p):
-                break
-        result.append(p)
-    return tuple(result)
-
-def randomPointsTest(Controller: Callable[[Robot, tuple[Vector2D, Vector2D]], LocalController], visualize=False):
+def randomPointsTest(
+    controller: LocalController,
+    Compass: Callable[[Vector2D, Vector2D], Compass],
+    points: Iterable[tuple[Vector2D, Vector2D]],
+    visualize=False, plot_it=False
+):
+    successes = 0
+    points = iter(points)
     with PybulletEnvironment(env_model="Savinov_val3", visualize=visualize, contains_robot=False) as env:
-        for _ in tqdm(range(100)):
-            start, goal = random_points(env)
+        for i in (bar := tqdm(range(100))):
+            start, goal = next(points)
+            compass = Compass(start, goal)
             with Robot(env, base_position=start) as robot:
-                controller = Controller(robot, (start, goal))
-                vector_navigation(env, controller.compass, gc_network=None, controller=controller)
+                goal_reached, _ = vector_navigation(env, compass, gc_network=None, plot_it=plot_it, controller=controller, step_limit=1000, goal_pos=goal)
+                successes += goal_reached
+            bar.set_description(f"{successes} ({successes/(i+1):.1%}) success")
 
 
 if __name__ == "__main__":
@@ -440,6 +444,7 @@ if __name__ == "__main__":
         2B) choose a few combinations to test
     """
     random_nav_parser = experiments.add_parser('random_nav')
+    random_nav_parser.add_argument('--seed', type=int, default=None)
 
     main_parser.add_argument('--visualize', action='store_true')
     args = main_parser.parse_args()
@@ -615,8 +620,7 @@ if __name__ == "__main__":
 
         working_combinations = []
         # 2) ADJUST TEST PARAMETER RANGES
-        all = False
-        if all:
+        if args.all:
             # 2A) test a range of parameter values in different combinations
             for nr_ofrays in [21]:
                 for cone in [120]:
@@ -638,5 +642,20 @@ if __name__ == "__main__":
         np.save("experiments/working_combinations", working_combinations)
 
     elif args.experiment == "random_nav":
-        controller = lambda robot, startandgoal: LocalController.default(robot, compass=AnalyticalCompass(*startandgoal))
-        randomPointsTest(controller, visualize=args.visualize)
+        controller = LocalController(transform_goal_vector=[ObstacleAvoidance()], on_reset_goal=[TurnToGoal()], hooks=[StuckDetector()])
+
+        from system.controller.reachability_estimator.data_generation.dataset import TrajectoriesDataset, get_path
+        from system.controller.simulation.environment.map_occupancy import random_points
+        from itertools import chain
+
+        dataset = TrajectoriesDataset([os.path.join(get_path(), "data", "trajectories", "trajectories.hd5")], env_cache=None)
+        samepath_points = dataset.subset(map_name="Savinov_val3", seed=args.seed)
+
+        rng = random.Random()
+        samepath_points = [ rng.choice(samepath_points) for _ in range(50) ]
+        random_points = [ random_points(env_model="Savinov_val3", rng=rng) for _ in range(50) ]
+        points = list(chain.from_iterable(zip(samepath_points, random_points))) # zip the two lists so the progress is more accurate (not all good points are shown at the beginning)
+
+        #if args.seed:
+        #    random.seed(args.seed)
+        randomPointsTest(controller, AnalyticalCompass, points, visualize=args.visualize, plot_it=False)

@@ -70,7 +70,7 @@ def waypoint_movement(path: List[Vector2D], env_model: str, gc_network: GridCell
         for i, goal in enumerate(tqdm(goals)):
             #print_debug(f"new waypoint with coordinates {goal}.", f'{i / len(goals) * 100} % completed.')
             compass = AnalyticalCompass(start_pos=path[0], goal_pos=goal)
-            vector_navigation(env, compass, gc_network, step_limit=5000, obstacles=True,
+            vector_navigation(env, compass, gc_network, step_limit=5000,
                             plot_it=plotting, exploration_phase=True, pc_network=pc_network, cognitive_map=cognitive_map)
             if plotting and (i + 1) % 100 == 0:
                 cognitive_map.draw()

@@ -21,6 +21,7 @@ from matplotlib import pyplot as plt
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
+from system.controller.reachability_estimator.types import PlaceInfo, untranspose_image
 from system.plotting.plotHelper import add_environment, TUM_colors
 from system.types import Vector2D
 from typing import Optional, List
@@ -31,10 +32,11 @@ def get_path_top():
     return dirname
 
 
-class PlaceCell:
+class PlaceCell(PlaceInfo):
     """Class to keep track of an individual Place Cell"""
 
     def __init__(self, gc_connections, observations, coordinates : Vector2D):
+        # explicitly not call super().__init__ because we'll provide data members ourselves (as aliases)
         self.gc_connections = gc_connections  # Connection matrix to grid cells of all modules; has form (n^2 x M)
         self.env_coordinates = coordinates  # Save x and y coordinate at moment of creation
 
@@ -111,7 +113,10 @@ class PlaceCell:
     @property
     def angle(self): return self.observations[0] # TODO
     @property
-    def img(self): return self.observations[-1] # TODO
+    def img(self):
+        if self.observations[-1].shape == (4, 64, 64): # backwards compatibiliy: Anna saved images in the transposed format
+            return untranspose_image(np.array([self.observations[-1]]))[0]
+        return self.observations[-1]
     @property
     def spikings(self): return self.gc_connections
 
@@ -227,7 +232,7 @@ if __name__ == '__main__':
     to = random.choice(list(cognitive_map.node_network.nodes))
     env = PybulletEnvironment(env_model, visualize=False, mode="combo", build_data_set=True,
                               start=list(fr.env_coordinates))
-    compass = ComboGcCompass(pod, gc_network, goal_pos=to.pos)
+    compass = ComboGcCompass(gc_network, pod, goal_pos=to.pos)
     gc_network.set_as_current_state(fr.gc_connections)
     stop, pc = vector_navigation(env, compass, gc_network, to.gc_connections, model="combo",
                                  obstacles=True, exploration_phase=False, pc_network=pc_network,

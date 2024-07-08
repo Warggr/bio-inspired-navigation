@@ -23,41 +23,43 @@ from system.controller.simulation.pybullet_environment import PybulletEnvironmen
 from system.bio_model.cognitive_map import LifelongCognitiveMap, CognitiveMapInterface
 from system.bio_model.place_cell_model import PlaceCellNetwork, PlaceCell
 from system.controller.local_controller.compass import Compass, AnalyticalCompass
-from system.controller.local_controller.local_controller import LocalController
+from system.controller.local_controller.local_controller import LocalController, ObstacleAvoidance, StuckDetector, ObstacleBackoff, TurnToGoal
 from system.controller.local_controller.local_navigation import vector_navigation, setup_gc_network, PodGcCompass, LinearLookaheadGcCompass
 import system.plotting.plotResults as plot
 from system.types import Vector2D
 
 # if True plot results
 plotting = True
-
+DEBUG = os.getenv('DEBUG', '').split('&')
 
 class TopologicalNavigation(object):
-    def __init__(self, env_model: str, method: str,
+    def __init__(self, env_model: str,
                  pc_network: PlaceCellNetwork, cognitive_map: CognitiveMapInterface,
-                 gc_network: GridCellNetwork, pod: PhaseOffsetDetectorNetwork):
+                 #gc_network: GridCellNetwork,
+        compass: Compass,
+    ):
         """
         Handles interactions between local controller and cognitive_map to navigate the environment.
         Performs topological navigation
 
         arguments:
         env_model: str -- name of the environment model
-        method: str -- type of goal vector calculation, possible values: ['pod', 'linear_lookahead', 'combo']
         pc_network: PlaceCellNetwork -- place cell network
         cognitive_map: CognitiveMapInterface -- cognitive map object
         gc_network: GridCellNetwork -- grid cell network
-        pod: PhaseOffsetDetectorNetwork -- phase offset detector object
         """
         self.pc_network = pc_network
         self.cognitive_map = cognitive_map
-        self.gc_network = gc_network
+        #self.gc_network = gc_network
         self.env_model = env_model
-        self.pod = pod
-        self.method = method
         self.path_length_limit = 30  # max number of topological navigation steps
-        self.step_limit = 500  # max number of vector navigation steps
+        self.step_limit = 2000  # max number of vector navigation steps
+        self.compass = compass
 
-    def navigate(self, start_ind: int, goal_ind: int, cognitive_map_filename: str = None, env: Optional[PybulletEnvironment] = None,
+    def navigate(self, start_ind: int, goal_ind: int, gc_network: GridCellNetwork,
+        cognitive_map_filename: str = None,
+        env: Optional[PybulletEnvironment] = None,
+        robot: Optional[Robot] = None,
         *nav_args, **nav_kwargs,
     ):
         """ Navigates the agent through the environment with topological navigation.
@@ -94,23 +96,27 @@ class TopologicalNavigation(object):
 
         src_pos = list(path[0].env_coordinates)
 
-        compass = Compass.factory(self.method, gc_network=self.gc_network, pod_network=self.pod)
+        if env is None:
+            if robot is None:
+                env = PybulletEnvironment(self.env_model, build_data_set=True, start=src_pos)
+            else:
+                env = robot.env
+        if robot is None:
+            robot = env.robot
+
+        assert env.env_model == self.env_model
 
         # TODO Pierre: make env required, use "with Robot"
-        if env is None:
-            env = PybulletEnvironment(self.env_model, build_data_set=True, start=src_pos)
-        else:
-            assert env.env_model == self.env_model
-            try:
-                env.robot.delete()
-            except AttributeError:
-                pass
+        if env.robot is None:
             env.robot = Robot(env=env, base_position=src_pos, build_data_set=True)
+        else:
+            #assert np.linalg.norm(np.array(env.robot.position) - np.array(src_pos)) <= 0.5, "robot provided but not at start position"
+            pass
 
         if plotting:
             plot.plotTrajectoryInEnvironment(env, cognitive_map=self.cognitive_map, path=path)
 
-        self.gc_network.set_as_current_state(path[0].gc_connections)
+        #self.gc_network.set_as_current_state(path[0].gc_connections)
         last_pc = path[0]
         i = 0
         curr_path_length = 0
@@ -124,13 +130,13 @@ class TopologicalNavigation(object):
             stop, pc = vector_navigation(env, self.compass, gc_network=gc_network,
                                          controller=controller, exploration_phase=False, pc_network=self.pc_network,
                                          cognitive_map=self.cognitive_map, plot_it=False,
-                                         step_limit=self.step_limit, *nav_args, **nav_kwargs)
+                                         step_limit=self.step_limit, goal_pos=goal.pos, *nav_args, **nav_kwargs)
             self.cognitive_map.postprocess_vector_navigation(node_p=path[i], node_q=path[i + 1],
                                                              observation_p=last_pc, observation_q=pc, success=stop == 1)
 
             curr_path_length += 1
             if stop != 1:
-                last_pc, new_path = self.locate_node(compass, pc, goal)
+                last_pc, new_path = self.locate_node(self.compass, pc, goal)
                 if not last_pc:
                     last_pc = path[i]
 
@@ -147,6 +153,8 @@ class TopologicalNavigation(object):
                     new_path = [path[i]] + new_path
 
                 path[i:] = new_path
+                if plotting:
+                    plot.plotTrajectoryInEnvironment(env, cognitive_map=self.cognitive_map, path=path)
             else:
                 last_pc = pc
                 i += 1
@@ -166,7 +174,7 @@ class TopologicalNavigation(object):
             self.cognitive_map.save(filename=cognitive_map_filename)
         return curr_path_length < self.path_length_limit
 
-    def locate_node(self, compass : Compass, position: Vector2D, goal: PlaceCell):
+    def locate_node(self, compass : Compass, pc: PlaceCell, goal: PlaceCell):
         """
         Maps a location of the given place cell to the node in the graph.
         Among multiple close nodes prioritize the one that has a valid path to the goal.
@@ -228,6 +236,9 @@ if __name__ == "__main__":
         # TODO Pierre figure out how to remove unnecessary xy_coordinates
         plot.plotTrajectoryInEnvironment(env, xy_coordinates=[0,0], goal=False, cognitive_map=tj.cognitive_map, trajectory=False)
 
+        if not args.seed:
+            args.seed = np.random.default_rng().integers(low=0, high=0b100000000)
+            print("Using seed", args.seed)
         random = np.random.default_rng(seed=args.seed)
 
         successful = 0

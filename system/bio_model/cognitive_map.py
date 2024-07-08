@@ -313,7 +313,8 @@ class CognitiveMap(CognitiveMapInterface):
 
     def test_place_cell_network(self, env : 'PybulletEnvironment', gc_network, from_data=False):
         """ Test the drift error of place cells stored in the cognitive map """
-        from system.controller.local_controller.local_navigation import find_new_goal_vector
+        from system.controller.local_controller.local_navigation import LinearLookaheadGcCompass
+        from system.controller.local_controller.compass import AnalyticalCompass
 
         delta_avg = 0
         pred_gvs = []  # goal vectors decoded using linear lookahead
@@ -330,7 +331,7 @@ class CognitiveMap(CognitiveMapInterface):
             delta_avg = np.mean(delta)
 
         else:
-            env.mode = "linear_lookahead"
+            compass = LinearLookaheadGcCompass(arena_size=env.arena_size)
             # decode goal vectors from current position to every place cell on the cognitive map 
             node_list: list[PlaceCell] = list(self.node_network.nodes)
             nodes_length = len(node_list)
@@ -338,11 +339,10 @@ class CognitiveMap(CognitiveMapInterface):
                 print("Decoding goal vector to place Cell", i, "out of", nodes_length)
                 target_spiking = p.gc_connections
                 gc_network.set_as_target_state(target_spiking)
-                env.goal_pos = p.env_coordinates
+                compass.reset_goal(compass.parse(p))
 
-                find_new_goal_vector(gc_network, env, env.mode)
-
-                pred_gv = env.goal_vector
+                pred_gv = compass.calculate_goal_vector()
+                true_gv = AnalyticalCompass(start_pos=env.robot.pos, goal_pos=p.pos)
                 true_gv = env.calculate_goal_vector_analytically()
 
                 error_gv = true_gv - pred_gv
@@ -362,8 +362,8 @@ class CognitiveMap(CognitiveMapInterface):
 
         plt.figure()
         ax = plt.gca()
-        pH.add_environment(ax, env)
-        pH.add_robot(ax, env)
+        pH.add_environment(ax, env.env_model)
+        pH.add_robot(ax, *env.robot.position_and_angle)
         pos = nx.get_node_attributes(self.node_network, 'pos')
         nx.draw_networkx_nodes(self.node_network, pos, node_color='#0065BD80', node_size=3000)
 
@@ -382,9 +382,9 @@ class CognitiveMap(CognitiveMapInterface):
             # control the amount of goal vectors displayed in the plot
             if i % 2 == 0 or i % 3 == 0 or i % 5 == 0:
                 continue
-            plt.quiver(env.xy_coordinates[-1][0], env.xy_coordinates[-1][1], gv[0], gv[1], color='grey', angles='xy',
+            plt.quiver(env.robot.position[0], env.robot.position[1], gv[0], gv[1], color='grey', angles='xy',
                        scale_units='xy', scale=1, width=0.005)
-            plt.quiver(env.xy_coordinates[-1][0] + gv[0], env.xy_coordinates[-1][1] + gv[1], error[i][0], error[i][1],
+            plt.quiver(env.robot.position[0] + gv[0], env.robot.position[1] + gv[1], error[i][0], error[i][1],
                        color='red', angles='xy', scale_units='xy', scale=1, width=0.005)
 
         plt.show()
@@ -655,29 +655,40 @@ class LifelongCognitiveMap(CognitiveMapInterface):
 
 if __name__ == "__main__":
     """ Load and visualize cognitive map + observations with grid cell spikings on both ends of distinct edges  """
-    from system.controller.simulation.pybullet_environment import PybulletEnvironment
+    from system.controller.reachability_estimator.ReachabilityDataset import SampleConfig
+
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('map_filename', nargs='?', default='after_exploration.gpickle')
+    parser.add_argument('-n', help='Number of samples to show', type=int, default=10)
+    args = parser.parse_args()
 
     # Adjust what sort of RE you want to use for connecting nodes
     connection_re_type = "neural_network"  # "neural_network" #"simulation" #"view_overlap"
     weights_filename = "re_mse_weights.50"
-    map_filename = "after_exploration.gpickle"
+    map_filename = args.map_filename
     env_model = "Savinov_val3"
     debug = True
 
+    re_config = SampleConfig(grid_cell_spikings=True)
+
     re = reachability_estimator_factory(connection_re_type, weights_file=weights_filename, #env_model=env_model,
-                                        debug=debug, with_spikings=True)
+                                        debug=debug, config=re_config)
     # Select the version of the cognitive map to use
-    cm = LifelongCognitiveMap(reachability_estimator=re, load_data_from=map_filename)
+    cm = LifelongCognitiveMap(reachability_estimator=re)
+    try:
+        cm.load(filename=map_filename, absolute_path=True)
+    except FileNotFoundError:
+        cm.load(filename=map_filename)
     cm.draw()
 
-    env = PybulletEnvironment(env_model, visualize=False, mode="analytical", build_data_set=True)
     import random
 
-    for i in range(10):
+    for i in range(args.n):
         # Select an edge to visualize or use a random one
         start, finish = random.sample(list(cm.node_network.edges()), 1)[0]
 
-        plot_cognitive_map_path(cm.node_network, [start, finish], env)
+        plot_cognitive_map_path(cm.node_network, [start, finish], env_model)
 
         fig = plt.figure()
 
