@@ -14,7 +14,7 @@ import itertools
 import bisect
 import random
 import matplotlib.pyplot as plt
-from typing import Tuple, Iterator, Dict, Optional, Callable, Set, List
+from typing import Tuple, Iterator, Dict, Optional, Callable, Iterable, List
 
 import sys
 import os
@@ -30,7 +30,7 @@ from system.controller.simulation.environment_cache import EnvironmentCache
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.controller.simulation.environment.map_occupancy_helpers.map_utils import path_length
 from system.plotting.plotResults import plotStartGoalDataset
-from system.types import types, FlatSpikings, WaypointInfo, Vector2D
+from system.types import types, FlatSpikings, WaypointInfo, Vector2D, AllowedMapName
 from system.controller.reachability_estimator.types import Sample, PlaceInfo, ReachabilityController
 
 def get_path():
@@ -148,11 +148,12 @@ class TrajectoriesDataset(data.Dataset):
             map_name: np.cumsum([self.traj_len_dict[_] for _ in traj_ids])
             for map_name, traj_ids in traj_ids_per_map.items()}
 
-        self.envs = env_cache
-        for map_name in self.maps:
-            try:
-                self.envs.load(map_name)
-            except KeyError: pass
+        if env_cache:
+            self.envs = env_cache
+            for map_name in self.maps:
+                try:
+                    self.envs.load(map_name)
+                except KeyError: pass
 
         self.opened = False
         self.load_to_mem = False
@@ -211,6 +212,20 @@ class TrajectoriesDataset(data.Dataset):
     def __len__(self):
         return self.traj_len_cumsum[-1]
 
+    def _dest_same_traj(self, src_traj: list, src_idx):
+        p = self.rng.uniform()
+        x = 0
+        while True:
+            x += 1
+            if p <= 0.75:
+                dst_idx = max(0, min(len(src_traj) - 1, src_idx + self.rng.randint(-10, 10)))
+            else:
+                dst_idx = self.rng.randint(0, len(src_traj))
+            if dst_idx != src_idx:
+                return dst_idx
+            if x >= 20:
+                raise TimeoutError("Couldn't get dst") #return None
+
     def _draw_sample_same_traj(self, idx) -> Optional[Tuple[str, WaypointInfo, WaypointInfo, float]]:
         """ Draw a source and goal sample from the same trajectory.
             Their distance will be between distance_min and distance_max.
@@ -229,18 +244,7 @@ class TrajectoriesDataset(data.Dataset):
         src_sample = src_traj[src_idx]
         src_pos = src_sample[0]
 
-        p = self.rng.uniform()
-        x = 0
-        while True:
-            x += 1
-            if p <= 0.75:
-                dst_idx = max(0, min(len(src_traj) - 1, src_idx + self.rng.randint(-10, 10)))
-            else:
-                dst_idx = self.rng.randint(0, len(src_traj))
-            if dst_idx != src_idx:
-                break
-            if x >= 20:
-                return None
+        dst_idx = self._dest_same_traj(src_traj, src_idx)
 
         dst_sample = src_traj[dst_idx]
         dst_pos = dst_sample[0]
@@ -326,6 +330,44 @@ class TrajectoriesDataset(data.Dataset):
             'maybe_diff_traj': self._draw_sample,
         }
         return self._Iterator(self, parent_function=functions[mode])
+
+    class _PointPairIterator:
+        def __init__(self, parent: 'TrajectoriesDataset', parent_function: Callable[[int], tuple[str, WaypointInfo, WaypointInfo, float]]):
+            self.parent = parent
+            self.parent_function = parent_function
+        def __len__(self):
+            return len(self.parent)
+        def __getitem__(self, idx: int) -> tuple[AllowedMapName, Vector2D, Vector2D]:
+            map_name, src_sample, dst_sample, path_l = self.parent_function(idx)
+            return map_name, src_sample[0], dst_sample[0]
+
+    def generate_point_pairs(self, mode='same_traj') -> Iterable[tuple[AllowedMapName, Vector2D, Vector2D]]:
+        functions = {
+            'same_traj': self._draw_sample_same_traj_multiple_tries,
+            'diff_traj': self._draw_sample_diff_traj,
+            'maybe_diff_traj': self._draw_sample,
+        }
+        return self._PointPairIterator(self, parent_function=functions[mode])
+
+    def subset(self, map_name: str, seed: int):
+        return TrajectoriesDatasetSingleMap(parent=self, map_name=map_name, seed=seed)
+
+
+class TrajectoriesDatasetSingleMap(data.Dataset):
+    def __init__(self, parent: TrajectoriesDataset, map_name: AllowedMapName, seed: int):
+        self.parent = parent
+        self.map_name = map_name
+        self.parent._init_once(seed)
+        print(f"Creating filtered dataset with {map_name=}, len={len(self)}")
+    def __len__(self):
+        return self.parent.traj_len_cumsum_per_map[self.map_name][-1]
+    def __getitem__(self, index) -> Tuple[Vector2D, Vector2D]:
+        dataset_idx, traj_id, src_idx = self.parent._locate_sample_single_map(index, self.map_name)
+        traj = self.parent.fds[dataset_idx][traj_id]
+        dst_idx = self.parent._dest_same_traj(traj, src_idx)
+        src_pos, dst_pos = traj[src_idx][0], traj[dst_idx][0]
+
+        return src_pos, dst_pos
 
 
 DATASET_KEY = 'positions'

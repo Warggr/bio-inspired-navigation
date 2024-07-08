@@ -644,6 +644,31 @@ class MapLayout(Map):
         plt.show()
 
 
+import random
+from system.controller.simulation.environment.map_occupancy import MapLayout
+
+
+def random_coordinates(xmin, xmax, ymin, ymax, rng=random.Random()):
+    return np.array([ rng.uniform(xmin, xmax), rng.uniform(ymin, ymax) ])
+
+def random_points(env_model: AllowedMapName, rng: random.Random) -> Tuple[Vector2D, Vector2D]:
+    map = MapLayout(env_model)
+    origin, corner = environment_dimensions(env_model)
+    dimensions = [ origin[0], origin[1], corner[0], corner[1] ]
+
+    result = []
+    for i in range(2):
+        i = 0
+        while True:
+            i += 1
+            p = random_coordinates(*dimensions, rng=rng)
+            #print(f"[i={i}]Trying", p, "...")
+            if map.suitable_position_for_robot(p):
+                break
+        result.append(p)
+    return tuple(result)
+
+
 if __name__ == "__main__":
     """ To compute the waypoints on the path in a particular maze ...
     ... first create the binary of the maze layout

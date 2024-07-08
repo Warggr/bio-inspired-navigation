@@ -360,7 +360,22 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network: O
         last_pc = pc_network.place_cells[-1]
     return goal_reached, last_pc
 
-from tqdm import tqdm
+
+T = TypeVar('T')
+
+from bisect import bisect_left
+
+class ChainSequence(Generic[T]):
+    def __init__(self, *sequences: list[Sequence[T]]):
+        self.sequences = sequences
+        self.cumsum = np.cumsum([len(seq) for seq in self.sequences])
+    def __len__(self):
+        return self.cumsum[-1]
+    def __getitem__(self, idx) -> T:
+        seq_idx = bisect_left(self.cumsum, idx+1)
+        seq_offset = idx - self.cumsum[seq_idx]
+        return self.sequences[seq_idx][seq_offset]
+
 import random
 
 class RandomTaker(Generic[T]):
