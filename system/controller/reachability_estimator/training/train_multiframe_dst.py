@@ -117,12 +117,18 @@ def process_batch(item : Batch, train_device : TrainDevice):
 
 LossFunction = Callable[[Prediction, Prediction], torch.Tensor]
 
+weights = [0.9, 1.3]
+def BCELoss_class_weighted(input, target):
+    input = torch.clamp(input,min=1e-7,max=1-1e-7)
+    bce = - weights[1] * target * torch.log(input) - (1 - target) * weights[0] * torch.log(1 - input)
+    return torch.mean(bce)
+
 def make_loss_function(position_loss_weight = 0.6, angle_loss_weight = 0.3) -> LossFunction:
     def loss_function(prediction : Prediction, truth : Prediction, return_details = False) -> torch.Tensor:
         reachability_prediction, position_prediction, angle_prediction = prediction
         reachability, position, angle = truth
 
-        loss_reachability = torch.nn.functional.binary_cross_entropy(reachability_prediction, reachability, reduction='none')
+        loss_reachability = BCELoss_class_weighted(reachability_prediction, reachability)
         if position_prediction is None:
             loss = loss_reachability
         else:
