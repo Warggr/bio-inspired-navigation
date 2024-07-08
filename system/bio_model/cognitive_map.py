@@ -311,7 +311,7 @@ class CognitiveMap(CognitiveMapInterface):
             self.update_reachabilities()
             CognitiveMapInterface.save(self, *args, **kwargs)
 
-    def test_place_cell_network(self, env: 'PybulletEnvironment', gc_network, from_data=False):
+    def test_place_cell_network(self, env : 'PybulletEnvironment', gc_network, from_data=False):
         """ Test the drift error of place cells stored in the cognitive map """
         from system.controller.local_controller.local_navigation import find_new_goal_vector
 
@@ -332,7 +332,7 @@ class CognitiveMap(CognitiveMapInterface):
         else:
             env.mode = "linear_lookahead"
             # decode goal vectors from current position to every place cell on the cognitive map 
-            node_list = list(self.node_network.nodes)
+            node_list: list[PlaceCell] = list(self.node_network.nodes)
             nodes_length = len(node_list)
             for i, p in enumerate(node_list):
                 print("Decoding goal vector to place Cell", i, "out of", nodes_length)

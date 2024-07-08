@@ -120,7 +120,7 @@ class PlaceCellNetwork:
 
     def __init__(self, reach_estimator: 'ReachabilityEstimator', from_data=False):
         """ Place Cell Network  of the environment. 
-        
+
         arguments:
         from_data   -- if True: load existing place cells (default False)
         re_type     -- type of reachability estimator determining whether a new node gets created
