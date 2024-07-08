@@ -27,7 +27,7 @@ class Compass(ABC, Generic[PositionRepresentation]):
         ...
 
     @abstractmethod
-    def update_position(self, robot : 'Robot'):
+    def update_position(self, robot: 'Robot'):
         """ Updates the stored position """
         ...
 
@@ -38,7 +38,6 @@ class Compass(ABC, Generic[PositionRepresentation]):
     @abstractmethod
     def reset_goal(self, new_goal: PositionRepresentation):
         """ Sets a new goal position """
-        print("Resetting goal_pos to", new_goal)
         self.goal_pos = new_goal
 
     def reached_goal(self) -> bool:

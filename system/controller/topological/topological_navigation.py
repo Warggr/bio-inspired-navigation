@@ -174,7 +174,7 @@ class TopologicalNavigation(object):
             self.cognitive_map.save(filename=cognitive_map_filename)
         return curr_path_length < self.path_length_limit
 
-    def locate_node(self, compass : Compass, pc: PlaceCell, goal: PlaceCell):
+    def locate_node(self, compass: Compass, pc: PlaceCell, goal: PlaceCell):
         """
         Maps a location of the given place cell to the node in the graph.
         Among multiple close nodes prioritize the one that has a valid path to the goal.

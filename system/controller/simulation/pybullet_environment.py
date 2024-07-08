@@ -461,7 +461,7 @@ class Robot:
         self.buffer = 0  # buffer for checking if agent got stuck, discards timesteps spent turning towards the goal
         self.data_collector = DatasetCollector(frame_limit=frame_limit, collectImages=build_data_set)
 
-        goal_vector=compass.calculate_goal_vector() if compass else np.array([0, 0])
+        goal_vector: Vector2D = compass.calculate_goal_vector() if compass else np.array([0., 0.])
         self.save_snapshot(goal_vector=goal_vector)  # save initial configuration
 
         self.mapping = 1.5  # see local_navigation experiments
