@@ -19,17 +19,16 @@ from system.bio_model.place_cell_model import PlaceCellNetwork
 
 from system.controller.local_controller.decoder.linear_lookahead_no_rewards import *
 from system.controller.local_controller.decoder.phase_offset_detector import PhaseOffsetDetectorNetwork
-from system.controller.simulation.math_utils import Vector2D
 from system.bio_model.grid_cell_model import GridCellNetwork
 from system.controller.simulation.pybullet_environment import PybulletEnvironment, Robot
 from system.controller.local_controller.compass import Compass, AnalyticalCompass
-from system.controller.local_controller.local_controller import LocalController, ObstacleAvoidance, ObstacleBackoff, TurnToGoal, RobotStuck
-from system.types import WaypointInfo, types
+from system.controller.local_controller.local_controller import LocalController, ObstacleAvoidance, ObstacleBackoff, StuckDetector, TurnToGoal, RobotStuck
+from system.types import Spikings, WaypointInfo, types, Vector2D
 from system.utils import normalize
 
 import system.plotting.plotResults as plot
 import numpy as np
-from typing import Callable, Optional, List, Tuple, Any
+from typing import Callable, Iterable, Optional, List, Sequence, Tuple, Any, Generic, TypeVar
 
 plotting = True  # if True: plot everything
 debug = os.getenv('DEBUG', False)  # if True: print debug output
@@ -42,21 +41,20 @@ def print_debug(*params):
 
 
 class GoalVectorCache(Compass):
+    @staticmethod
+    def parse(pc: 'PlaceCell'):
+        return GcCompass.parse(pc)
+
     @property
     def arrival_threshold(self):
         return self.impl.arrival_threshold
 
-    @property
-    def goal_pos(self):
-        return self.impl.goal_pos
-
-    def reset(self, new_goal: Vector2D):
-        self.impl.reset(new_goal)
+    def reset_goal(self, new_goal: Spikings):
+        self.impl.reset_goal(new_goal)
         self.goal_vector = None
 
-    def __init__(self, impl: Compass, update_fraction=0.5):
+    def __init__(self, impl: Compass[Spikings], update_fraction=0.5):
         # intentionally don't call super().__init__() because we don't really need it
-        self.nr_ofsteps = 0  # we just need this line
         self.impl = impl
         self.update_fraction = update_fraction  # how often the goal vector is recalculated
         self.goal_vector = None  # egocentric goal vector after last update
@@ -68,6 +66,9 @@ class GoalVectorCache(Compass):
             self.distance_to_goal_original = np.linalg.norm(self.goal_vector)
 
         return self.goal_vector
+
+    def reset_position(self, new_position: Spikings):
+        return self.impl.reset_position(new_position)
 
     def update_position(self, robot: Robot):
         distance_to_goal = np.linalg.norm(self.goal_vector)  # current length of goal vector
@@ -84,13 +85,23 @@ class GoalVectorCache(Compass):
             # robot.turn_to_goal()
         else:
             self.goal_vector = self.goal_vector - np.array(robot.xy_speed) * robot.env.dt
+        self.impl.update_position(robot)
 
-class GcCompass(Compass):
+class GcCompass(Compass[Spikings]):
     """ Uses decoded grid cell spikings as a goal vector. """
 
-    def __init__(self, gc_network : GridCellNetwork, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    @staticmethod
+    def parse(pc: 'PlaceInfo'):
+        return pc.spikings
+
+    def __init__(self, gc_network: GridCellNetwork):
         self.gc_network = gc_network
+
+    def reset_position(self, new_position: Spikings):
+        self.gc_network.set_as_current_state(new_position)
+
+    def reset_goal(self, new_goal: Spikings):
+        self.gc_network.set_as_target_state(new_goal)
 
     def update_position(self, robot : 'Robot'):
         pass # TODO Pierre: ensure that the GCNetwork is updated separately
@@ -144,13 +155,13 @@ class ComboGcCompass(GcCompass):
         compass = GoalVectorCache(compass)
         self.impl = compass
 
-    def reset(self, new_goal : Vector2D):
-        super().reset(new_goal)
+    def reset_goal(self, new_goal: Spikings):
+        super().reset_goal(new_goal)
         if type(self.impl) == LinearLookaheadGcCompass:
             self.impl = PodGcCompass(pod_network=self.pod_network, gc_network=self.impl.gc_network, goal_pos=new_pos)
             self.impl = GoalVectorCache(self.impl)
         else:
-            self.impl.reset(new_goal)
+            self.impl.reset_goal(new_goal)
 
     def calculate_goal_vector(self, *args, **kwargs):
         return self.impl.calculate_goal_vector(*args, **kwargs)
@@ -284,7 +295,13 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network : 
     last_pc = None
     while n < step_limit and not goal_reached:
         try:
-            goal_reached = controller.step()
+            goal_vector = compass.calculate_goal_vector()
+            if np.linalg.norm(goal_vector) == 0:
+                goal_reached = True
+            else:
+                controller.step(goal_vector, robot)
+                compass.update_position(robot)
+                goal_reached = compass.reached_goal()
         except RobotStuck:
             break
 
@@ -502,7 +519,7 @@ if __name__ == "__main__":
                     actual_error_goal = np.linalg.norm(env.robot.position - goal)
                     actual_error_goal_array.append(actual_error_goal)
                     # TODO Pierre: env.nr_ofsteps = 0
-                    compass.reset(new_goal=start)
+                    compass.reset_goal(new_goal=start)
                     gc_network.set_as_target_state(start_spiking)
                     vector_navigation(env, compass, gc_network, step_limit=8000, plot_it=False)
 

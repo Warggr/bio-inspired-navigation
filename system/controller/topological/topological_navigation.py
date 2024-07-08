@@ -115,13 +115,13 @@ class TopologicalNavigation(object):
         i = 0
         curr_path_length = 0
         while i + 1 < len(path) and curr_path_length < self.path_length_limit:
-            goal_pos = list(path[i + 1].env_coordinates)
-            assert goal_pos is not None
-            compass.reset(new_goal=goal_pos)
-            assert compass.goal_pos is not None
+            goal = path[i + 1]
+            self.compass.reset_goal(new_goal=self.compass.parse(goal))
             goal_spiking = path[i + 1].gc_connections
-            controller = LocalController.default(env.robot, compass, obstacles=True)
-            stop, pc = vector_navigation(env, compass, self.gc_network, target_gc_spiking=goal_spiking,
+            if gc_network:
+                gc_network.set_as_target_state(goal_spiking)
+            controller = LocalController(on_reset_goal=[TurnToGoal()], transform_goal_vector=[ObstacleAvoidance(follow_walls=True)], hooks=[StuckDetector()]) # ObstacleBackoff(backoff_on_distance=0.25, backoff_off_distance=0.35)
+            stop, pc = vector_navigation(env, self.compass, gc_network=gc_network,
                                          controller=controller, exploration_phase=False, pc_network=self.pc_network,
                                          cognitive_map=self.cognitive_map, plot_it=False,
                                          step_limit=self.step_limit, *nav_args, **nav_kwargs)
@@ -181,9 +181,11 @@ class TopologicalNavigation(object):
         [PlaceCell] | None -- path to the goal if exists
         """
         closest_node = None
+        # TODO: assert compass.current_pos == pc
+        #compass.reset_position(compass.parse(pc))
         for node in self.cognitive_map.node_network.nodes:
-            compass.reset(new_goal=node.env_coordinates)
-            goal_vector = compass.calculate_goal_vector(robotPosition=position)
+            compass.reset_goal(new_goal=compass.parse(node))
+            goal_vector = compass.calculate_goal_vector()
             if np.linalg.norm(goal_vector) < compass.arrival_threshold: # TODO: maybe we could find the *closest* node?
                 closest_node = node
                 new_path = self.cognitive_map.find_path(node, goal)

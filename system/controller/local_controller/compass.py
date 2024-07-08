@@ -1,27 +1,24 @@
 from system.types import Vector2D
 from abc import ABC, abstractmethod, abstractmethod
 import numpy as np
-from typing import Optional
+from typing import Optional, Generic, TypeVar
 
-class Compass(ABC):
+PositionRepresentation = TypeVar('PositionRepresentation')
+
+class Compass(ABC, Generic[PositionRepresentation]):
     """
     The Compass class tracks the current position and goal position, and allows to compute goal vectors.
     """
 
-    def __init__(self, goal_pos : Optional[Vector2D] = None):
-        """
-        Creates a Compass that gives a goal position to the agent.
-        arrival_threshold -- threshold for goal_vector length that signals arrival at goal
-        goal_pos          -- position of the goal (can be set to None, or reset later).
-                             used for analytical goal vector calculation and plotting
-        stuck_threshold   -- threshold for considering the agent as stuck
-
-        """
-        self.goal_pos = goal_pos
+    @staticmethod
+    @abstractmethod
+    def parse(pc: 'PlaceInfo') -> PositionRepresentation:
+        ...
 
     @property
     @abstractmethod
     def arrival_threshold(self) -> float:
+        """ threshold for goal_vector length that signals arrival at goal """
         ...
 
     @abstractmethod
@@ -34,7 +31,12 @@ class Compass(ABC):
         """ Updates the stored position """
         ...
 
-    def reset(self, new_goal : Vector2D):
+    @abstractmethod
+    def reset_position(self, new_position: PositionRepresentation):
+        ...
+
+    @abstractmethod
+    def reset_goal(self, new_goal: PositionRepresentation):
         """ Sets a new goal position """
         print("Resetting goal_pos to", new_goal)
         self.goal_pos = new_goal
@@ -67,19 +69,27 @@ class Compass(ABC):
             return GcCompass.factory(mode, *args, **kwargs)
 
 
-class AnalyticalCompass(Compass):
+class AnalyticalCompass(Compass[Vector2D]):
     """ Uses a precise goal vector. """
 
     arrival_threshold = 0.1
 
-    def __init__(self, start_pos : Optional[Vector2D] = None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.current_pos : Vector2D = start_pos
+    @staticmethod
+    def parse(pc: 'PlaceInfo'):
+        return pc.pos
+
+    def __init__(self, start_pos: Optional[Vector2D] = None, goal_pos: Optional[Vector2D] = None):
+        self.goal_pos = goal_pos
+        self.current_pos = start_pos
 
     def update_position(self, robot : 'Robot'):
         self.current_pos = robot.position
 
     def calculate_goal_vector(self) -> Vector2D:
-        goal_vector = [self.goal_pos[0] - self.current_pos[0], self.goal_pos[1] - self.current_pos[1]]
+        return np.array(self.goal_pos) - np.array(self.current_pos)
 
-        return goal_vector
+    def reset_position(self, new_position: Vector2D):
+        self.current_pos = new_position
+
+    def reset_goal(self, new_goal: Vector2D):
+        self.goal_pos = new_goal
