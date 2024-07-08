@@ -170,7 +170,9 @@ if __name__ == "__main__":
     dataset = ReachabilityDataset(filename='dataset' + dataset_features + ".hd5")
     dataset = ImageDataset(dataset)
 
-    net = ImageAutoencoder(args.code_dim)
+    optimizer_params = {}
+    if args.code_dim >= 75: optimizer_params['lr'] = 6e-4 # the default LR does not perform well for 100
+    net = ImageAutoencoder(args.code_dim, optimizer_params=optimizer_params)
 
     match args.mode:
         case 'train':

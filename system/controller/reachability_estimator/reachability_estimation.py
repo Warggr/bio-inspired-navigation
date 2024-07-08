@@ -19,7 +19,7 @@ import system.controller.reachability_estimator.networks as networks
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.bio_model.place_cell_model import PlaceCell
 import system.types as types
-from system.controller.reachability_estimator.types import ReachabilityController, PlaceInfo, transpose_image
+from system.controller.reachability_estimator.types import Prediction, ReachabilityController, PlaceInfo
 
 try:
     from typing import override

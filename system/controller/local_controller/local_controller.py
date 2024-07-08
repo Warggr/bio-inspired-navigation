@@ -51,8 +51,10 @@ class ObstacleAvoidance:
         num_ray_dir = 21,
         tactile_cone = 120,
         ray_length = 1,
+        follow_walls = False,
     ):
         self.combine = combine
+        self.follow_walls = follow_walls
         self.lidar_kwargs = dict(tactile_cone=tactile_cone, num_ray_dir=num_ray_dir, ray_length=ray_length)
 
     def __call__(self, goal_vector : Vector2D, robot: 'Robot') -> Vector2D:
@@ -68,25 +70,36 @@ class ObstacleAvoidance:
         multiple = 1 if vectors_in_one_direction(normed_goal_vector, obstacle_vector) else -1
         if not intersect(robot.position, normed_goal_vector, point, obstacle_vector * multiple):
             multiple = 0
-        goal_vector = normed_goal_vector * self.combine + obstacle_vector * multiple
-        robot.env.add_debug_line(robot.position, np.array(robot.position) + goal_vector, color=(0, 0, 1), width=3)
+            print("multiple is 0 (no intersection)", end='\r')
+        else:
+            print("   ~", end='\r')
+        combine = self.combine
+        if self.follow_walls and multiple == 1 and np.linalg.norm(obstacle_vector) > 3: # norm is 1.5 / min(distances), i.e. if norm > 3 <=> distance < 0.5
+            combine = 0
+        goal_vector = normed_goal_vector * combine + obstacle_vector * multiple
         return goal_vector
 
 
 class ObstacleBackoff:
-    def __init__(self, backoff_distance = 0.4):
-        self.backoff_distance = backoff_distance
+    def __init__(self, backoff_on_distance = 0.4, backoff_off_distance = 0.4):
+        self.backoff_on_distance = backoff_on_distance
+        self.backoff_off_distance = backoff_off_distance
+        self.backing_off = False
+        assert self.backoff_on_distance <= self.backoff_off_distance
     def __call__(self, goal_vector: Vector2D, robot: 'Robot') -> Vector2D:
-        collision_data, _ = robot.env.lidar(
-            tactile_cone=np.radians(40),
-            num_ray_dir=5,
-            blind_spot_cone=0,
+        distances = robot.env.straight_lidar(
+            radius=0.18,
+            num_ray_dir=3,
             agent_pos_orn=robot.lidar_sensor_position,
-            ray_length=self.backoff_distance,
+            ray_length=(self.backoff_off_distance if self.backing_off else self.backoff_on_distance),
             draw_debug_lines=True
         )
-        if any(distance != -1 for distance in collision_data.distances):
-            return - np.array(robot.heading_vector())
+        if any(distance != -1 for distance in distances):
+            self.backing_off = True
+        else:
+            self.backing_off = False
+        if self.backing_off:
+            return - np.array(goal_vector)
         else:
             return goal_vector
 
@@ -102,11 +115,13 @@ class StuckDetector(Hook):
     def on_reset_goal(self, new_goal, robot):
         self.nr_ofsteps = 0
     def transform_goal_vector(self, goal_vector: Vector2D, robot: 'Robot') -> Vector2D:
-        self.nr_ofsteps += 1
-        if self.nr_ofsteps % 20 == 0:
-            print(self.nr_ofsteps, np.linalg.norm(robot.position - self.previous_position))
-        if self.nr_ofsteps >= self.stuck_threshold and np.linalg.norm(robot.position - self.previous_position) < 0.1:
-            raise RobotStuck()
+        if self.previous_position is not None and np.linalg.norm(robot.position - self.previous_position) < 0.001:
+            self.nr_ofsteps += 1
+            if self.nr_ofsteps >= self.stuck_threshold:
+                raise RobotStuck()
+        else:
+            self.nr_ofsteps = 0
+
         self.previous_position = robot.position
         return goal_vector
 
@@ -114,4 +129,30 @@ class TurnToGoal:
     def __init__(self, tolerance = 0.05):
         self.tolerance = tolerance
     def __call__(self, goal_vector : Vector2D, robot: 'Robot'):
+        ray_length = 0.25
+        while True:
+            collision_data, _ = robot.env.lidar(
+                tactile_cone=np.radians(180),
+                num_ray_dir=20,
+                blind_spot_cone=0,
+                agent_pos_orn=robot.lidar_sensor_position,
+                ray_length=ray_length,
+                draw_debug_lines=True
+            )
+            if all(distance == -1 for distance in collision_data.distances):
+                break
+            robot.navigation_step(goal_vector=-np.array(robot.heading_vector()))
+        while True:
+            collision_data, _ = robot.env.lidar(
+                tactile_cone=np.radians(360),
+                num_ray_dir=20,
+                blind_spot_cone=np.radians(180),
+                agent_pos_orn=robot.lidar_sensor_position,
+                ray_length=ray_length,
+                draw_debug_lines=True
+            )
+            if all(distance == -1 for distance in collision_data.distances):
+                break
+            robot.navigation_step(goal_vector=np.array(robot.heading_vector()))
+
         robot.turn_to_goal(goal_vector, tolerance=self.tolerance)

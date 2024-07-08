@@ -454,7 +454,7 @@ def create_and_save_reachability_samples(
         while reachable is None:
             try:
                 sample, path_l, map_name = next(samples)
-            except (ValueError, AssertionError):
+            except (ValueError,): #, AssertionError):
                 tqdm.write(f"Error at sample {i}")
                 continue
 

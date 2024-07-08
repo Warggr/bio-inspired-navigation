@@ -192,7 +192,7 @@ class Map(object):
         # print(p, 'is suitable:', end='')
         map_coords = self.map_coord_to_path_coord(p[0], p[1])
         try:
-            return self.path_map[map_coords[::-1]] == 0
+            return self.path_map[map_coords[::-1]] <= 128
         except IndexError:
             return False
 

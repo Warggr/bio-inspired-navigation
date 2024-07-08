@@ -220,10 +220,10 @@ def create_gc_spiking(start : Vector2D, goal : Vector2D, gc_network_at_start: Op
         robot_position += xy_speed * dt
         history.append(np.array(robot_position))
         compass.current_pos = robot_position
-        gc_network.track_movement(xy_speed)
+        gc_network.track_movement(xy_speed, virtual=True)
 
     if plotting: plot.plotTrajectoryInEnvironment(env_model="plane", xy_coordinates=history)
-    return gc_network.consolidate_gc_spiking()
+    return gc_network.consolidate_gc_spiking(virtual=True)
 
 
 def setup_gc_network(dt) -> GridCellNetwork:

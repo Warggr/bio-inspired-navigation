@@ -373,6 +373,51 @@ class PybulletEnvironment:
         if self.visualize:
             p.addUserDebugLine(start, end, color, width)
 
+    def straight_lidar(
+        self,
+        agent_pos_orn : Optional[types.PositionAndOrientation] = None,
+        ray_length = WHISKER_LENGTH,
+        draw_debug_lines = False,
+        radius: float = 0.25,
+        num_ray_dir: float = 3,
+    ) -> list[float]:
+        if agent_pos_orn:
+            rayFromPoint, euler_angle = agent_pos_orn
+            if len(rayFromPoint) == 2:
+                rayFromPoint = list(rayFromPoint) + [ PybulletEnvironment.ROBOT_Z_POS + 0.1 ] # TODO: make sure this is high enough not to hit the robot, if there is one
+        else:
+            rayFromPoint, euler_angle = self.robot.lidar_sensor_position
+        rayFromPoint = np.array(rayFromPoint)
+
+        rayFrom, rayTo = [], []
+        for distance in np.linspace(start=-radius, stop=radius, num=num_ray_dir):
+            rayFromI = rayFromPoint + distance * np.array([ -np.sin(euler_angle), np.cos(euler_angle), 0 ])
+            rayToI = rayFromI + ray_length * np.array([ np.cos(euler_angle), np.sin(euler_angle), 0 ])
+            rayFrom.append(rayFromI); rayTo.append(rayToI)
+
+        rayHitColor = [1, 0, 0]
+        rayMissColor = [1, 1, 1]
+
+        ray_return = []
+        results = p.rayTestBatch(rayFrom, rayTo, numThreads=0)  # get intersections with obstacles
+        for start, end, hit in zip(rayFrom, rayTo, results):
+            hit_object_uid = hit[0]
+
+            if hit_object_uid < 0:
+                if draw_debug_lines:
+                    self.add_debug_line(start, end, (0, 0, 0))
+                ray_return.append(-1)
+            else:
+                if self.robot:
+                    assert hit_object_uid != self.robot.ID
+                hitPosition = hit[3]
+                if draw_debug_lines:
+                    self.add_debug_line(start, end, rayHitColor)
+                distance = math.sqrt((hitPosition[0] - start[0]) ** 2 + (hitPosition[1] - start[1]) ** 2)
+                assert 0 <= distance and distance <= 1
+                ray_return.append(distance)
+        return ray_return
+
     def lidar(
         self,
         agent_pos_orn : Optional[types.PositionAndOrientation] = None,
