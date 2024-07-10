@@ -20,14 +20,11 @@ for d in datasets:
         dattrs = ','.join(map(lambda keyval: f"{keyval[0]}={keyval[1]}", f.attrs.items()))
         print(f"size {dlength}\t{dattrs}")
         BLOCK_SIZE=10000
-        #n1 = np.zeros((BLOCK_SIZE,), dtype=dset.dtype)
         reached = 0
-        for i in (bar := tqdm(range(0, len(dset), BLOCK_SIZE))):
-            #dset.read_direct(n1, np.s_[i*BLOCK_SIZE:(i+1)*BLOCK_SIZE])
-            n1 = dset[i*BLOCK_SIZE:(i+1)*BLOCK_SIZE]
+        for i in (bar := tqdm(range(0, len(dset), BLOCK_SIZE), file=sys.stdout)):
+            n1 = dset[i:i+BLOCK_SIZE]
             reached += sum(n1['reached'])
-            bar.set_description(f"        {(i+1)*BLOCK_SIZE} / {reached} reached ({reached/dlength:.1%})")
-        #print(f"\t{dlength} / {reached} reached ({reached/dlength:.1%})")
+            bar.set_description(f"  {i+BLOCK_SIZE} / {reached} reached ({reached/(i+BLOCK_SIZE):.1%})")
     except BlockingIOError:
         print("Couldn't open dataset")
     except OSError:

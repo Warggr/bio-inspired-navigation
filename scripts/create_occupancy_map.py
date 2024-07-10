@@ -1,6 +1,6 @@
 # coding: utf-8
 import xml.etree.ElementTree as ET
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 import numpy as np
 import sys, os
 
@@ -54,4 +54,5 @@ for start, stop in zip(starts, stops):
     print("Drawing rectangle", start, stop)
     draw.rectangle([tuple(start), tuple(stop)], fill=0)
 
+image = ImageOps.flip(image)
 image.save(os.path.join(img_root, folder, "maze_topview_binary.png"))

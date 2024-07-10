@@ -13,6 +13,8 @@ def a_star(obstacle_map, start_pos, goal_pos, soft_obstacle_scale=0.0):
                                 generating paths too close to real obstacles.
     """
     height, width = obstacle_map.shape
+    if start_pos == goal_pos:
+        return [start_pos]
 
     # Convert to standard python types. This speeds up path finding significantly.
     assert obstacle_map[goal_pos[::-1]] != 255 and obstacle_map[start_pos[::-1]] != 255
