@@ -43,7 +43,7 @@ import pybullet_data
 import numpy as np
 import math
 import itertools
-from typing import List, Optional, Any, Tuple, Callable
+from typing import List, Optional, Any, Tuple, Callable, Self
 from random import Random
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../.."))
@@ -209,6 +209,25 @@ class PybulletEnvironment:
             p.removeBody(wallID)
         p.removeAllUserDebugItems()
         p.disconnect()
+
+    def switch_visualization(self, visualize) -> Self:
+        if visualize == self.visualize:
+            return self
+        if self.robot is not None:
+            pos = self.robot.position_and_angle
+            robot_kwargs = { 'contains_robot': True, 'start': pos[0], 'orientation': pos[1], 'build_data_set': self.robot.buildDataSet }
+        else:
+            robot_kwargs = { 'contains_robot': False }
+        self.__exit__(None, None, None)
+        new_env = PybulletEnvironment(
+            env_model=self.env_model, dt=self.dt, visualize=visualize,
+            realtime=False, **robot_kwargs
+        )
+        if self.robot is not None:
+            new_robot = new_env.robot
+            self.robot.env = new_env
+            self.robot.ID = new_robot.ID
+        return new_env
 
     @property
     def dimensions(self):
