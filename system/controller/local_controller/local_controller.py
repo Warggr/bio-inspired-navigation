@@ -7,7 +7,7 @@ from system.types import Vector2D
 from typing import List, Callable
 
 ResetGoalHook = Callable[[Vector2D, 'Robot'], None]
-TransformGoalHook = Callable[[Vector2D, 'Robot'], Vector2D]
+TransformGoalHook = Callable[[Vector2D, 'Robot'], Vector2D|tuple[Vector2D, dict]]
 
 class Hook:
     def on_reset_goal(self, new_goal: Vector2D, robot: 'Robot'):
@@ -38,10 +38,15 @@ class LocalController(ABC):
 
     def step(self, goal_vector: Vector2D, robot: 'Robot'):
         for hook in self.transform_goal_vector:
-            goal_vector = hook(goal_vector, robot)
+            res = hook(goal_vector, robot)
+            kwargs = {}
+            try:
+                goal_vector, kwargs = res
+            except ValueError:
+                goal_vector = res
 
         robot.env.add_debug_line(robot.position, np.array(robot.position) + goal_vector, color=(0, 0, 1), width=3)
-        robot.navigation_step(goal_vector)
+        robot.navigation_step(goal_vector, **kwargs)
 
 
 class ObstacleAvoidance:
@@ -86,7 +91,7 @@ class ObstacleBackoff:
         self.backoff_off_distance = backoff_off_distance
         self.backing_off = False
         assert self.backoff_on_distance <= self.backoff_off_distance
-    def __call__(self, goal_vector: Vector2D, robot: 'Robot') -> Vector2D:
+    def __call__(self, goal_vector: Vector2D, robot: 'Robot') -> Vector2D|tuple[Vector2D,dict]:
         distances = robot.env.straight_lidar(
             radius=0.18,
             num_ray_dir=3,
@@ -99,7 +104,7 @@ class ObstacleBackoff:
         else:
             self.backing_off = False
         if self.backing_off:
-            return - np.array(goal_vector)
+            return - np.array(goal_vector), {'allow_backwards': True}
         else:
             return goal_vector
 

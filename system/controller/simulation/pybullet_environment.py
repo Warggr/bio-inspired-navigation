@@ -522,14 +522,14 @@ class Robot:
         self.env.robot = None
         self.delete()
 
-    def navigation_step(self, goal_vector : Vector2D):
+    def navigation_step(self, goal_vector: Vector2D, allow_backwards=False):
         """ One navigation step for the agent. Moves towards goal_vector.
         """
 
         if self.env.visualize:
             p.removeAllUserDebugItems()
 
-        gains = self.compute_gains(goal_vector)
+        gains = self.compute_gains(goal_vector, allow_backwards=allow_backwards)
         assert not np.any(np.isnan(gains))
 
         self._step(gains, goal_vector)
@@ -575,8 +575,13 @@ class Robot:
         if self.buildDataSet:
             self.data_collector.images.append(self.env.camera((position, angle)))
 
-    def compute_gains(self, goal_vector) -> Tuple[float, float]:
-        """ computes the motor gains resulting from (inhibited) goal vector"""
+    def compute_gains(self, goal_vector, allow_backwards=False) -> Tuple[float, float]:
+        """ computes the motor gains resulting from (inhibited) goal vector
+        Arguments:
+        :param allow_backwards: Whether to allow backwards movement.
+                                If set to False, if the goal vector points behind the robot,
+                                the robot will start a U-Turn.
+        """
         current_heading = self.heading_vector()
         diff_angle = compute_angle(current_heading, goal_vector)
         assert not np.isnan(diff_angle), (current_heading, goal_vector)
@@ -589,7 +594,7 @@ class Robot:
             gain = 0
 
         backwards = False
-        if abs(diff_angle) > math.radians(90):
+        if abs(diff_angle) > math.radians(90) and allow_backwards:
             backwards = True
             diff_angle = -diff_angle + np.pi if diff_angle > 0 else -diff_angle - np.pi
 
