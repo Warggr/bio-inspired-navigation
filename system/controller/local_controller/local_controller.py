@@ -38,12 +38,11 @@ class LocalController(ABC):
 
     def step(self, goal_vector: Vector2D, robot: 'Robot'):
         for hook in self.transform_goal_vector:
-            res = hook(goal_vector, robot)
-            kwargs = {}
-            try:
-                goal_vector, kwargs = res
-            except ValueError:
-                goal_vector = res
+            match hook(goal_vector, robot):
+                case (goal_vector, kwargs):
+                    pass
+                case goal_vector:
+                    kwargs = {}
 
         robot.env.add_debug_line(robot.position, np.array(robot.position) + goal_vector, color=(0, 0, 1), width=3)
         robot.navigation_step(goal_vector, **kwargs)
@@ -146,7 +145,7 @@ class TurnToGoal:
             )
             if all(distance == -1 for distance in collision_data.distances):
                 break
-            robot.navigation_step(goal_vector=-np.array(robot.heading_vector()))
+            robot.navigation_step(goal_vector=-np.array(robot.heading_vector()), allow_backwards=True)
         while True:
             collision_data, _ = robot.env.lidar(
                 tactile_cone=np.radians(360),
