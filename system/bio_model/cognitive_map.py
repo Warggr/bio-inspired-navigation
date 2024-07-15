@@ -194,6 +194,84 @@ class CognitiveMapInterface(ABC):
         """
         pass
 
+    def test_place_cell_network(self, env : 'PybulletEnvironment', gc_network, from_data=False):
+        """ Test the drift error of place cells stored in the cognitive map """
+        from system.controller.local_controller.local_navigation import LinearLookaheadGcCompass
+        from system.controller.local_controller.compass import AnalyticalCompass
+
+        delta_avg = 0
+        pred_gvs = []  # goal vectors decoded using linear lookahead
+        true_gvs = []  # analytically calculated goal vectors
+        error = []
+
+        if from_data:
+            dirname = os.path.join(os.path.dirname(__file__), "../../experiments/drift_error")
+
+            pred_gvs = np.load(os.path.join(dirname, "pred_gvs.npy"))
+            true_gvs = np.load(os.path.join(dirname, "true_gvs.npy"))
+            error = true_gvs - pred_gvs
+            delta = [np.linalg.norm(i) for i in error]
+            delta_avg = np.mean(delta)
+
+        else:
+            compass = LinearLookaheadGcCompass(arena_size=env.arena_size)
+            # decode goal vectors from current position to every place cell on the cognitive map 
+            node_list: list[PlaceCell] = list(self.node_network.nodes)
+            nodes_length = len(node_list)
+            for i, p in enumerate(node_list):
+                print("Decoding goal vector to place Cell", i, "out of", nodes_length)
+                target_spiking = p.gc_connections
+                gc_network.set_as_target_state(target_spiking)
+                compass.reset_goal(compass.parse(p))
+
+                pred_gv = compass.calculate_goal_vector()
+                true_gv = AnalyticalCompass(start_pos=env.robot.pos, goal_pos=p.pos)
+                true_gv = env.calculate_goal_vector_analytically()
+
+                error_gv = true_gv - pred_gv
+                delta = np.linalg.norm(error_gv)
+
+                delta_avg += delta
+                pred_gvs.append(pred_gv)
+                true_gvs.append(true_gv)
+                error.append(error_gv)
+
+            delta_avg /= nodes_length
+
+        print("Average error:", delta_avg)
+
+        # Plot the drift error on the cognitive map
+        import system.plotting.plotHelper as pH
+
+        plt.figure()
+        ax = plt.gca()
+        pH.add_environment(ax, env.env_model)
+        pH.add_robot(ax, *env.robot.position_and_angle)
+        pos = nx.get_node_attributes(self.node_network, 'pos')
+        nx.draw_networkx_nodes(self.node_network, pos, node_color='#0065BD80', node_size=3000)
+
+        directory = "experiments/"
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
+        directory = "experiments/drift_error"
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
+        np.save("experiments/drift_error/pred_gvs", pred_gvs)
+        np.save("experiments/drift_error/true_gvs", true_gvs)
+
+        for i, gv in enumerate(pred_gvs):
+            # control the amount of goal vectors displayed in the plot
+            if i % 2 == 0 or i % 3 == 0 or i % 5 == 0:
+                continue
+            plt.quiver(env.robot.position[0], env.robot.position[1], gv[0], gv[1], color='grey', angles='xy',
+                       scale_units='xy', scale=1, width=0.005)
+            plt.quiver(env.robot.position[0] + gv[0], env.robot.position[1] + gv[1], error[i][0], error[i][1],
+                       color='red', angles='xy', scale_units='xy', scale=1, width=0.005)
+
+        plt.show()
+
 
 class CognitiveMap(CognitiveMapInterface):
     def __init__(self, reachability_estimator=None, mode="exploration", connection=("all", "delayed"),
@@ -311,83 +389,6 @@ class CognitiveMap(CognitiveMapInterface):
             self.update_reachabilities()
             CognitiveMapInterface.save(self, *args, **kwargs)
 
-    def test_place_cell_network(self, env : 'PybulletEnvironment', gc_network, from_data=False):
-        """ Test the drift error of place cells stored in the cognitive map """
-        from system.controller.local_controller.local_navigation import LinearLookaheadGcCompass
-        from system.controller.local_controller.compass import AnalyticalCompass
-
-        delta_avg = 0
-        pred_gvs = []  # goal vectors decoded using linear lookahead
-        true_gvs = []  # analytically calculated goal vectors
-        error = []
-
-        if from_data:
-            dirname = os.path.join(os.path.dirname(__file__), "../../experiments/drift_error")
-
-            pred_gvs = np.load(os.path.join(dirname, "pred_gvs.npy"))
-            true_gvs = np.load(os.path.join(dirname, "true_gvs.npy"))
-            error = true_gvs - pred_gvs
-            delta = [np.linalg.norm(i) for i in error]
-            delta_avg = np.mean(delta)
-
-        else:
-            compass = LinearLookaheadGcCompass(arena_size=env.arena_size)
-            # decode goal vectors from current position to every place cell on the cognitive map 
-            node_list: list[PlaceCell] = list(self.node_network.nodes)
-            nodes_length = len(node_list)
-            for i, p in enumerate(node_list):
-                print("Decoding goal vector to place Cell", i, "out of", nodes_length)
-                target_spiking = p.gc_connections
-                gc_network.set_as_target_state(target_spiking)
-                compass.reset_goal(compass.parse(p))
-
-                pred_gv = compass.calculate_goal_vector()
-                true_gv = AnalyticalCompass(start_pos=env.robot.pos, goal_pos=p.pos)
-                true_gv = env.calculate_goal_vector_analytically()
-
-                error_gv = true_gv - pred_gv
-                delta = np.linalg.norm(error_gv)
-
-                delta_avg += delta
-                pred_gvs.append(pred_gv)
-                true_gvs.append(true_gv)
-                error.append(error_gv)
-
-            delta_avg /= nodes_length
-
-        print("Average error:", delta_avg)
-
-        # Plot the drift error on the cognitive map
-        import system.plotting.plotHelper as pH
-
-        plt.figure()
-        ax = plt.gca()
-        pH.add_environment(ax, env.env_model)
-        pH.add_robot(ax, *env.robot.position_and_angle)
-        pos = nx.get_node_attributes(self.node_network, 'pos')
-        nx.draw_networkx_nodes(self.node_network, pos, node_color='#0065BD80', node_size=3000)
-
-        directory = "experiments/"
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-
-        directory = "experiments/drift_error"
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-
-        np.save("experiments/drift_error/pred_gvs", pred_gvs)
-        np.save("experiments/drift_error/true_gvs", true_gvs)
-
-        for i, gv in enumerate(pred_gvs):
-            # control the amount of goal vectors displayed in the plot
-            if i % 2 == 0 or i % 3 == 0 or i % 5 == 0:
-                continue
-            plt.quiver(env.robot.position[0], env.robot.position[1], gv[0], gv[1], color='grey', angles='xy',
-                       scale_units='xy', scale=1, width=0.005)
-            plt.quiver(env.robot.position[0] + gv[0], env.robot.position[1] + gv[1], error[i][0], error[i][1],
-                       color='red', angles='xy', scale_units='xy', scale=1, width=0.005)
-
-        plt.show()
 
     def postprocess_topological_navigation(self):
         self.update_reachabilities()
