@@ -16,6 +16,7 @@ from system.bio_model.grid_cell_model import GridCellNetwork
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.controller.simulation.pybullet_environment import PybulletEnvironment
 from system.controller.local_controller.local_navigation import vector_navigation, setup_gc_network
+from system.controller.local_controller.local_controller import LocalController, controller_rules
 from system.controller.local_controller.compass import AnalyticalCompass
 from system.bio_model.place_cell_model import PlaceCellNetwork
 from system.bio_model.cognitive_map import LifelongCognitiveMap, CognitiveMapInterface

@@ -1,8 +1,8 @@
 import numpy as np
 from system.utils import normalize
-from system.controller.simulation.math_utils import vectors_in_one_direction, intersect
+from system.controller.simulation.math_utils import vectors_in_one_direction, intersect, compute_angle
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from system.types import Vector2D
 from typing import List, Callable
 
@@ -48,6 +48,31 @@ class LocalController(ABC):
         robot.navigation_step(goal_vector, **kwargs)
 
 
+class FajenObstacleAvoidance:
+    """
+    A biologically inspired local navigation algorithm (inspired by humans).
+    See: Fajen, B.R., Warren, W.H., Temizer, S. et al. A Dynamical Model of Visually-Guided Steering, Obstacle Avoidance, and Route Selection. International Journal of Computer Vision 54, 13–34 (2003). https://doi.org/10.1023/A:1023701300169
+    """
+    def __init__(self, b = 3.25, kg = 7.5, c1 = 0.40, c2 = 0.20, ko = 198, c3 = 6.5, c4 = 0.8):
+        self.b = b
+        self.kg = kg
+        self.c1 = c1
+        self.c2 = c2
+        self.ko = ko
+        self.c3 = c3
+        self.c4 = c4
+        self.angle_velocity = 0
+
+    def __call__(self, goal_vector: Vector2D, robot: 'Robot') -> Vector2D:
+        dX = -self.b * self.angle_velocity - self.kg * (compute_angle(robot.heading_vector(), goal_vector)) * (np.exp(-self.c1 * np.linalg.norm(goal_vector)) + self.c2)
+        lidar, _ = robot.env.lidar(tactile_cone=120, num_ray_dir=13, ray_length=2)
+        for angle, distance in zip(lidar.angles, lidar.distances):
+            if distance != -1:
+                dX += self.ko * (angle) * (np.exp(-self.c3 * abs(angle))) * np.exp(-self.c4 * distance)
+        self.angle_velocity += dX * robot.env.dt
+        angle = robot.position_and_angle[1] + self.angle_velocity * robot.env.dt
+        return np.array([ np.cos(angle), np.sin(angle) ])
+
 class ObstacleAvoidance:
     def __init__(
         self,
@@ -74,9 +99,6 @@ class ObstacleAvoidance:
         multiple = 1 if vectors_in_one_direction(normed_goal_vector, obstacle_vector) else -1
         if not intersect(robot.position, normed_goal_vector, point, obstacle_vector * multiple):
             multiple = 0
-            print("multiple is 0 (no intersection)", end='\r')
-        else:
-            print("   ~", end='\r')
         combine = self.combine
         if self.follow_walls and multiple == 1 and np.linalg.norm(obstacle_vector) > 3: # norm is 1.5 / min(distances), i.e. if norm > 3 <=> distance < 0.5
             combine = 0
@@ -129,6 +151,16 @@ class StuckDetector(Hook):
         self.previous_position = robot.position
         return goal_vector
 
+class TurnWhenNecessary:
+    def __call__(self, goal_vector: Vector2D, robot: 'Robot'):
+        current_heading = robot.heading_vector()
+        diff_angle = compute_angle(current_heading, goal_vector)
+        if abs(diff_angle) > np.radians(90) and np.linalg.norm(goal_vector) > 0.5:
+            robot.turn_to_goal(goal_vector)
+        if abs(diff_angle) > np.radians(90):
+            print(np.linalg.norm(goal_vector))
+        return goal_vector
+
 class TurnToGoal:
     def __init__(self, tolerance = 0.05):
         self.tolerance = tolerance
@@ -160,3 +192,10 @@ class TurnToGoal:
             robot.navigation_step(goal_vector=np.array(robot.heading_vector()))
 
         robot.turn_to_goal(goal_vector, tolerance=self.tolerance)
+
+class controller_rules: # namespace
+    ObstacleAvoidance = ObstacleAvoidance
+    ObstacleBackoff = ObstacleBackoff
+    StuckDetector = StuckDetector
+    TurnToGoal = TurnToGoal
+    TurnWhenNecessary = TurnWhenNecessary

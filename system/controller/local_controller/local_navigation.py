@@ -22,7 +22,8 @@ from system.controller.local_controller.decoder.phase_offset_detector import Pha
 from system.bio_model.grid_cell_model import GridCellNetwork
 from system.controller.simulation.pybullet_environment import PybulletEnvironment, Robot
 from system.controller.local_controller.compass import Compass, AnalyticalCompass
-from system.controller.local_controller.local_controller import LocalController, ObstacleAvoidance, ObstacleBackoff, StuckDetector, TurnToGoal, RobotStuck
+from system.controller.local_controller.local_controller import LocalController, RobotStuck
+import system.controller.local_controller.local_controller as ctrl_rules
 from system.types import Spikings, WaypointInfo, types, Vector2D
 from system.utils import normalize
 
@@ -610,7 +611,11 @@ if __name__ == "__main__":
 
                 compass = AnalyticalCompass(start_pos=start, goal_pos=goal)
                 with PybulletEnvironment(env_model, start=start, visualize=args.visualize) as env:
-                    controller = LocalController(transform_goal_vector=([] if trial == 0 else [ObstacleAvoidance()]), on_reset_goal=[TurnToGoal()], hooks=[StuckDetector()])
+                    controller = LocalController(
+                        transform_goal_vector=([] if trial == 0 else [ctrl_rules.ObstacleAvoidance()]),
+                        on_reset_goal=[ctrl_rules.TurnToGoal()],
+                        hooks=[ctrl_rules.StuckDetector()],
+                    )
                     env.mapping = mapping
 
                     over, nr_steps_this_trial = vector_navigation(env, compass, collect_nr_steps=True, gc_network=gc_network, controller=controller, target_gc_spiking=target_spiking,
@@ -657,7 +662,11 @@ if __name__ == "__main__":
         np.save("experiments/working_combinations", working_combinations)
 
     elif args.experiment == "random_nav":
-        controller = LocalController(transform_goal_vector=[ObstacleAvoidance()], on_reset_goal=[TurnToGoal()], hooks=[StuckDetector()])
+        controller = LocalController(
+            transform_goal_vector=[ctrl_rules.ObstacleAvoidance()],
+            on_reset_goal=[ctrl_rules.TurnToGoal()],
+            hooks=[ctrl_rules.StuckDetector()],
+        )
 
         from system.controller.reachability_estimator.data_generation.dataset import TrajectoriesDataset, get_path
         from system.controller.simulation.environment.map_occupancy import random_points
