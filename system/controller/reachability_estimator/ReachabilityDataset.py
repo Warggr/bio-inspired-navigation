@@ -60,7 +60,7 @@ class ReachabilityDataset(torch.utils.data.Dataset):
         transformation  -- transformation between source position and goal position
     """
 
-    def __init__(self, filename, external_link=False, sample_config : SampleConfig = SampleConfig(), dirname = DATA_STORAGE_FOLDER):
+    def __init__(self, filename, external_link=False, sample_config: SampleConfig = SampleConfig(), dirname = DATA_STORAGE_FOLDER):
         self.file_path = os.path.join(dirname, filename)
         self.externalLink = external_link
         self.dataset = h5py.File(self.file_path, 'r')

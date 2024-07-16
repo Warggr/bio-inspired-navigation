@@ -194,7 +194,7 @@ class CognitiveMapInterface(ABC):
         """
         pass
 
-    def test_place_cell_network(self, env : 'PybulletEnvironment', gc_network, from_data=False):
+    def test_place_cell_network(self, env: 'PybulletEnvironment', gc_network, from_data=False):
         """ Test the drift error of place cells stored in the cognitive map """
         from system.controller.local_controller.local_navigation import LinearLookaheadGcCompass
         from system.controller.local_controller.compass import AnalyticalCompass
@@ -215,7 +215,7 @@ class CognitiveMapInterface(ABC):
 
         else:
             compass = LinearLookaheadGcCompass(arena_size=env.arena_size)
-            # decode goal vectors from current position to every place cell on the cognitive map 
+            # decode goal vectors from current position to every place cell on the cognitive map
             node_list: list[PlaceCell] = list(self.node_network.nodes)
             nodes_length = len(node_list)
             for i, p in enumerate(node_list):
@@ -303,7 +303,10 @@ class CognitiveMap(CognitiveMapInterface):
         self.radius = 5  # radius in which node connection is calculated
 
     def update_reachabilities(self):
-        """ Update reachability between the nodes. """
+        """
+        Update reachability between the nodes.
+        Asks the reachability estimator for an estimated reachability and overwrites the existing value.
+        """
         nr_nodes = len(list(self.node_network.nodes))
         for i, p in enumerate(list(self.node_network.nodes)):
             self.print_debug("currently updating node " + str(i))
@@ -354,7 +357,7 @@ class CognitiveMap(CognitiveMapInterface):
             self._connect_single_node(p)
             self.print_debug("connecting finished")
 
-    def track_vector_movement(self, pc_firing: [float], created_new_pc: bool, pc: PlaceCell, lidar: [float] = None, **kwargs):
+    def track_vector_movement(self, pc_firing: list[float], created_new_pc: bool, pc: PlaceCell, lidar: list[float] = None, **kwargs):
         """Keeps track of current place cell firing and creation of new place cells"""
 
         # get the currently active place cell
@@ -397,8 +400,8 @@ class CognitiveMap(CognitiveMapInterface):
 class LifelongCognitiveMap(CognitiveMapInterface):
     def __init__(
             self,
-            reachability_estimator: ReachabilityEstimator = None,
-            load_data_from: str = None,
+            reachability_estimator: ReachabilityEstimator|None = None,
+            load_data_from: str|None = None,
             debug: bool = False,
             add_edges: bool = True,
             remove_edges: bool = True,

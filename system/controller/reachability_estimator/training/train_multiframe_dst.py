@@ -109,7 +109,7 @@ def run_test_model(dataset, filename = "trained_model_new.50"):
 Batch = Any # TODO
 TrainDevice = Literal['cpu', 'gpu'] # TODO (Pierre): not sure about how exactly 'gpu' is called
 
-def process_batch(item : Batch, train_device : TrainDevice):
+def process_batch(item: Batch, train_device: TrainDevice):
     model_args, ground_truth = item
     model_args = [ data.to(device=train_device, non_blocking=True) for data in model_args ]
     ground_truth = [ data.to(device=train_device, non_blocking=True) for data in ground_truth ]
@@ -183,7 +183,7 @@ def tensor_log(
             for key, loss_detail in zip(loss_detail_names, loss_details):
                 log_scores[key] += loss_detail.sum().item()
 
-    metrics : Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     metrics["Loss/Validation"] = log_loss / len(loader)
     for key, value in log_scores.items():
         metrics[key] = value / len(loader)
@@ -196,26 +196,26 @@ from dataclasses import dataclass
 
 @dataclass
 class Hyperparameters:
-    batch_size : int = 64
-    samples_per_epoch : int = 10000
-    max_epochs : int = 25
+    batch_size: int = 64
+    samples_per_epoch: int = 10000
+    max_epochs: int = 25
     lr: float = 3e-4
-    lr_decay_epoch : int = 1
-    lr_decay_rate : float = 0.7
+    lr_decay_epoch: int = 1
+    lr_decay_rate: float = 0.7
     eps: float = 1e-5
 
 def train_multiframedst(
-    nets : Model, dataset : ReachabilityDataset,
-    train_device : TrainDevice,
-    resume : bool = False,
-    hyperparams : Hyperparameters = Hyperparameters(),
+    nets: Model, dataset: ReachabilityDataset,
+    train_device: TrainDevice,
+    resume: bool = False,
+    hyperparams: Hyperparameters = Hyperparameters(),
     n_dataset_worker = 0,
     log_interval = 20,
     save_interval = 5,
-    model_suffix : str = '',
+    model_suffix: str = '',
     model_filename = "reachability_network",
     model_dir = DATA_STORAGE_FOLDER,
-    loss_function : LossFunction = make_loss_function(),
+    loss_function: LossFunction = make_loss_function(),
 ):
     """ Train the model on a multiframe dataset. """
 

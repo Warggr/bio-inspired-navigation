@@ -24,7 +24,7 @@ if __name__ == "__main__":
 from system.controller.reachability_estimator.types import PlaceInfo, untranspose_image
 from system.plotting.plotHelper import add_environment, TUM_colors
 from system.types import Vector2D
-from typing import Optional, List
+from typing import Optional
 
 def get_path_top():
     """ returns path to topological data folder """
@@ -44,7 +44,7 @@ class PlaceCell(PlaceInfo):
 
         self.observations = observations
         assert observations[0] is not None
-        self.lidar : Optional[np.ndarray] = None
+        self.lidar: Optional['LidarReading'] = None
 
     def compute_firing(self, s_vectors):
         """Computes firing value based on current grid cell spiking"""
@@ -133,7 +133,7 @@ class PlaceCellNetwork:
                     plus additional type "firing" that uses place cell spikings
         """
         self.reach_estimator = reach_estimator
-        self.place_cells = []  # array of place cells
+        self.place_cells: list[PlaceCell] = []
 
         if from_data:
             # Load place cells if wanted
@@ -152,7 +152,7 @@ class PlaceCellNetwork:
         pc = PlaceCell(*args, **kwargs)
         self.place_cells.append(pc)
 
-    def in_range(self, reach: List[float]) -> bool:
+    def in_range(self, reach: list[float]) -> bool:
         """ Determine whether one value meets the threshold """
         return any(reach_value > self.reach_estimator.threshold_same for reach_value in reach)
 
@@ -171,7 +171,7 @@ class PlaceCellNetwork:
 
         return [firing_values, created_new_pc]
 
-    def compute_firing_values(self, gc_modules, virtual=False, axis=None, plot=False):
+    def compute_firing_values(self, gc_modules: list['GridCellModule'], virtual=False, axis=None, plot=False):
 
         s_vectors = np.empty((len(gc_modules), len(gc_modules[0].s)))
         # Consolidate grid cell spiking vectors that we want to consider

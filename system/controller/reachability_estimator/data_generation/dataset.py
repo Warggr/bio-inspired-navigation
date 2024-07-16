@@ -60,8 +60,8 @@ def place_info(
 ) -> PlaceInfo:
     pos, angle, spikings = data
     spikings = spikings_reshape(spikings)
-    img = env.camera([pos, angle])
-    lidar, _ = env.lidar([pos, angle])
+    img = env.camera((pos, angle))
+    lidar, _ = env.lidar((pos, angle))
     return PlaceInfo(pos, angle, spikings, img, lidar)
 
 

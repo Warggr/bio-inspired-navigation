@@ -107,8 +107,8 @@ class GcCompass(Compass[Spikings]):
         pass # TODO Pierre: ensure that the GCNetwork is updated separately
 
     @staticmethod
-    def factory(mode, gc_network : GridCellNetwork, *args,
-        pod_network : Optional[PhaseOffsetDetectorNetwork] = None,
+    def factory(mode, gc_network: GridCellNetwork, *args,
+        pod_network: Optional[PhaseOffsetDetectorNetwork] = None,
         arena_size: Optional[float] = None,
         **kwargs
     ):
@@ -149,7 +149,7 @@ class LinearLookaheadGcCompass(GcCompass):
 
 
 class ComboGcCompass(GcCompass):
-    def __init__(self, gc_network : GridCellNetwork, pod_network : Optional['PhaseOffsetDetectorNetwork'] = None, *args, **kwargs):
+    def __init__(self, gc_network: GridCellNetwork, pod_network: Optional['PhaseOffsetDetectorNetwork'] = None, *args, **kwargs):
         super().__init__(gc_network, *args, **kwargs)
         # self.gc_network = gc_network # already done by the super().__init__
         compass = PodGcCompass(pod_network, gc_network, *args, **kwargs)
@@ -182,7 +182,7 @@ class ComboGcCompass(GcCompass):
             # robot.turn_to_goal(goal_vector)
 
 
-def create_gc_spiking(start : Vector2D, goal : Vector2D, gc_network_at_start: Optional[GridCellNetwork]=None, plotting=plotting) -> types.Spikings:
+def create_gc_spiking(start: Vector2D, goal: Vector2D, gc_network_at_start: Optional[GridCellNetwork]=None, plotting=plotting) -> types.Spikings:
     """ 
     Agent navigates from start to goal accross a plane without any obstacles, using the analyticallly 
     calculated goal vector to genereate the grid cell spikings necessary for the decoders. During actual
@@ -200,7 +200,7 @@ def create_gc_spiking(start : Vector2D, goal : Vector2D, gc_network_at_start: Op
 
     compass = AnalyticalCompass(start_pos=start, goal_pos=goal)
     robot_position = np.array(start, dtype=float)
-    history : List[Vector2D] = [ robot_position ]
+    history: list[Vector2D] = [ robot_position ]
 
     if compass.reached_goal():
         assert False, "Positions are too close to each other!"
@@ -240,7 +240,7 @@ def setup_gc_network(dt) -> GridCellNetwork:
     return gc_network
 
 
-def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network: Optional[GridCellNetwork], controller: Optional[LocalController] = None, target_gc_spiking=None,
+def vector_navigation(env: PybulletEnvironment, compass: Compass, gc_network: Optional[GridCellNetwork], controller: Optional[LocalController] = None, target_gc_spiking=None,
     step_limit=float('inf'), plot_it=False,
                       collect_data_freq=False, collect_data_reachable=False, collect_nr_steps=False, exploration_phase=False,
     pc_network: Optional[PlaceCellNetwork] = None, cognitive_map: Optional[CognitiveMapInterface] = None,
@@ -272,7 +272,7 @@ def vector_navigation(env : PybulletEnvironment, compass: Compass, gc_network: O
     goal_reached : bool, last_pc : PlaceCell else
     """
 
-    data : List[WaypointInfo] = []
+    data: list[WaypointInfo] = []
     robot = env.robot
     assert robot is not None
 

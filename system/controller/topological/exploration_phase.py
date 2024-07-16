@@ -20,8 +20,6 @@ from system.controller.local_controller.compass import AnalyticalCompass
 from system.bio_model.place_cell_model import PlaceCellNetwork
 from system.bio_model.cognitive_map import LifelongCognitiveMap, CognitiveMapInterface
 import system.plotting.plotResults as plot
-
-from typing import List
 from system.types import Vector2D
 
 plotting = True  # if True: plot paths
@@ -35,7 +33,7 @@ def print_debug(*params):
         print(*params)
 
 
-def waypoint_movement(path: List[Vector2D], env_model: str, gc_network: GridCellNetwork, pc_network: PlaceCellNetwork,
+def waypoint_movement(path: list[Vector2D], env_model: str, gc_network: GridCellNetwork, pc_network: PlaceCellNetwork,
                       cognitive_map: CognitiveMapInterface):
     """ Navigates the agent on the given path and builds the cognitive map.
         The local controller navigates the path analytically and updates the pc_network and the cognitive_map.

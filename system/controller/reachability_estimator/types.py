@@ -17,11 +17,11 @@ class PlaceInfo:
     All the info that can be extracted about a certain place.
     """
 
-    pos : types.Vector2D
-    angle : types.Angle
-    spikings : types.Spikings
-    img : types.Image
-    lidar : types.LidarReading
+    pos: types.Vector2D
+    angle: types.Angle
+    spikings: types.Spikings
+    img: types.Image
+    lidar: types.LidarReading
 
     def __repr__(self):
         return f"PlaceInfo(pos={self.pos}, angle={self.angle=}, { 'lidar=...' if hasattr(self, 'lidar') else 'no lidar' })"
@@ -29,8 +29,8 @@ class PlaceInfo:
 @dataclass
 class Sample:
     """ One sample containing two places. This can be taken as an input to evaluate reachability of both places. """
-    src : PlaceInfo
-    dst : PlaceInfo
+    src: PlaceInfo
+    dst: PlaceInfo
 
     def to_tuple(self, reachable : bool) -> Tuple:
         """ Returns a tuple which can be put into a Numpy array of type Sample.dtype """
@@ -55,10 +55,10 @@ class Sample:
         ) = tup
         return Sample(
             PlaceInfo(
-                src_pos, src_angle, src_spikings, img_reshape(src_img), LidarReading(src_lidar, LidarReading.angles(src_angle))
+                src_pos, src_angle, src_spikings, img_reshape(src_img), LidarReading(src_lidar, LidarReading.angle_range(src_angle))
             ),
             PlaceInfo(
-                dst_pos, dst_angle, dst_spikings, img_reshape(dst_img), LidarReading(dst_lidar, LidarReading.angles(dst_angle))
+                dst_pos, dst_angle, dst_spikings, img_reshape(dst_img), LidarReading(dst_lidar, LidarReading.angle_range(dst_angle))
             ),
         ), reachable
 

@@ -41,10 +41,10 @@ else:
     from .map_occupancy_helpers.math_utils import depth_to_xy_plane, depth_to_xy, compute_normals
     from .map_occupancy_helpers import map_utils_cpp as map_cpp
 
-from typing import Optional, Tuple, List
 from system.types import Vector2D, AllowedMapName
 
-class Map(object):
+
+class Map:
     def __init__(self,
                  occupancy_grid,
                  resolution,
@@ -142,7 +142,7 @@ class Map(object):
         self.range_scanner = range_libc.PyBresenhamsLine(self.omap, 1000)
 
     @property
-    def shape(self) -> Tuple[float, float]:
+    def shape(self) -> tuple[float, float]:
         return self.binary_occupancy.shape
 
     def _compute_visible_map_bbox(self, background_traversable):
@@ -251,7 +251,7 @@ class Map(object):
         dilated = np.clip(255.0 - (distance_map / n_iter) * 255.0, 0.0, None)
         return dilated
 
-    def find_path(self, start_pos : Vector2D, goal_pos : Vector2D) -> List[Vector2D]:
+    def find_path(self, start_pos: Vector2D, goal_pos: Vector2D) -> list[Vector2D]:
         assert self.suitable_position_for_robot(start_pos) and self.suitable_position_for_robot(goal_pos)
         start_coord = self.grid_coord(start_pos[0], start_pos[1], self.path_map_division)
         goal_coord = self.grid_coord(goal_pos[0], goal_pos[1], self.path_map_division)
@@ -651,7 +651,7 @@ from system.controller.simulation.environment.map_occupancy import MapLayout
 def random_coordinates(xmin, xmax, ymin, ymax, rng=random.Random()):
     return np.array([ rng.uniform(xmin, xmax), rng.uniform(ymin, ymax) ])
 
-def random_points(env_model: AllowedMapName, rng: random.Random) -> Tuple[Vector2D, Vector2D]:
+def random_points(env_model: AllowedMapName, rng: random.Random) -> tuple[Vector2D, Vector2D]:
     map = MapLayout(env_model)
     origin, corner = environment_dimensions(env_model)
     dimensions = [ origin[0], corner[0], origin[1], corner[1] ]

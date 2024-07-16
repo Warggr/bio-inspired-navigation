@@ -1,10 +1,11 @@
-from typing import Sized, Tuple, Iterable, List, Protocol, Literal
+from typing import Sized, Iterable, Protocol, Literal
 import numpy as np
 
-Angle = float # assumed to be in radians
+Angle = float  # assumed to be in radians
+
 
 class LidarReading:
-    def __init__(self, distances: List[float], angles: Iterable[Angle]):
+    def __init__(self, distances: list[float], angles: Iterable[Angle]):
         self.distances = distances
         self.angles = list(angles)
 
@@ -12,7 +13,7 @@ class LidarReading:
         return self.distances[index]
 
     @staticmethod
-    def angles(
+    def angle_range(
         start_angle,
         tactile_cone = np.radians(310),
         num_ray_dir = 62, # number of directions to check (e.g. 16,51,71)
@@ -26,13 +27,18 @@ class LidarReading:
 
     DEFAULT_NUMBER_OF_ANGLES = 52
 
-assert LidarReading.DEFAULT_NUMBER_OF_ANGLES == len(list(LidarReading.angles(0)))
+
+assert LidarReading.DEFAULT_NUMBER_OF_ANGLES == len(list(LidarReading.angle_range(0)))
+
 
 class Vector2D(Sized, Iterable[float], Protocol):
-    #def __getitem__(self, index : int) -> float: ...
+    # def __getitem__(self, index : int) -> float: ...
     pass
 
-Vector3D = Tuple[float, float, float]
+
+Vector3D = tuple[float, float, float]
+PositionAndOrientation = tuple[Vector2D, Angle]
+Quaternion = tuple[float, float, float, float]
 # (grid cell) spikings
 Spikings = 'np.ndarray[float, (40, 40, 6)]' # TODO: actual non-string type hint
 Image = 'np.ndarray[float, (64, 64, 4)]'
@@ -43,16 +49,18 @@ allowed_map_names = [
 AllowedMapName = Literal[*allowed_map_names]
 AllowedMapName.options = allowed_map_names
 
+
 class types:
     Vector2D = Vector2D
     Vector3D = Vector3D
-    Quaternion = Tuple[float, float, float, float]
+    Quaternion = Quaternion
     Spikings = Spikings
     Angle = Angle
     Image = Image
-    PositionAndOrientation = Tuple[Vector2D, Angle]
+    PositionAndOrientation = PositionAndOrientation
     AllowedMapName = AllowedMapName
     LidarReading = LidarReading
 
+
 FlatSpikings = 'np.ndarray[float, 9600]'
-WaypointInfo = Tuple[types.Vector2D, types.Angle, FlatSpikings]
+WaypointInfo = tuple[types.Vector2D, types.Angle, FlatSpikings]

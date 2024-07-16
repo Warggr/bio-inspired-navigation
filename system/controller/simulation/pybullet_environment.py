@@ -89,13 +89,13 @@ class PybulletEnvironment:
     ROBOT_Z_POS = 0.02 # see p3dx model
 
     def __init__(self,
-        env_model : str = "Savinov_val3",
-        dt : float = 1e-2,
+        env_model: str = "Savinov_val3",
+        dt: float = 1e-2,
         visualize=False,
         realtime=False,
         build_data_set=False,
-        start : Optional[types.Vector2D] = None,
-        orientation : types.Angle = np.pi/2,
+        start: Optional[types.Vector2D] = None,
+        orientation: types.Angle = np.pi/2,
         frame_limit=5000,
         contains_robot=True,
         wall_kwargs={},
@@ -139,7 +139,7 @@ class PybulletEnvironment:
         base_position = [0, 0.05]  # [0, 0.05] ensures that it actually starts at origin
 
         self.planeID = None
-        self.mazeID : List[int] = []
+        self.mazeID: list[int] = []
 
         # environment choices
         if env_model == "Savinov_val3":
@@ -233,7 +233,7 @@ class PybulletEnvironment:
     def dimensions(self):
         return environment_dimensions(self.env_model)
 
-    def __load_walls(self, model_folder, textures : str | Callable[int, str] | List[str], nb_batches = None) -> List[int]:
+    def __load_walls(self, model_folder, textures : str | Callable[[int], str] | list[str], nb_batches = None) -> list[int]:
         MAXIMUM_BATCH_SIZE = 16 # bullet doesn't accept multibodies with >16 bodies
 
         wall_dir = os.path.join(model_folder, "walls")
@@ -317,7 +317,7 @@ class PybulletEnvironment:
         p.changeVisualShape(multiBodyId, -1, textureUniqueId=textureId)
         return multiBodyId
 
-    def camera(self, agent_pos_orn : Optional[types.PositionAndOrientation] = None) -> types.Image:
+    def camera(self, agent_pos_orn: Optional[types.PositionAndOrientation] = None) -> types.Image:
         """ simulates a camera mounted on the robot, creating images """
 
         distance = 100000
@@ -439,7 +439,7 @@ class PybulletEnvironment:
 
     def lidar(
         self,
-        agent_pos_orn : Optional[types.PositionAndOrientation] = None,
+        agent_pos_orn: Optional[types.PositionAndOrientation] = None,
         ray_length = WHISKER_LENGTH,
         draw_debug_lines = False,
         **angle_args
@@ -466,7 +466,7 @@ class PybulletEnvironment:
         else:
             rayFromPoint, euler_angle = self.robot.lidar_sensor_position
 
-        ray_angles = list(LidarReading.angles(start_angle=euler_angle, **angle_args))
+        ray_angles = list(LidarReading.angle_range(start_angle=euler_angle, **angle_args))
 
         for angle in ray_angles:
             rayTo.append([
@@ -506,7 +506,7 @@ class Robot:
         max_speed=5.5,
         frame_limit=5000,
         build_data_set : bool = True,
-        compass : Optional['Compass'] = None,
+        compass: Optional['Compass'] = None,
     ):
         """
         arguments:
@@ -669,7 +669,7 @@ class Robot:
             self._step(gains, None)
             self.env.camera()
 
-    def _step(self, gains : Tuple[float, float], current_goal_vector : Optional[Vector2D]):
+    def _step(self, gains: tuple[float, float], current_goal_vector: Optional[Vector2D]):
         # change speed
         p.setJointMotorControlArray(bodyUniqueId=self.ID,
                             jointIndices=[4, 6],
@@ -679,7 +679,7 @@ class Robot:
         self.env.step()
         self.save_snapshot(current_goal_vector)
 
-    def calculate_simple_normal_vector(self, lidar_data: Optional[Tuple[LidarReading, List[Vector2D]]] = None) -> Vector2D:
+    def calculate_simple_normal_vector(self, lidar_data: Optional[tuple[LidarReading, list[Vector2D]]] = None) -> Vector2D:
         if lidar_data is None:
             lidar_data = self.env.lidar(tactile_cone=120, num_ray_dir=21, blind_spot_cone=0, agent_pos_orn=self.lidar_sensor_position)
         lidar, hit_points = lidar_data
@@ -755,7 +755,7 @@ class Robot:
         direction_vector = direction_vector * 1.5 / min(lidar[start_index:end_index + 1])
         return hit_points[0], direction_vector
 
-    def turn_to_goal(self, goal_vector : Vector2D, tolerance : types.Angle = 0.05):
+    def turn_to_goal(self, goal_vector: Vector2D, tolerance: types.Angle = 0.05):
         """ Agent turns to face in goal vector direction """
 
         i = 0

@@ -61,7 +61,7 @@ class ObstacleAvoidance:
         self.follow_walls = follow_walls
         self.lidar_kwargs = dict(tactile_cone=tactile_cone, num_ray_dir=num_ray_dir, ray_length=ray_length)
 
-    def __call__(self, goal_vector : Vector2D, robot: 'Robot') -> Vector2D:
+    def __call__(self, goal_vector: Vector2D, robot: 'Robot') -> Vector2D:
         lidar = robot.env.lidar(**self.lidar_kwargs, blind_spot_cone=0, agent_pos_orn=robot.lidar_sensor_position)
         point, obstacle_vector = robot.calculate_obstacle_vector(lidar)
         #print(f"{self.position=}, {obstacle_vector=}, {goal_vector=}")

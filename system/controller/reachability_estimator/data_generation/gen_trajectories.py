@@ -86,7 +86,7 @@ def random_location(dimensions : Dimensions, generator : np.random.RandomState) 
     y = np.around(generator.uniform(dimensions[2], dimensions[3]), 1)
     return [x, y]
 
-def waypoint_movement(env : PybulletEnvironment, cam_freq, traj_length, map_layout : MapLayout, gc_network, seed : int) -> List[WaypointInfo]:
+def waypoint_movement(env : PybulletEnvironment, cam_freq, traj_length, map_layout: MapLayout, gc_network, seed: int) -> list[WaypointInfo]:
     ''' Calculates environment-specific waypoints from start to goal and creates
     trajectory by making agent follow them.
     
@@ -97,8 +97,8 @@ def waypoint_movement(env : PybulletEnvironment, cam_freq, traj_length, map_layo
     '''
 
     random_state = np.random.RandomState(seed=seed)
-    dimensions : Dimensions = environment_dimensions(env.env_model)
-    valid_locations : Iterator[types.Vector2D] = filter( # TODO Pierre: I'm sorry for the unreadable code
+    dimensions: Dimensions = environment_dimensions(env.env_model)
+    valid_locations: Iterator[types.Vector2D] = filter( # TODO Pierre: I'm sorry for the unreadable code
         map_layout.suitable_position_for_robot,
         iter(lambda: random_location(dimensions, random_state), None),
     )
@@ -108,7 +108,7 @@ def waypoint_movement(env : PybulletEnvironment, cam_freq, traj_length, map_layo
     robot = Robot(env=env, base_position=start)
     with robot:
 
-        samples : List['PlaceInfo'] = []
+        samples: list['PlaceInfo'] = []
 
         while len(samples) < traj_length / cam_freq:
             goal = next(valid_locations)
@@ -147,7 +147,7 @@ def waypoint_movement(env : PybulletEnvironment, cam_freq, traj_length, map_layo
     return samples
 
 
-def generate_multiple_trajectories(out_hd5_obj, num_traj, trajectory_length, cam_freq, mapname : types.AllowedMapName):
+def generate_multiple_trajectories(out_hd5_obj, num_traj, trajectory_length, cam_freq, mapname: types.AllowedMapName):
     ''' Generate multiple trajectories
     
     arguments:

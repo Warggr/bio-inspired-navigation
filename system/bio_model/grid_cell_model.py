@@ -156,7 +156,7 @@ class GridCellNetwork:
 
     def __init__(self, n, M, dt, gmin, gmax=None, from_data=False, gc_name="gc_model_6"):
 
-        self.gc_modules : List[GridCellModule] = []
+        self.gc_modules: list[GridCellModule] = []
         self.dt = dt
 
         if not from_data:
@@ -254,7 +254,7 @@ class GridCellNetwork:
         for m, gc in enumerate(self.gc_modules):
             gc.t = np.copy(gc.s)
 
-    def set_as_target_state(self, gc_connections : Spikings):
+    def set_as_target_state(self, gc_connections: Spikings):
         for m, gc in enumerate(self.gc_modules):
             gc.t = gc_connections[m]
         print("Set new target state")

@@ -51,7 +51,7 @@ class ViewOverlapReachabilityController(ReachabilityController):
         return overlap_ratios
 
     @override
-    def reachable(self, env : 'PybulletEnvironment', src: PlaceInfo, dst: PlaceInfo, path_l : Optional[float] = None) -> bool:
+    def reachable(self, env: 'PybulletEnvironment', src: PlaceInfo, dst: PlaceInfo, path_l: Optional[float] = None) -> bool:
         visual_overlap = min(self.compute_overlap(env.env_model,
                                                   src.pos, src.angle,
                                                   dst.pos, dst.angle))

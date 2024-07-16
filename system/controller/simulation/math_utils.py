@@ -1,5 +1,4 @@
 import numpy as np
-from typing import Tuple
 
 from system.types import Vector2D, Angle
 
