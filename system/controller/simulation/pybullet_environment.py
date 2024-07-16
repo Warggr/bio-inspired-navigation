@@ -462,7 +462,9 @@ class PybulletEnvironment:
         if agent_pos_orn:
             rayFromPoint, euler_angle = agent_pos_orn
             if len(rayFromPoint) == 2:
-                rayFromPoint = list(rayFromPoint) + [ PybulletEnvironment.ROBOT_Z_POS + 0.1 ] # TODO: make sure this is high enough not to hit the robot, if there is one
+                ROBOT_HEIGHT = 0.25 # TODO: precise, non-guessed value
+                MARGIN = 0.1
+                rayFromPoint = list(rayFromPoint) + [ PybulletEnvironment.ROBOT_Z_POS + ROBOT_HEIGHT + MARGIN ]
         else:
             rayFromPoint, euler_angle = self.robot.lidar_sensor_position
 

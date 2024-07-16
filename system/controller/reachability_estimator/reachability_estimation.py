@@ -211,7 +211,10 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
     @classmethod
     def to_batch(cls, p: PlaceInfo, q: PlaceInfo):
         def get_lidar(p: PlaceInfo):
-            return getattr(p, 'lidar', -1 * np.ones(types.LidarReading.DEFAULT_NUMBER_OF_ANGLES))
+            if hasattr(p, 'lidar') and p.lidar is not None:
+                return p.lidar.distances
+            else:
+                return -1 * np.ones(types.LidarReading.DEFAULT_NUMBER_OF_ANGLES)
 
         args = (
             p.img, q.img,

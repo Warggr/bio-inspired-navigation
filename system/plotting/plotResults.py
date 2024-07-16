@@ -90,7 +90,7 @@ def plotTrajectory(xy_coordinates):
 
 def plotTrajectoryInEnvironment(env: Optional['PybulletEnvironment'] = None, title="", xy_coordinates=None, env_model=None, cognitive_map=None, path=None,
                                 goal=None, trajectory=True, start=None, end=None):
-    if not xy_coordinates:
+    if xy_coordinates is None and env is not None and env.robot is not None:
         xy_coordinates = env.robot.data_collector.xy_coordinates
     if not env_model:
         env_model = env.env_model

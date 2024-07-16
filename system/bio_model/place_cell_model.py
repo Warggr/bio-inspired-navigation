@@ -111,7 +111,8 @@ class PlaceCell(PlaceInfo):
     @property
     def pos(self): return self.env_coordinates
     @property
-    def angle(self): return self.observations[0] # TODO
+    def angle(self):
+        return NotImplemented # TODO Pierre: place cells were saved without angles
     @property
     def img(self):
         if self.observations[-1].shape == (4, 64, 64): # backwards compatibiliy: Anna saved images in the transposed format
