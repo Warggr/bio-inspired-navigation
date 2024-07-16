@@ -1,0 +1,37 @@
+rule:
+	output: "data/trajectories/trajectories.hd5"
+	shell:
+		"python data_generation/gen_trajectories.py --extension '.hd5.part' && "
+		"ln -s $(basename {output}).part {output}"
+
+rule:
+	output: "data/trajectories/{map}.trajectories.hd5"
+	shell:
+		"python data_generation/gen_trajectories.py --env-model {wildcards.map} --extension '.hd5.part' && "
+		"ln -s $(basename {output}).part {output}"
+
+rule:
+	input: "data/trajectories/trajectories.hd5"
+	output: "data/reachability/trajectories.hd5"
+	shell: "ln -sf ../trajectories/trajectories.hd5 {output}"
+
+rule:
+	input: "data/trajectories/{map}.trajectories.hd5"
+	output: "data/reachability/{map}.trajectories.hd5"
+	shell: "ln -sf ../trajectories/{map}.trajectories.hd5 {output}"
+
+for dataset_flags in ['', '3colors']:
+	cmdline_flags = f'--wall-colors {dataset_flags}' if dataset_flags else ''
+	filename_flags = f'-{dataset_flags}' if dataset_flags else ''
+	rule:
+		output: f"data/reachability/dataset{filename_flags}.hd5"
+		input: "data/reachability/trajectories.hd5"
+		shell:
+			f"python data_generation/dataset.py -n 200000 --flush-freq 1000 --extension '.hd5.part' {cmdline_flags} && "
+			"ln -s $(basename {output}).part {output}"
+	rule:
+		output: f"data/reachability/dataset-map{{map}}{filename_flags}.hd5"
+		input: "data/reachability/{map}.trajectories.hd5"
+		shell:
+			f"python data_generation/dataset.py -n 200000 --flush-freq 1000 --extension '.hd5.part' {cmdline_flags} && "
+			"ln -s $(basename {output}).part {output}"

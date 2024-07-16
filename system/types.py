@@ -1,4 +1,4 @@
-from typing import Sized, Tuple, Iterable, List, Protocol
+from typing import Sized, Tuple, Iterable, List, Protocol, Literal
 import numpy as np
 
 Angle = float # assumed to be in radians
@@ -36,7 +36,12 @@ Vector3D = Tuple[float, float, float]
 # (grid cell) spikings
 Spikings = 'np.ndarray[float, (40, 40, 6)]' # TODO: actual non-string type hint
 Image = 'np.ndarray[float, (64, 64, 4)]'
-AllowedMapName = str # TODO: an enumeration of the actual map names, i.e. Literal['Savinov_val3', ...]
+
+allowed_map_names = [
+    'Savinov_val3', 'linear_sunburst'
+]
+AllowedMapName = Literal[*allowed_map_names]
+AllowedMapName.options = allowed_map_names
 
 class types:
     Vector2D = Vector2D

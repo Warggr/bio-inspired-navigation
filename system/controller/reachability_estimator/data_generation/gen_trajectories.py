@@ -229,7 +229,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', '--filepath')
     parser.add_argument('--extension')
-    parser.add_argument('-e', '--env-model', choices=['Savinov_val3', 'Savinov_val2', 'Savinov_test7'], default='Savinov_val3')
+    parser.add_argument('-e', '--env-model', choices=types.AllowedMapName.options, default='Savinov_val3')
     parser.add_argument('-n', '--num-traj', type=int, default=1000)
     parser.add_argument('-l', '--traj-length', type=int, help='Length of one trajectory in timesteps', default=3000)
     parser.add_argument('--cam-freq', type=int, default=10)
@@ -242,6 +242,8 @@ if __name__ == "__main__":
         filepath = args.filepath
     else:
         filename = "trajectories"
+        if args.env_model != "Savinov_val3":
+            filename = args.env_model + "." + filename
         extension = getattr(args, 'extension', ".hd5")
         filepath = os.path.join(get_path(), "data", "trajectories", filename + extension)
 
