@@ -556,7 +556,7 @@ def environment_dimensions(env_model: AllowedMapName):
         return None
     elif "obstacle" in env_model:
         return None
-    elif env_model == "linear_sunburst_map":
+    elif env_model == "linear_sunburst":
         return np.array([0, 0]), np.array([11, 11])
     else:
         raise ValueError("No matching env_model found.")
