@@ -134,7 +134,7 @@ def waypoint_movement(env : PybulletEnvironment, cam_freq, traj_length, map_layo
                 compass = AnalyticalCompass(robot.position, g)
                 env.add_debug_line(start=robot.position, end=g, color=(1, 0, 0), width=2)
                 goal_reached, data = vector_navigation(env, compass, gc_network, step_limit=5000, plot_it=False,
-                                            obstacles=False, collect_data_freq=cam_freq)
+                                            collect_data_freq=cam_freq)
                 samples += data
                 if not goal_reached:
                     print("Couldn't reach intermediate goal - breaking")
