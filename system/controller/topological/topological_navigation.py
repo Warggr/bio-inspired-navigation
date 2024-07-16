@@ -56,7 +56,8 @@ class TopologicalNavigation(object):
         self.step_limit = 2000  # max number of vector navigation steps
         self.compass = compass
 
-    def navigate(self, start_ind: int, goal_ind: int, gc_network: GridCellNetwork,
+    def navigate(self, start: PlaceCell, goal: PlaceCell, gc_network: GridCellNetwork,
+        controller: Optional[LocalController] = None,
         cognitive_map_filename: str = None,
         env: Optional[PybulletEnvironment] = None,
         robot: Optional[Robot] = None,
@@ -75,8 +76,6 @@ class TopologicalNavigation(object):
         int  -- index of goal node
         """
 
-        start = list(self.cognitive_map.node_network.nodes)[start_ind]
-        goal = list(self.cognitive_map.node_network.nodes)[goal_ind]
 
         # Plan a topological path through the environment,
         # if no such path exists choose random start and goal until a path is found
@@ -116,6 +115,13 @@ class TopologicalNavigation(object):
         if plotting:
             plot.plotTrajectoryInEnvironment(env, cognitive_map=self.cognitive_map, path=path)
 
+        if controller is None:
+            controller = LocalController(
+                on_reset_goal=[TurnToGoal()],
+                transform_goal_vector=[ObstacleAvoidance(), ObstacleBackoff(backoff_on_distance=0.25, backoff_off_distance=0.35)],
+                hooks=[StuckDetector()],
+            )
+
         #self.gc_network.set_as_current_state(path[0].gc_connections)
         last_pc = path[0]
         i = 0
@@ -126,7 +132,6 @@ class TopologicalNavigation(object):
             goal_spiking = path[i + 1].gc_connections
             if gc_network:
                 gc_network.set_as_target_state(goal_spiking)
-            controller = LocalController(on_reset_goal=[TurnToGoal()], transform_goal_vector=[ObstacleAvoidance(follow_walls=True)], hooks=[StuckDetector()]) # ObstacleBackoff(backoff_on_distance=0.25, backoff_off_distance=0.35)
             stop, pc = vector_navigation(env, self.compass, gc_network=gc_network,
                                          controller=controller, exploration_phase=False, pc_network=self.pc_network,
                                          cognitive_map=self.cognitive_map, plot_it=False,
@@ -241,14 +246,19 @@ if __name__ == "__main__":
             print("Using seed", args.seed)
         random = np.random.default_rng(seed=args.seed)
 
+        place_cells = list(tj.cognitive_map.node_network.nodes)
+
         successful = 0
         for navigation_i in range(100):
             start_index, goal_index = None, None
             while start_index == goal_index:
-                start_index, goal_index = random.integers(0, len(tj.cognitive_map.node_network.nodes), size=2)
+                start_index, goal_index = random.integers(0, len(place_cells), size=2)
                 assert len(tj.cognitive_map.node_network.nodes) > 1
 
-            success = tj.navigate(start_ind=start_index, goal_ind=goal_index, cognitive_map_filename=map_file_after_lifelong_learning, env=env)
+            start, goal = place_cells[start_index], place_cells[goal_index]
+
+            compass.reset_position(compass.parse(start))
+            success = tj.navigate(start, goal, cognitive_map_filename=map_file_after_lifelong_learning, env=env, gc_network=gc_network)
             if success:
                 successful += 1
             tj.cognitive_map.draw()
