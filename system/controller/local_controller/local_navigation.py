@@ -278,7 +278,9 @@ def vector_navigation(env: PybulletEnvironment, compass: Compass, gc_network: Op
     assert robot is not None
 
     if gc_network is not None:
-        robot.navigation_hooks.append(gc_network.track_movement)
+        def on_nav_step(robot: Robot):
+            gc_network.track_movement(robot.xy_speed)
+        robot.navigation_hooks.append(on_nav_step)
 
     if controller is None:
         controller = LocalController.default()
@@ -354,7 +356,7 @@ def vector_navigation(env: PybulletEnvironment, compass: Compass, gc_network: Op
         return goal_reached, n
 
     if gc_network is not None:
-        robot.navigation_hooks.remove(gc_network.track_movement)
+        robot.navigation_hooks.remove(on_nav_step)
 
     if not last_pc and not exploration_phase and pc_network:
         pc_network.create_new_pc(gc_network.consolidate_gc_spiking(), observations, robot.position)

@@ -532,7 +532,7 @@ class Robot:
 
         self.mapping = 1.5  # see local_navigation experiments
 
-        self.navigation_hooks : List[Callable[[Vector2D], None]] = []
+        self.navigation_hooks: list[Callable[[Robot], None]] = []
 
     def __enter__(self):
         assert self.env.robot is None
@@ -555,7 +555,7 @@ class Robot:
 
         self._step(gains, goal_vector)
         for hook in self.navigation_hooks:
-            hook(self.xy_speed)
+            hook(self)
 
     @property
     def position_and_angle(self) -> Tuple[types.Vector2D, types.Angle]:
@@ -584,7 +584,7 @@ class Robot:
         linkWorldPosition, linkWorldOrientation, *_ignored_data = p.getLinkState(self.ID, 0) # position of chassis compared to base
         linkWorldPosition = list(linkWorldPosition)
         linkWorldPosition[2] += PybulletEnvironment.ROBOT_Z_POS # ROBOT_Z_POS is position of base
-        linkWorldPosition[2] += 0.1 # safety margin; TODO this could be removed once we put the correct 3D orientation
+        #linkWorldPosition[2] += 0.1 # safety margin; TODO this could be removed once we put the correct 3D orientation
         # TODO maybe the orientation needs to be turned?
         angle = p.getEulerFromQuaternion(linkWorldOrientation)[2]
         return tuple(linkWorldPosition), angle
