@@ -33,9 +33,15 @@ def print_debug(*params):
     if debug:
         print(*params)
 
+class TooManyPlaceCells(Exception):
+    def __init__(self, progress: float):
+        self.progress = progress
 
-def waypoint_movement(path: list[Vector2D], env_model: str, gc_network: GridCellNetwork, pc_network: PlaceCellNetwork,
-                      cognitive_map: CognitiveMapInterface):
+def waypoint_movement(
+    path: list[Vector2D], env_model: str, gc_network: GridCellNetwork, pc_network: PlaceCellNetwork,
+    cognitive_map: CognitiveMapInterface,
+    visualize=False,
+):
     """ Navigates the agent on the given path and builds the cognitive map.
         The local controller navigates the path analytically and updates the pc_network and the cognitive_map.
 
@@ -62,15 +68,23 @@ def waypoint_movement(path: list[Vector2D], env_model: str, gc_network: GridCell
     if plotting:
         map_layout.draw_path(goals)
 
-    with PybulletEnvironment(env_model, dt=dt, build_data_set=True, start=path[0]) as env:
+    controller = LocalController.default()
+    #controller.transform_goal_vector.append(controller_rules.TurnWhenNecessary())
+
+    with PybulletEnvironment(env_model, dt=dt, build_data_set=True, start=path[0], visualize=visualize) as env:
 
         from tqdm import tqdm
 
+        compass = AnalyticalCompass(start_pos=path[0])
         for i, goal in enumerate(tqdm(goals)):
             #print_debug(f"new waypoint with coordinates {goal}.", f'{i / len(goals) * 100} % completed.')
-            compass = AnalyticalCompass(start_pos=path[0], goal_pos=goal)
-            vector_navigation(env, compass, gc_network, step_limit=5000,
-                            plot_it=plotting, exploration_phase=True, pc_network=pc_network, cognitive_map=cognitive_map)
+            try:
+                compass.reset_goal(goal)
+                goal_reached, last_pc = vector_navigation(env, compass, gc_network, step_limit=5000,
+                            plot_it=plotting, exploration_phase=True, pc_network=pc_network, cognitive_map=cognitive_map, controller=controller)
+                assert goal_reached
+            except PlaceCellNetwork.TooManyPlaceCells:
+                raise TooManyPlaceCells(progress=i/len(goals))
             if plotting and (i + 1) % 100 == 0:
                 cognitive_map.draw()
                 plot.plotTrajectoryInEnvironment(env, goal=False, cognitive_map=cognitive_map, trajectory=False)
@@ -88,6 +102,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("env_model", default="Savinov_val3", choices=["Savinov_val3", "linear_sunburst_map"])
+    parser.add_argument('--visualize', action='store_true')
     args = parser.parse_args()
 
     re_type = "neural_network"
@@ -134,12 +149,28 @@ if __name__ == "__main__":
 
     gc_network = setup_gc_network(dt)
     re = reachability_estimator_factory(re_type, weights_file=re_weights_file, debug=debug, config=SampleConfig(grid_cell_spikings=True))
-    pc_network = PlaceCellNetwork(reach_estimator=re)
-    cognitive_map = LifelongCognitiveMap(reachability_estimator=re)
 
-    pc_network, cognitive_map = waypoint_movement(goals, args.env_model, gc_network, pc_network, cognitive_map)
-    cognitive_map.postprocess_topological_navigation()
-    assert len(cognitive_map.node_network.nodes) > 1
+    desired_number_of_place_cells = 30
+    too_strict_threshold = 0.993 #1.1
+    too_lax_threshold = 0.72975 #0.0
+    while True:
+        re.threshold_same = (too_lax_threshold + too_strict_threshold) / 2
+        pc_network = PlaceCellNetwork(reach_estimator=re, max_capacity=2*desired_number_of_place_cells)
+        cognitive_map = LifelongCognitiveMap(reachability_estimator=re)
+
+        print(f"Trying threshold {re.threshold_same}...")
+        try:
+            pc_network, cognitive_map = waypoint_movement(goals, args.env_model, gc_network, pc_network, cognitive_map, visualize=args.visualize)
+        except TooManyPlaceCells as err:
+            too_strict_threshold = re.threshold_same
+            print("Too high!")
+            continue
+        if len(pc_network.place_cells) < desired_number_of_place_cells / 2:
+            too_lax_threshold = re.threshold_same
+            print("Too low!")
+        cognitive_map.postprocess_topological_navigation()
+        assert len(cognitive_map.node_network.nodes) > 1
+        break
 
     pc_network.save_pc_network()
     cognitive_map.save(filename=cognitive_map_filename)
