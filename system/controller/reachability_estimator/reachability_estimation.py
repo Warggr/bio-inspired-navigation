@@ -152,7 +152,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         self.batch_size = batch_size
 
     @staticmethod
-    def from_file(weights_file: str, weights_folder: str = WEIGHTS_FOLDER, **kwargs):
+    def from_file(weights_file: str, weights_folder: str = WEIGHTS_FOLDER, backbone_classname=None, **kwargs):
         """ Loads a NetworkReachabilityEstimator from a snapshot in a file.
 
         arguments:
@@ -172,7 +172,8 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         # self.print_debug('global args:')
         # self.print_debug(tabulate.tabulate(global_args.items()))
 
-        backbone_classname = global_args.pop('backbone')
+        if backbone_classname is None:
+            backbone_classname = global_args.pop('backbone')
         global_args = { key: value for key, value in global_args.items() if key in ['with_conv_layer'] }
         # TODO: other possible global_args
 

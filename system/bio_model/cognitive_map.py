@@ -225,8 +225,7 @@ class CognitiveMapInterface(ABC):
                 compass.reset_goal(compass.parse(p))
 
                 pred_gv = compass.calculate_goal_vector()
-                true_gv = AnalyticalCompass(start_pos=env.robot.pos, goal_pos=p.pos)
-                true_gv = env.calculate_goal_vector_analytically()
+                true_gv = AnalyticalCompass(start_pos=env.robot.position, goal_pos=p.pos).calculate_goal_vector()
 
                 error_gv = true_gv - pred_gv
                 delta = np.linalg.norm(error_gv)
@@ -386,12 +385,9 @@ class CognitiveMap(CognitiveMapInterface):
             self.prior_idx_pc_firing = idx_pc_active
 
     def save(self, *args, **kwargs):
-        CognitiveMapInterface.save(self, *args, **kwargs)
-
         if self.connection[1] == "delayed":
             self.update_reachabilities()
-            CognitiveMapInterface.save(self, *args, **kwargs)
-
+        CognitiveMapInterface.save(self, *args, **kwargs)
 
     def postprocess_topological_navigation(self):
         self.update_reachabilities()

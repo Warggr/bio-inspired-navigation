@@ -22,9 +22,10 @@ for d in datasets:
         BLOCK_SIZE=10000
         reached = 0
         for i in (bar := tqdm(range(0, len(dset), BLOCK_SIZE), file=sys.stdout)):
-            n1 = dset[i:i+BLOCK_SIZE]
+            actual_block_size = min(BLOCK_SIZE, len(dset) - i)
+            n1 = dset[i:i+actual_block_size]
             reached += sum(n1['reached'])
-            bar.set_description(f"  {i+BLOCK_SIZE} / {reached} reached ({reached/(i+BLOCK_SIZE):.1%})")
+            bar.set_description(f"  {i+actual_block_size} / {reached} reached ({reached/(i+actual_block_size):.1%})")
     except BlockingIOError:
         print("Couldn't open dataset")
     except OSError:

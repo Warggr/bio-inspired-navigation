@@ -493,7 +493,7 @@ class PybulletEnvironment:
                 if draw_debug_lines:
                     self.add_debug_line(start, end, rayHitColor)
                 distance = math.sqrt((hitPosition[0] - start[0]) ** 2 + (hitPosition[1] - start[1]) ** 2)
-                assert 0 <= distance and distance <= 1
+                assert 0 <= distance and distance <= ray_length
                 ray_return.append(distance)
 
         return LidarReading(ray_return, ray_angles), [it[3] for it in results]
