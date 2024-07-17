@@ -88,7 +88,6 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("env_model", default="Savinov_val3", choices=["Savinov_val3", "linear_sunburst_map"])
-    parser.add_argument("--variant")
     args = parser.parse_args()
 
     re_type = "neural_network"

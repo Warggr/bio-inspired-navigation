@@ -547,7 +547,7 @@ class Map:
 
 def environment_dimensions(env_model: AllowedMapName):
     if env_model == "Savinov_val3":
-        return np.array([-9, -6]), np.array([6, 4])
+        return np.array([-9, -5]), np.array([6, 4])
     elif env_model == "Savinov_val2":
         return np.array([-5, -5]), np.array([5, 5])
     elif env_model == "Savinov_test7":
