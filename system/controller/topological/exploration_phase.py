@@ -7,11 +7,6 @@
 *
 ***************************************************************************************
 """
-import sys
-import os
-
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-
 from system.bio_model.grid_cell_model import GridCellNetwork
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.controller.simulation.pybullet_environment import PybulletEnvironment
