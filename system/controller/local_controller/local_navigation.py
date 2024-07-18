@@ -241,7 +241,7 @@ def setup_gc_network(dt) -> GridCellNetwork:
     return gc_network
 
 
-def vector_navigation(env: PybulletEnvironment, compass: Compass, gc_network: Optional[GridCellNetwork], controller: Optional[LocalController] = None, target_gc_spiking=None,
+def vector_navigation(env: PybulletEnvironment, compass: Compass, gc_network: Optional[GridCellNetwork] = None, controller: Optional[LocalController] = None, target_gc_spiking=None,
     step_limit=float('inf'), plot_it=False,
                       collect_data_freq=False, collect_data_reachable=False, collect_nr_steps=False, exploration_phase=False,
     pc_network: Optional[PlaceCellNetwork] = None, cognitive_map: Optional[CognitiveMapInterface] = None,

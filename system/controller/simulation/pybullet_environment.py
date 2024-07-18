@@ -703,12 +703,13 @@ class Robot:
         self.env.add_debug_line([*self.position, height], [*(self.position + normal_vector), height], (0, 0, 1))
         return normal_vector
 
-    def calculate_obstacle_vector(self, lidar_data : Optional[Tuple[LidarReading, List[Vector2D]]] = None) -> Tuple[Vector2D, Vector2D]:
+    def calculate_obstacle_vector(self, lidar_data: Optional[tuple[LidarReading, list[Vector2D]]] = None) -> tuple[Vector2D|None, Vector2D|None, Vector2D]:
         """
         Calculates the obstacle_vector from the ray distances.
 
         Returns:
-            p: the first point on the obstacle line
+            p1: the first point on the obstacle line
+            p2: the last point on the obstacle line
             v: the direction vector of the obstacle
         """
         if lidar_data is None:
@@ -718,7 +719,7 @@ class Robot:
         hit_points = hit_points[start_index:end_index+1]
 
         if end_index < 0:
-            return np.array([0, 0]), np.array([0.0, 0.0])
+            return None, None, np.array([0.0, 0.0])
 
         if end_index - start_index + 1 < 5:
             middle_index = (end_index + start_index) // 2
@@ -744,18 +745,18 @@ class Robot:
                     direction_vector = np.array([1.0, slope])
                     direction_vector /= np.linalg.norm(direction_vector)  # Normalize the direction vector
             except (IndexError, ValueError, np.linalg.LinAlgError):
-                return np.array([0.0, 0.0]), np.array([0.0, 0.0])
+                return None, None, np.array([0.0, 0.0])
 
         if lidar[end_index] > 0:
             self_point = p.getLinkState(self.ID, 0)[0]
             start_point = self_point + np.array(
                 [np.cos(lidar.angles[end_index]), np.sin(lidar.angles[end_index]), self_point[-1]]) * lidar[end_index]
             end_point = start_point - np.array([direction_vector[0], direction_vector[1], 0])
-            self.env.add_debug_line(start_point, end_point, (0, 0, 0))
+            #self.env.add_debug_line(start_point, end_point, (0, 0, 0))
 
         assert min(lidar[start_index:end_index + 1]) != 0, lidar[start_index:end_index + 1]
         direction_vector = direction_vector * 1.5 / min(lidar[start_index:end_index + 1])
-        return hit_points[0], direction_vector
+        return hit_points[0], hit_points[-1], direction_vector
 
     def turn_to_goal(self, goal_vector: Vector2D, tolerance: types.Angle = 0.05):
         """ Agent turns to face in goal vector direction """
