@@ -73,12 +73,13 @@ class FajenObstacleAvoidance:
         angle = robot.position_and_angle[1] + self.angle_velocity * robot.env.dt
         return np.array([ np.cos(angle), np.sin(angle) ])
 
+
 class ObstacleAvoidance:
     def __init__(
         self,
         combine = 1.5,
         num_ray_dir = 21,
-        tactile_cone = 120,
+        tactile_cone = np.radians(120),
         ray_length = 1,
         follow_walls = False,
     ):

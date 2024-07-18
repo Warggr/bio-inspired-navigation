@@ -683,7 +683,7 @@ class Robot:
 
     def calculate_simple_normal_vector(self, lidar_data: Optional[tuple[LidarReading, list[Vector2D]]] = None) -> Vector2D:
         if lidar_data is None:
-            lidar_data = self.env.lidar(tactile_cone=120, num_ray_dir=21, blind_spot_cone=0, agent_pos_orn=self.lidar_sensor_position)
+            lidar_data = self.env.lidar(tactile_cone=np.radians(120), num_ray_dir=21, blind_spot_cone=0, agent_pos_orn=self.lidar_sensor_position)
         lidar, hit_points = lidar_data
         hit_points = np.array(hit_points)
         hit_points = hit_points[np.array(lidar.distances) != -1]
