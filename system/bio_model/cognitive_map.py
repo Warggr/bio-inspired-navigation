@@ -214,14 +214,12 @@ class CognitiveMapInterface(ABC):
             delta_avg = np.mean(delta)
 
         else:
-            compass = LinearLookaheadGcCompass(arena_size=env.arena_size)
+            compass = LinearLookaheadGcCompass(arena_size=env.arena_size, gc_network=gc_network)
             # decode goal vectors from current position to every place cell on the cognitive map
             node_list: list[PlaceCell] = list(self.node_network.nodes)
             nodes_length = len(node_list)
             for i, p in enumerate(node_list):
                 print("Decoding goal vector to place Cell", i, "out of", nodes_length)
-                target_spiking = p.gc_connections
-                gc_network.set_as_target_state(target_spiking)
                 compass.reset_goal(compass.parse(p))
 
                 pred_gv = compass.calculate_goal_vector()

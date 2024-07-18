@@ -168,6 +168,7 @@ if __name__ == "__main__":
         if len(pc_network.place_cells) < desired_number_of_place_cells / 2:
             too_lax_threshold = re.threshold_same
             print("Too low!")
+            continue
         cognitive_map.postprocess_topological_navigation()
         assert len(cognitive_map.node_network.nodes) > 1
         break

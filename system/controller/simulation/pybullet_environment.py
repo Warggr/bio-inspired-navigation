@@ -99,6 +99,7 @@ class PybulletEnvironment:
         frame_limit=5000,
         contains_robot=True,
         wall_kwargs={},
+        variant=None,
     ):
         """ Create environment.
 
@@ -163,13 +164,12 @@ class PybulletEnvironment:
         elif "obstacle" in env_model:
             plane = resource_path(self.env_model, "plane.urdf")
             self.planeID = p.loadURDF(plane)
-        elif env_model.startswith("linear_sunburst"):
+        elif env_model == "linear_sunburst":
             base_position = [5.5, 0.55]
-            if env_model == "linear_sunburst":
-                doors_option = "plane"
-            else:
-                _, doors_option = env_model.split('.') # "plane" for default, "plane_doors", "plane_doors_individual"
-            self.planeID = p.loadURDF(resource_path("linear_sunburst", doors_option + ".urdf"))
+            if variant == None:
+                variant = "plane"
+            assert variant in ['plane', 'plane_doors', 'plane_doors_individual']
+            self.planeID = p.loadURDF(resource_path("linear_sunburst", variant + ".urdf"))
         else:
             raise ValueError("No matching env_model found.")
 
@@ -848,9 +848,9 @@ class DatasetCollector:
     def get_observations(self, deltaT = 3) -> List[Any]: # TODO: how is this different from a types.Image?
         # observations with context length k=10 and delta T = 3
         assert len(self.images) != 0
-        return self.images
-        # observations = self.images[::3][-1:]
+        observations = self.images[::3][-1:]
         # return [np.transpose(observation[2], (2, 0, 1)) for observation in observations]
+        return observations
 
 all_possible_textures = [ file for file in sorted(os.listdir(WALL_TEXTURE_PATH)) if file[-4:] == '.jpg' ]
 

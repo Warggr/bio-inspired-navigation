@@ -168,32 +168,28 @@ class TurnToGoal:
     def __init__(self, tolerance = 0.05):
         self.tolerance = tolerance
     def __call__(self, goal_vector : Vector2D, robot: 'Robot'):
-        ray_length = 0.25
-        while True:
-            collision_data, _ = robot.env.lidar(
-                tactile_cone=np.radians(180),
-                num_ray_dir=20,
-                blind_spot_cone=0,
-                agent_pos_orn=robot.lidar_sensor_position,
-                ray_length=ray_length,
-                draw_debug_lines=True
-            )
-            if all(distance == -1 for distance in collision_data.distances):
-                break
-            robot.navigation_step(goal_vector=-np.array(robot.heading_vector()), allow_backwards=True)
-        while True:
-            collision_data, _ = robot.env.lidar(
-                tactile_cone=np.radians(360),
-                num_ray_dir=20,
-                blind_spot_cone=np.radians(180),
-                agent_pos_orn=robot.lidar_sensor_position,
-                ray_length=ray_length,
-                draw_debug_lines=True
-            )
-            if all(distance == -1 for distance in collision_data.distances):
-                break
-            robot.navigation_step(goal_vector=np.array(robot.heading_vector()))
-
+        ray_length = 0.28
+        """
+        for angle in map(np.radians, [-45, 45, 135, -135]):
+            for _ in range(100):
+                agent_pos, agent_heading = robot.lidar_sensor_position
+                world_angle = angle + agent_heading
+                backoff_vector = -np.array([ np.cos(world_angle), np.sin(world_angle) ])
+                collision_data, _ = robot.env.lidar(
+                    tactile_cone=np.radians(90),
+                    num_ray_dir=20,
+                    blind_spot_cone=0,
+                    agent_pos_orn=(agent_pos, world_angle),
+                    ray_length=ray_length,
+                    draw_debug_lines=True
+                )
+                if all(distance == -1 for distance in collision_data.distances):
+                    break
+                robot.env.add_debug_line(robot.position, np.array(robot.position) + backoff_vector, (0, 1, 0))
+                robot.navigation_step(goal_vector=backoff_vector, allow_backwards=True)
+            else: # no break encountered, i.e. timeout
+                raise RobotStuck()
+        """
         robot.turn_to_goal(goal_vector, tolerance=self.tolerance)
 
 class controller_rules: # namespace
