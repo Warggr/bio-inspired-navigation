@@ -11,7 +11,7 @@ from system.bio_model.grid_cell_model import GridCellNetwork
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.controller.simulation.pybullet_environment import PybulletEnvironment
 from system.controller.local_controller.local_navigation import vector_navigation, setup_gc_network
-from system.controller.local_controller.local_controller import LocalController, controller_rules
+from system.controller.local_controller.local_controller import LocalController, StuckDetector, TurnToGoal, controller_rules
 from system.controller.local_controller.compass import AnalyticalCompass
 from system.bio_model.place_cell_model import PlaceCellNetwork
 from system.bio_model.cognitive_map import LifelongCognitiveMap, CognitiveMapInterface
@@ -63,7 +63,11 @@ def waypoint_movement(
     if plotting:
         map_layout.draw_path(goals)
 
-    controller = LocalController.default()
+    controller = LocalController(
+        on_reset_goal=[TurnToGoal()],
+        transform_goal_vector=[], # not using ObstacleAvoidance because the waypoints are not in obstacles anyway
+        hooks=[StuckDetector()],
+    )
     #controller.transform_goal_vector.append(controller_rules.TurnWhenNecessary())
 
     with PybulletEnvironment(env_model, dt=dt, build_data_set=True, start=path[0], visualize=visualize) as env:
@@ -97,10 +101,11 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("env_model", default="Savinov_val3", choices=["Savinov_val3", "linear_sunburst_map"])
+    parser.add_argument('-n', dest='desired_nb_of_place_cells', help='desired number of place cells', type=int, default=30)
+    parser.add_argument('--re', dest='re_type', default='neural_network', choices=['neural_network', 'view_overlap'])
     parser.add_argument('--visualize', action='store_true')
     args = parser.parse_args()
 
-    re_type = "neural_network"
     re_weights_file = "re_mse_weights.50"
 
     if args.env_model == "Savinov_val3":
@@ -143,14 +148,13 @@ if __name__ == "__main__":
         raise ValueError(f"Unsupported map: {args.env_model}")
 
     gc_network = setup_gc_network(dt)
-    re = reachability_estimator_factory(re_type, weights_file=re_weights_file, debug=debug, config=SampleConfig(grid_cell_spikings=True))
+    re = reachability_estimator_factory(args.re_type, weights_file=re_weights_file, debug=debug, config=SampleConfig(grid_cell_spikings=True))
 
-    desired_number_of_place_cells = 30
-    too_strict_threshold = 0.993 #1.1
-    too_lax_threshold = 0.72975 #0.0
+    too_strict_threshold = 1.4
+    too_lax_threshold = 0.2
     while True:
         re.threshold_same = (too_lax_threshold + too_strict_threshold) / 2
-        pc_network = PlaceCellNetwork(reach_estimator=re, max_capacity=2*desired_number_of_place_cells)
+        pc_network = PlaceCellNetwork(reach_estimator=re, max_capacity=2*args.desired_nb_of_place_cells)
         cognitive_map = LifelongCognitiveMap(reachability_estimator=re)
 
         print(f"Trying threshold {re.threshold_same}...")
@@ -160,7 +164,7 @@ if __name__ == "__main__":
             too_strict_threshold = re.threshold_same
             print("Too high!")
             continue
-        if len(pc_network.place_cells) < desired_number_of_place_cells / 2:
+        if len(pc_network.place_cells) < args.desired_nb_of_place_cells / 2:
             too_lax_threshold = re.threshold_same
             print("Too low!")
             continue
