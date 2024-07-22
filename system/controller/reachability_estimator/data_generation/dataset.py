@@ -30,7 +30,7 @@ from system.controller.simulation.environment_cache import EnvironmentCache
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.controller.simulation.environment.map_occupancy_helpers.map_utils import path_length
 from system.plotting.plotResults import plotStartGoalDataset
-from system.types import types, FlatSpikings, WaypointInfo, Vector2D, AllowedMapName
+from system.types import PositionAndOrientation, types, FlatSpikings, WaypointInfo, Vector2D, AllowedMapName
 from system.controller.reachability_estimator.types import Sample, PlaceInfo, ReachabilityController
 
 def get_path():
@@ -358,16 +358,16 @@ class TrajectoriesDatasetSingleMap(data.Dataset):
         self.parent = parent
         self.map_name = map_name
         self.parent._init_once(seed)
-        print(f"Creating filtered dataset with {map_name=}, len={len(self)}")
+        print(f"Creating filtered dataset with {map_name=}, len={len(self)}", file=sys.stderr)
     def __len__(self):
         return self.parent.traj_len_cumsum_per_map[self.map_name][-1]
-    def __getitem__(self, index) -> Tuple[Vector2D, Vector2D]:
+    def __getitem__(self, index) -> Tuple[PositionAndOrientation, PositionAndOrientation]:
         dataset_idx, traj_id, src_idx = self.parent._locate_sample_single_map(index, self.map_name)
         traj = self.parent.fds[dataset_idx][traj_id]
         dst_idx = self.parent._dest_same_traj(traj, src_idx)
-        src_pos, dst_pos = traj[src_idx][0], traj[dst_idx][0]
+        src, dst = traj[src_idx], traj[dst_idx]
 
-        return src_pos, dst_pos
+        return (src[0], src[1]), (dst[0], dst[1])
 
 
 DATASET_KEY = 'positions'

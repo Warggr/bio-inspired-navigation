@@ -61,13 +61,16 @@ max_succ_angle = np.radians(0)
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('precision', nargs='?', type=float, default=5, help='Precision, in degrees')
+parser.add_argument('--ray-length', default=1, type=float)
 parser.add_argument('--visualize', action='store_true')
 args = parser.parse_args()
 
 precision = np.radians(args.precision)
 controller = LocalController(
     on_reset_goal=[],
-    transform_goal_vector=[controller_rules.ObstacleAvoidance(follow_walls=True)],
+    transform_goal_vector=[
+        controller_rules.ObstacleAvoidance(ray_length=args.ray_length),
+    ],
     hooks=[controller_rules.StuckDetector()],
 )
 

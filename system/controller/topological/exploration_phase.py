@@ -11,14 +11,16 @@ from system.bio_model.grid_cell_model import GridCellNetwork
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.controller.simulation.pybullet_environment import PybulletEnvironment
 from system.controller.local_controller.local_navigation import vector_navigation, setup_gc_network
-from system.controller.local_controller.local_controller import LocalController, StuckDetector, TurnToGoal, controller_rules
+from system.controller.local_controller.local_controller import LocalController, controller_rules
 from system.controller.local_controller.compass import AnalyticalCompass
 from system.bio_model.place_cell_model import PlaceCellNetwork
 from system.bio_model.cognitive_map import LifelongCognitiveMap, CognitiveMapInterface
 import system.plotting.plotResults as plot
 from system.types import Vector2D
+import os
 
-plotting = True  # if True: plot paths
+PLOTTING = os.getenv('PLOTTING', '').split('&')
+plotting = 'exploration' in PLOTTING  # if True: plot paths
 debug = True  # if True: print debug output
 dt = 1e-2
 
@@ -64,9 +66,9 @@ def waypoint_movement(
         map_layout.draw_path(goals)
 
     controller = LocalController(
-        on_reset_goal=[TurnToGoal()],
+        on_reset_goal=[controller_rules.TurnToGoal()],
         transform_goal_vector=[], # not using ObstacleAvoidance because the waypoints are not in obstacles anyway
-        hooks=[StuckDetector()],
+        hooks=[controller_rules.StuckDetector()],
     )
     #controller.transform_goal_vector.append(controller_rules.TurnWhenNecessary())
 
@@ -82,6 +84,9 @@ def waypoint_movement(
                 goal_reached, last_pc = vector_navigation(env, compass, gc_network, step_limit=5000,
                             plot_it=plotting, exploration_phase=True, pc_network=pc_network, cognitive_map=cognitive_map, controller=controller)
                 assert goal_reached
+            except AssertionError:
+                print(f"At {','.join(map(str, env.robot.position))} -> {','.join(map(str, goals[i]))}")
+                raise
             except PlaceCellNetwork.TooManyPlaceCells:
                 raise TooManyPlaceCells(progress=i/len(goals))
             if plotting and (i + 1) % 100 == 0:

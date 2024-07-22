@@ -217,15 +217,22 @@ if __name__ == "__main__":
     from system.controller.reachability_estimator.ReachabilityDataset import SampleConfig
     import argparse
     parser = argparse.ArgumentParser()
+    parser.add_argument('env_model', choices=['Savinov_val3', 'linear_sunburst'], default='Savinov_val3')
+    parser.add_argument('--env-variant', '--variant', help='Environment model variant')
+    parser.add_argument('map_file', nargs='?', default='after_exploration.gpickle')
+    parser.add_argument('map_file_after_lifelong_learning', nargs='?', default='after_lifelong_learning.gpickle')
     parser.add_argument('--visualize', action='store_true')
     parser.add_argument('--seed', type=int, default=None, help='Seed for random index generation.') # for reproducibility / debugging purposes
     args = parser.parse_args()
 
     re_type = "neural_network"
     re_weights_file = "re_mse_weights.50"
-    map_file = "after_exploration.gpickle"
-    map_file_after_lifelong_learning = "after_lifelong_learning.gpickle"
-    env_model = "Savinov_val3"
+    map_file, map_file_after_lifelong_learning = args.map_file, args.map_file_after_lifelong_learning
+    if args.env_model != 'Savinov_val3':
+        if not map_file.startswith(args.env_model + '.'):
+            map_file = args.env_model + '.' + map_file
+        if not map_file_after_lifelong_learning.startswith(args.env_model + '.'):
+            map_file_after_lifelong_learning = args.env_model + '.' + map_file_after_lifelong_learning
     model = "combo"
     input_config = SampleConfig(grid_cell_spikings=True)
 
@@ -235,10 +242,11 @@ if __name__ == "__main__":
     assert len(cognitive_map.node_network.nodes) > 1
     gc_network = setup_gc_network(1e-2)
     pod = PhaseOffsetDetectorNetwork(16, 9, 40)
+    compass = Compass.factory(model, gc_network=gc_network, pod_network=pod)
 
-    tj = TopologicalNavigation(env_model, model, pc_network, cognitive_map, gc_network, pod)
+    tj = TopologicalNavigation(args.env_model, pc_network, cognitive_map, compass)
 
-    with PybulletEnvironment(env_model, build_data_set=True, visualize=args.visualize, contains_robot=False) as env:
+    with PybulletEnvironment(args.env_model, variant=args.env_variant, build_data_set=True, visualize=args.visualize, contains_robot=False) as env:
         # TODO Pierre figure out how to remove unnecessary xy_coordinates
         plot.plotTrajectoryInEnvironment(env, xy_coordinates=[0,0], goal=False, cognitive_map=tj.cognitive_map, trajectory=False)
 

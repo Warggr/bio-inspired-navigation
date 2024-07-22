@@ -42,6 +42,7 @@ else:
     from .map_occupancy_helpers import map_utils_cpp as map_cpp
 
 from system.types import Vector2D, AllowedMapName
+from system.types import Angle, Vector2D, PositionAndOrientation, AllowedMapName
 
 
 class Map:
@@ -252,7 +253,7 @@ class Map:
         return dilated
 
     def find_path(self, start_pos: Vector2D, goal_pos: Vector2D) -> list[Vector2D]:
-        assert self.suitable_position_for_robot(start_pos) and self.suitable_position_for_robot(goal_pos)
+        assert self.suitable_position_for_robot(start_pos) and self.suitable_position_for_robot(goal_pos), self.draw_points([start_pos, goal_pos])
         start_coord = self.grid_coord(start_pos[0], start_pos[1], self.path_map_division)
         goal_coord = self.grid_coord(goal_pos[0], goal_pos[1], self.path_map_division)
 
@@ -643,6 +644,22 @@ class MapLayout(Map):
         plt.axis("off")
         plt.show()
 
+    def draw_points(self, points: list[tuple[float, float]]):
+        from system.controller.simulation.environment.map_occupancy_helpers.map_visualizer import OccupancyMapVisualizer
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots(1, 1)
+        im = plt.imshow([[1, 2], [3, 4]])
+        fig.canvas.draw()
+        ax.draw_artist(im)
+        vis = OccupancyMapVisualizer(self, ax)
+        vis.draw_map()
+        x, y = list(zip(*points))
+        plt.scatter(x, y, c='#ff0000')
+        for i, point in enumerate(points):
+            ax.annotate(i, point)
+        plt.axis("off")
+        plt.show()
 
 import random
 from system.controller.simulation.environment.map_occupancy import MapLayout

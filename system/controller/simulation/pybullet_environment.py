@@ -185,6 +185,7 @@ class PybulletEnvironment:
 
         p.setGravity(0, 0, -9.81)
 
+        self.t = 0.0
         self.dt = dt
         p.setTimeStep(self.dt)
 
@@ -362,15 +363,12 @@ class PybulletEnvironment:
         return rgb_img
 
     def step(self):
+        self.t += self.dt
         p.stepSimulation()
         if self.visualize:
-            time.sleep(self.dt / 5)
+            time.sleep(self.dt)
 
-    def step_forever(self, slowdown = 1):
-        while True:
-            p.stepSimulation()
-            if self.visualize:
-                time.sleep(self.dt * slowdown / 5)
+        #assert not p.getContactPoints(self.robot.ID, self.planeID)
 
     def detect_maze_agent_contact(self):
         """ true, if the robot is in contact with the maze """
