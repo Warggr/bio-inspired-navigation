@@ -89,7 +89,7 @@ class ObstacleAvoidance:
 
     def __call__(self, goal_vector: Vector2D, robot: 'Robot') -> Vector2D:
         lidar = robot.env.lidar(**self.lidar_kwargs, blind_spot_cone=0, agent_pos_orn=robot.lidar_sensor_position)
-        start_point, end_point, obstacle_vector = robot.calculate_obstacle_vector(lidar)
+        point, obstacle_vector = robot.calculate_obstacle_vector(lidar)
         #print(f"{self.position=}, {obstacle_vector=}, {goal_vector=}")
         robot.env.add_debug_line(robot.position, np.array(robot.position) + obstacle_vector, color=(1, 0, 0), width=3)
         robot.env.add_debug_line(robot.position, np.array(robot.position) + goal_vector, color=(0, 0, 0), width=3)
@@ -97,11 +97,8 @@ class ObstacleAvoidance:
         normed_goal_vector = normalize(goal_vector)
 
         # combine goal and obstacle vector
-        if vectors_in_one_direction(normed_goal_vector, obstacle_vector):
-            multiple, start_point = 1, start_point
-        else:
-            multiple, start_point = -1, end_point
-        if not intersect(robot.position, normed_goal_vector, start_point, obstacle_vector * multiple):
+        multiple = 1 if vectors_in_one_direction(normed_goal_vector, obstacle_vector) else -1
+        if not intersect(robot.position, normed_goal_vector, point, obstacle_vector * multiple):
             multiple = 0
         combine = self.combine
         if self.follow_walls and multiple == 1 and np.linalg.norm(obstacle_vector) > 3: # norm is 1.5 / min(distances), i.e. if norm > 3 <=> distance < 0.5
