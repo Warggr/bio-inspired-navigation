@@ -37,10 +37,9 @@ def add_environment(ax, env_model : str):
     filename = os.path.join(dirname, "controller/simulation/environment/"+env_model+"/maze_topview_binary.png")
     filename = os.path.realpath(filename)
 
-    dimensions = environment_dimensions(env_model)
-
     if not env_model == "plane" and not "obstacle" in env_model:
         topview = plt.imread(filename)
+        dimensions = environment_dimensions(env_model)
         ax.imshow(topview,cmap="gray",extent=dimensions,origin="upper")
     elif env_model == "obstacle_map_2":
         box1 = plt.Rectangle((-1.75, -1.5), 0.5, 3, color=TUM_colors['TUMDarkGray'])

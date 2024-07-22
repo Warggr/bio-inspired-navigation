@@ -452,6 +452,7 @@ if __name__ == "__main__":
     """
 
     obstacle_avoidance_parser = experiments.add_parser('obstacle_avoidance')
+    obstacle_avoidance_parser.add_argument('--all', help='Execute all combinations of test parameters', action='store_true')
     """ 
     Test the obstacle avoidance system
 

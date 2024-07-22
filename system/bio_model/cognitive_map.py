@@ -50,7 +50,7 @@ class CognitiveMapInterface(ABC):
         reachability_estimator: ReachabilityEstimator,
         load_data_from: Optional[str] = None,
         debug = True,
-        metadata: Optional[dict] = None,
+        metadata: dict = {},
     ):
         """ Abstract base class defining the interface for cognitive map implementations.
 
