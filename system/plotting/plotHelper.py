@@ -29,7 +29,7 @@ TUM_colors = {
                 'TUMAccentBlue': '#64A0C8'
 }
 
-def add_environment(ax, env_model : str):
+def add_environment(ax, env_model: str):
 
     #load topview of maze
     dirname = os.path.dirname(__file__)

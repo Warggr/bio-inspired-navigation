@@ -246,7 +246,7 @@ def vector_navigation(env: PybulletEnvironment, compass: Compass, gc_network: Op
                       collect_data_freq=False, collect_data_reachable=False, collect_nr_steps=False, exploration_phase=False,
     pc_network: Optional[PlaceCellNetwork] = None, cognitive_map: Optional[CognitiveMapInterface] = None,
     goal_pos: Optional[Vector2D] = None,
-) -> Tuple[bool, Any]:
+) -> tuple[bool, Any]:
     """
     Agent navigates towards goal.
 
