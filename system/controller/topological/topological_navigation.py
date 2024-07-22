@@ -28,9 +28,8 @@ from system.controller.local_controller.local_navigation import vector_navigatio
 import system.plotting.plotResults as plot
 from system.types import Vector2D
 
-# if True plot results
-plotting = True
-DEBUG = os.getenv('DEBUG', '').split('&')
+from system.debug import DEBUG, PLOTTING
+plotting = 'topo' in PLOTTING # if True plot results
 
 class TopologicalNavigation(object):
     def __init__(self, env_model: str,
@@ -134,15 +133,15 @@ class TopologicalNavigation(object):
             goal_spiking = path[i + 1].gc_connections
             if gc_network:
                 gc_network.set_as_target_state(goal_spiking)
-            stop, pc = vector_navigation(env, self.compass, gc_network=gc_network,
+            success, pc = vector_navigation(env, self.compass, gc_network=gc_network,
                                          controller=controller, exploration_phase=False, pc_network=self.pc_network,
-                                         cognitive_map=self.cognitive_map, plot_it=False,
+                                         cognitive_map=self.cognitive_map, plot_it=plotting,
                                          step_limit=self.step_limit, goal_pos=goal.pos, *nav_args, **nav_kwargs)
             self.cognitive_map.postprocess_vector_navigation(node_p=path[i], node_q=path[i + 1],
-                                                             observation_p=last_pc, observation_q=pc, success=stop == 1)
-
+                                                             observation_p=last_pc, observation_q=pc, success=success)
+            print('Vector navigation success:', success)
             curr_path_length += 1
-            if stop != 1:
+            if not success:
                 last_pc, new_path = self.locate_node(self.compass, pc, goal)
                 if not last_pc:
                     last_pc = path[i]
@@ -249,7 +248,8 @@ if __name__ == "__main__":
 
     with PybulletEnvironment(args.env_model, variant=args.env_variant, build_data_set=True, visualize=args.visualize, contains_robot=False) as env:
         # TODO Pierre figure out how to remove unnecessary xy_coordinates
-        plot.plotTrajectoryInEnvironment(env, xy_coordinates=[0,0], goal=False, cognitive_map=tj.cognitive_map, trajectory=False)
+        if plotting:
+            plot.plotTrajectoryInEnvironment(env, xy_coordinates=[0,0], goal=False, cognitive_map=tj.cognitive_map, trajectory=False)
 
         if not args.seed:
             args.seed = np.random.default_rng().integers(low=0, high=0b100000000)
@@ -273,7 +273,8 @@ if __name__ == "__main__":
                 successful += 1
             tj.cognitive_map.draw()
             print(f"Navigation {navigation_i} finished")
-            plot.plotTrajectoryInEnvironment(env, goal=False, cognitive_map=tj.cognitive_map, trajectory=False)
+            if plotting:
+                plot.plotTrajectoryInEnvironment(env, goal=False, cognitive_map=tj.cognitive_map, trajectory=False)
 
     print(f"{successful} successful navigations")
     print("Navigation finished")
