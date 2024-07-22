@@ -174,7 +174,7 @@ if __name__ == "__main__":
             too_strict_threshold = re.threshold_same
             print("Too high!")
             continue
-        if len(pc_network.place_cells) < desired_nb_of_place_cells / 2:
+        if len(pc_network.place_cells) < args.desired_nb_of_place_cells / 2:
             too_lax_threshold = re.threshold_same
             print("Too low!")
             continue

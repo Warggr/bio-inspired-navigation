@@ -108,7 +108,8 @@ class TopologicalNavigation(object):
         # TODO Pierre: make env required, use "with Robot"
         if env.robot is None:
             env.robot = Robot(env=env, base_position=src_pos, build_data_set=True)
-            self.compass.reset_position(src_pos)
+            # only reset the compass to the (center of the) place cell if the robot was just created and is actually at the center
+            self.compass.reset_position(self.compass.parse(start))
         else:
             #assert np.linalg.norm(np.array(env.robot.position) - np.array(src_pos)) <= 0.5, "robot provided but not at start position"
             pass
