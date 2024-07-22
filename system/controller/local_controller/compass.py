@@ -10,7 +10,6 @@ class Compass(ABC, Generic[PositionRepresentation]):
     The Compass class tracks the current position and goal position, and allows to compute goal vectors.
     """
 
-    @staticmethod
     @abstractmethod
     def parse(pc: 'PlaceInfo') -> PositionRepresentation:
         ...

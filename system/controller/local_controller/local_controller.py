@@ -195,6 +195,7 @@ class TurnToGoal:
 
 class controller_rules: # namespace
     ObstacleAvoidance = ObstacleAvoidance
+    FajenObstacleAvoidance = FajenObstacleAvoidance
     ObstacleBackoff = ObstacleBackoff
     StuckDetector = StuckDetector
     TurnToGoal = TurnToGoal
