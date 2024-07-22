@@ -45,7 +45,13 @@ def report(fun):
     return _wrapper
 
 class CognitiveMapInterface(ABC):
-    def __init__(self, reachability_estimator: ReachabilityEstimator, load_data_from: Optional[str] = None, debug = True):
+    def __init__(
+        self,
+        reachability_estimator: ReachabilityEstimator,
+        load_data_from: Optional[str] = None,
+        debug = True,
+        metadata: Optional[dict] = None,
+    ):
         """ Abstract base class defining the interface for cognitive map implementations.
 
         arguments:
@@ -58,6 +64,7 @@ class CognitiveMapInterface(ABC):
 
         self.reach_estimator = reachability_estimator
         self.node_network = nx.DiGraph()
+        self.node_network.graph.update(metadata)
         self.debug = debug
         if load_data_from is not None:
             self.load(filename=load_data_from)
@@ -394,13 +401,12 @@ class CognitiveMap(CognitiveMapInterface):
 class LifelongCognitiveMap(CognitiveMapInterface):
     def __init__(
             self,
-            reachability_estimator: ReachabilityEstimator|None = None,
-            load_data_from: str|None = None,
-            debug: bool = False,
+            *args,
             add_edges: bool = True,
             remove_edges: bool = True,
             remove_nodes: bool = True,
-            add_nodes: bool = True
+            add_nodes: bool = True,
+            **kwargs,
     ):
         """ Implements a cognitive map with lifelong learning algorithm.
 
@@ -416,7 +422,7 @@ class LifelongCognitiveMap(CognitiveMapInterface):
         add_nodes: bool                               -- defines if node addition is enabled
         """
 
-        super().__init__(reachability_estimator, load_data_from=load_data_from, debug=debug)
+        super().__init__(*args, **kwargs)
         # values used for probabilistic calculations
         self.sigma = 0.015
         self.sigma_squared = self.sigma ** 2
