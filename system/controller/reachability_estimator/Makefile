@@ -27,7 +27,7 @@ data/models/reachability_network${FEATURES_FILE_FLAGS}.hd5: data/reachability/da
 data/models/reachability_network-3colors${FEATURES_FILE_FLAGS}.hd5: data/reachability/dataset-3colors.hd5 | data/models
 	python training/train_multiframe_dst.py train ${FEATURES} --resume --dataset-features 3colors
 
-code_sizes = 0 1 4 16 20 100
+code_sizes = 0 1 4 16 20 50 80 100
 
 AUTOENCODER_EPOCHS = 25
 

@@ -808,7 +808,7 @@ class DatasetCollector:
         SPEED_NORM = 3
         GOAL = 4
 
-    def __init__(self, frame_limit = 5000, collectImages = True):
+    def __init__(self, frame_limit = 50, collectImages = True):
         self.frame_limit = frame_limit
 
         #self.xy_coordinates : List[Vector2D] = []  # keeps track of agent's coordinates at each time step

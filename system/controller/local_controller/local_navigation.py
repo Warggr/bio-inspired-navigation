@@ -138,7 +138,7 @@ class PodGcCompass(GcCompass):
 
 
 class LinearLookaheadGcCompass(GcCompass):
-    arrival_threshold = 0.2
+    arrival_threshold = 0.02
     def __init__(self, arena_size, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.arena_size = arena_size
@@ -621,7 +621,7 @@ if __name__ == "__main__":
                     env.mapping = mapping
 
                     over, nr_steps_this_trial = vector_navigation(env, compass, collect_nr_steps=True, gc_network=gc_network, controller=controller, target_gc_spiking=target_spiking,
-                                            plot_it=True, step_limit=10000)
+                                            plot_it=True, step_limit=500)
                     # assert over == 1
                     print(trial, over, mapping, combine, num_ray_dir, cone)
 

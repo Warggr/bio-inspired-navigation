@@ -257,7 +257,7 @@ class GridCellNetwork:
     def set_as_target_state(self, gc_connections: Spikings):
         for m, gc in enumerate(self.gc_modules):
             gc.t = gc_connections[m]
-        print("Set new target state")
+        #print("Set new target state")
         self.target_spiking = np.array(gc_connections)
 
     def reset_s_virtual(self):
