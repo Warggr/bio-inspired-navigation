@@ -388,13 +388,17 @@ if __name__ == '__main__':
     parser.add_argument('--dataset-features', nargs='+', default=[])
     parser.add_argument('--dataset-basename', help='The base name of the reachability dataset HD5 file', default='dataset')
     parser.add_argument('--tag', help=f'Network saved in `{model_basename}-{{tag}}`', default='')
+
     parser.add_argument('--images', help='Images are included in the dataset', nargs='?', default=True, choices=[True, False, 'zeros', 'fixed'], type=lambda s: False if s in ['no', 'off'] else s)
     parser.add_argument('--spikings', help='Grid cell spikings are included in the dataset', action='store_true')
     parser.add_argument('--lidar', help='LIDAR distances are included in the dataset', choices=['raw_lidar', 'ego_bc', 'allo_bc'])
+    parser.add_argument('--dist', help='Provide the distance and angle to the reachability estimator', action='store_true')
+    parser.add_argument('--image-crop', help='Cover the border (+n) or center (-n) pixels in white', type=int)
+
     parser.add_argument('--image-encoder', help='Image encoder', choices=['fc', 'conv', 'pretrained'], default='conv')
     parser.add_argument('--hidden-fc-layers', help='Hidden FC layer dimensions as a comma-separated list', type=lambda s: [int(i) for i in s.split(',')])
     parser.add_argument('--dropout', help='Use dropout in the hidden FC layers', action='store_true')
-    parser.add_argument('--dist', help='Provide the distance and angle to the reachability estimator', action='store_true')
+
     parser.add_argument('--resume', action='store_true', help='Continue training from last saved model')
     parser.add_argument('--save-interval', type=optional(int))
 
@@ -407,6 +411,7 @@ if __name__ == '__main__':
         grid_cell_spikings=args.spikings,
         lidar=args.lidar,
         images=args.images,
+        image_crop=args.image_crop,
         dist=args.dist,
     )
 

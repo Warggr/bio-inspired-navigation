@@ -28,11 +28,13 @@ class SampleConfig:
         grid_cell_spikings=False,
         lidar: Optional[Literal['raw_lidar', 'ego_bc', 'allo_bc']]=None,
         images: bool|Literal['zeros', 'fixed'] = True,
+        image_crop: int|None = None,
         dist = False,
     ):
         self.with_grid_cell_spikings = grid_cell_spikings
         self.lidar = lidar
         self.images = images
+        self.image_crop = image_crop
         self.with_dist = dist
 
     def suffix(self) -> str:
@@ -40,6 +42,7 @@ class SampleConfig:
             + ('+spikings' if self.with_grid_cell_spikings else '')
             + (f'+lidar--{self.lidar}' if self.lidar else '')
             + ('+noimages' if not self.images else '' if self.images is True else f'+{self.images}images')
+            + (('+crop' + ('X' if self.image_crop > 0 else 'N') + str(abs(self.image_crop))) if self.image_crop is not None else '')
             + ('+dist' if self.with_dist else '')
         )
 
@@ -102,7 +105,20 @@ class ReachabilityDataset(torch.utils.data.Dataset):
         elif self.config.images == 'fixed':
             model_args += [torch.tensor(self.fixed_image).float(), torch.tensor(self.fixed_image).float()]
         elif self.config.images:
-            model_args += [torch.tensor(sample.src.img).float(), torch.tensor(sample.dst.img).float()]
+            for pos in (sample.src, sample.dst):
+                image = pos.img
+                if self.config.image_crop is not None and self.config.image_crop > 0:
+                    image = image.copy()
+                    lowbound, upbound = self.config.image_crop, 64-self.config.image_crop
+                    image[:lowbound, :].fill(0) # top and bottom margin
+                    image[upbound:, :].fill(0)
+                    image[lowbound:upbound, :lowbound].fill(0) # left and right margin
+                    image[lowbound:upbound, upbound:].fill(0)
+                elif self.config.image_crop is not None and self.config.image_crop < 0:
+                    image = image.copy()
+                    lowbound, upbound = -self.config.image_crop, 64+self.config.image_crop
+                    image[lowbound:upbound, lowbound:upbound].fill(0)
+                model_args += [torch.tensor(image).float()]
         else:
             model_args += [ None_tensor, None_tensor ]
 
