@@ -459,7 +459,7 @@ def plot_angles(real_trajectory, target, vec_array1=None, vec_array2=None, vec_a
     plt.show()
 
 
-def plot_current_state(env : 'PybulletEnvironment', gc_modules, f_gc, f_t, f_mon,
+def plot_current_state(env: 'PybulletEnvironment', gc_modules, f_gc, f_t, f_mon,
                        matches_array=None, vectors_array=None, pc_active_array=None,
                        pc_network=None, cognitive_map=None, exploration_phase=False, goal_vector=None):
     xy_coordinates = env.xy_coordinates

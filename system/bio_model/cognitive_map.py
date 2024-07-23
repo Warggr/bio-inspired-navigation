@@ -22,8 +22,7 @@ from system.plotting.helper import plot_cognitive_map_path
 from system.plotting.plotThesis import plot_grid_cell
 
 from system.bio_model.place_cell_model import PlaceCell, PlaceCellNetwork
-from system.controller.reachability_estimator.reachability_estimation import reachability_estimator_factory, \
-    ReachabilityEstimator
+ReachabilityEstimator = 'ReachabilityEstimator'
 
 from typing import Optional
 

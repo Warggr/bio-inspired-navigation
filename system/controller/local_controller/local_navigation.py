@@ -173,7 +173,7 @@ class ComboGcCompass(GcCompass):
     def arrival_threshold(self):
         return LinearLookaheadGcCompass.arrival_threshold
 
-    def update_position(self, robot : Robot):
+    def update_position(self, robot: Robot):
         self.impl.update_position(robot)
         goal_reached = self.impl.reached_goal()
         if goal_reached and type(self.impl) == PodGcCompass:
@@ -498,7 +498,7 @@ if __name__ == "__main__":
             # initialize grid cell network and create target spiking
             gc_network = setup_gc_network(dt)
 
-            start : Vector2D = np.array([0.0, 0.0])
+            start: Vector2D = np.array([0.0, 0.0])
 
             """Picks a location at circular edge of environment"""
             distance = args.goal_distance
@@ -508,7 +508,7 @@ if __name__ == "__main__":
             with PybulletEnvironment(env_model, dt=dt, start=start) as env:
                 model = args.decoder
                 # changes the update fraction and arrival threshold according to the chosen model
-                compass : Compass
+                compass: Compass
                 if model == "pod":
                     compass = PodGcCompass(gc_network=gc_network)
                     compass.arrival_threshold = 0.2

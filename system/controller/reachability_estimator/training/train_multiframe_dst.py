@@ -10,15 +10,13 @@
 
 import torch
 import time
-from torchmetrics import Accuracy, F1Score
 from torchmetrics.classification import BinaryPrecision, BinaryRecall, BinaryAccuracy, BinaryF1Score
 from torch.utils.data import DataLoader, RandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
 import sys
 import os
-import numpy as np
-from typing import Type, Literal, Callable, Dict, Any
+from typing import Literal, Callable, Any
 
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
@@ -28,7 +26,7 @@ from system.controller.reachability_estimator.ReachabilityDataset import Reachab
 from system.controller.reachability_estimator.training.utils import load_model, DATA_STORAGE_FOLDER
 from system.controller.reachability_estimator.types import Prediction
 
-def _load_weights(model_file, nets : Model, **kwargs) -> int:
+def _load_weights(model_file, nets: Model, **kwargs) -> int:
     state, epoch = load_model( model_file, load_to_cpu=True, **kwargs)
 
     for name, net in nets.nets.items():
@@ -124,7 +122,7 @@ def BCELoss_class_weighted(input, target):
     return torch.mean(bce)
 
 def make_loss_function(position_loss_weight = 0.6, angle_loss_weight = 0.3) -> LossFunction:
-    def loss_function(prediction : Prediction, truth : Prediction, return_details = False) -> torch.Tensor:
+    def loss_function(prediction: Prediction, truth: Prediction, return_details = False) -> torch.Tensor:
         reachability_prediction, position_prediction, angle_prediction = prediction
         reachability, position, angle = truth
 
@@ -147,10 +145,10 @@ def make_loss_function(position_loss_weight = 0.6, angle_loss_weight = 0.3) -> L
     return loss_function
 
 def tensor_log(
-    loader : DataLoader,
-    train_device,
-    writer : SummaryWriter,
-    epoch : int,
+    loader: DataLoader,
+    train_device: TrainDevice,
+    writer: SummaryWriter,
+    epoch: int,
     net: Model,
     loss_function: LossFunction,
 ):
@@ -333,9 +331,9 @@ def train_multiframedst(
     writer.add_hparams(hparams, latest_metrics)
 
 
-def validate_func(net : Model, dataset : ReachabilityDataset, batch_size, train_device,
-    loss_function : LossFunction,
-    model_suffix : str,
+def validate_func(net: Model, dataset: ReachabilityDataset, batch_size, train_device,
+    loss_function: LossFunction,
+    model_suffix: str,
     model_filename = "reachability_network",
     model_dir = DATA_STORAGE_FOLDER,
 ):

@@ -3,7 +3,7 @@ import numpy as np
 from . import parameters as p
 from system.types import Angle
 
-def headingCellsActivityTraining(heading : Angle) -> p.HeadingCellActivity:
+def headingCellsActivityTraining(heading: Angle) -> p.HeadingCellActivity:
     '''
     calculates HDC activity from current decoded heading direction
     :param heading: heading direction

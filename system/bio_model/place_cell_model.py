@@ -35,7 +35,7 @@ def get_path_top():
 class PlaceCell(PlaceInfo):
     """Class to keep track of an individual Place Cell"""
 
-    def __init__(self, gc_connections, observations, coordinates : Vector2D):
+    def __init__(self, gc_connections, observations, coordinates: Vector2D):
         # explicitly not call super().__init__ because we'll provide data members ourselves (as aliases)
         self.gc_connections = gc_connections  # Connection matrix to grid cells of all modules; has form (n^2 x M)
         self.env_coordinates = coordinates  # Save x and y coordinate at moment of creation

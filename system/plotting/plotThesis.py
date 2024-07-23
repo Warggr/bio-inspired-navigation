@@ -42,7 +42,7 @@ rc('text', usetex=True)
 
 
 # --------------- Plot grid cells ---------------
-def plot_grid_cell_modules(gc_modules : 'GridCellNetwork', i=None, plot_target=False, plot_matches=False):
+def plot_grid_cell_modules(gc_modules: 'GridCellNetwork', i=None, plot_target=False, plot_matches=False):
 
     spike_detector = None
     # if plot_matches:

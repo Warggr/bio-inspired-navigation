@@ -34,7 +34,7 @@ sigmaR = radialDispersion(grid_distances)
 
 # TODO: optimization: make all these functions accept a batch
 
-def bcActivity(angle : types.Angle, distance : float, out : Optional[p.BoundaryCellActivity] = None) -> p.BoundaryCellActivity:
+def bcActivity(angle: types.Angle, distance: float, out: Optional[p.BoundaryCellActivity] = None) -> p.BoundaryCellActivity:
     if out is None:
         out = np.zeros_like(grid_distances)
 
@@ -56,7 +56,7 @@ def normalize(activity_vector: p.BoundaryCellActivity) -> p.BoundaryCellActivity
         assert not np.isnan(np.min(activity_vector))
     return activity_vector
 
-def bcActivityForLidar(lidar : types.LidarReading) -> p.BoundaryCellActivity:
+def bcActivityForLidar(lidar: types.LidarReading) -> p.BoundaryCellActivity:
     '''
     Calculates BC activity.
 
@@ -83,7 +83,7 @@ x_points = np.arange(min_x + p.resolution / 2, min_x + (nr_x - 0.5) * p.resoluti
 y_points = np.arange(min_y + p.resolution / 2, min_y + (nr_y - 0.5) * p.resolution, p.resolution)
 x, y = np.meshgrid(x_points, y_points)
 
-def bcForWall(start : types.Vector2D, end : types.Vector2D) -> p.BoundaryCellActivity:
+def bcForWall(start: types.Vector2D, end: types.Vector2D) -> p.BoundaryCellActivity:
     '''
     :param boundary_location: start and endpoints of a certain boundary given as function parameters.
     :return: activity vector which contains each cell's activity

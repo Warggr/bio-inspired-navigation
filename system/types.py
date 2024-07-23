@@ -32,7 +32,7 @@ assert LidarReading.DEFAULT_NUMBER_OF_ANGLES == len(list(LidarReading.angle_rang
 
 
 class Vector2D(Sized, Iterable[float], Protocol):
-    # def __getitem__(self, index : int) -> float: ...
+    # def __getitem__(self, index: int) -> float: ...
     pass
 
 

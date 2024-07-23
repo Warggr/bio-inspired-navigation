@@ -3,7 +3,7 @@ from system.types import LidarReading
 import numpy as np
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
-from typing import Tuple, Self, Optional
+from typing import Self, Optional
 
 def img_reshape(img_array) -> types.Image:
     """ image stored in array form to image in correct shape for nn """
@@ -32,7 +32,7 @@ class Sample:
     src: PlaceInfo
     dst: PlaceInfo
 
-    def to_tuple(self, reachable : bool) -> Tuple:
+    def to_tuple(self, reachable: bool) -> tuple:
         """ Returns a tuple which can be put into a Numpy array of type Sample.dtype """
         return (
             self.src.img.flatten(), self.dst.img.flatten(),
@@ -44,7 +44,7 @@ class Sample:
         )
 
     @staticmethod
-    def from_tuple(tup : tuple) -> tuple[Self, bool]:
+    def from_tuple(tup: tuple) -> tuple[Self, bool]:
         (
             src_img, dst_img,
             reachable,
@@ -81,7 +81,7 @@ class ReachabilityController(ABC):
     """ Any algorithm that decides whether one place is reachable from another. """
 
     @abstractmethod
-    def reachable(self, env : 'PybulletEnvironment', src : PlaceInfo, dst : PlaceInfo, path_l: Optional[float]=None) -> bool:
+    def reachable(self, env: 'PybulletEnvironment', src: PlaceInfo, dst: PlaceInfo, path_l: Optional[float]=None) -> bool:
         """
         Decides whether dst is reachable from dst.
 
@@ -110,7 +110,7 @@ ModelInput = list['torch.Tensor']
 Prediction = tuple[float, types.Vector2D, types.Angle]
 
 ImageForTorch = 'np.array[float, (4, 64, 64)]'
-def transpose_image(img : types.Image) -> ImageForTorch:
+def transpose_image(img: types.Image) -> ImageForTorch:
     assert img.shape[1:] == (64, 64, 4) # that's the format returned by env.camera() and used in the rest of the code
     try: # for torch.Tensors
         img = img.transpose(1, 3).transpose(2, 3) # reorder 0123 -> 0321 -> 0312, i.e. channels first

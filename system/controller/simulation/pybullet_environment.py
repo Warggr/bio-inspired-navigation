@@ -60,7 +60,7 @@ except AttributeError:
     from system.polyfill import batched
     itertools.batched = batched
 
-def closest_subsegment(values : List[float]) -> Tuple[int, int]:
+def closest_subsegment(values: list[float]) -> tuple[int, int]:
     values = np.array(values)
     if not np.any(values >= 0):
         return -1, -1
@@ -234,13 +234,13 @@ class PybulletEnvironment:
     def dimensions(self):
         return environment_dimensions(self.env_model)
 
-    def __load_walls(self, model_folder, textures : str | Callable[[int], str] | list[str], nb_batches = None) -> list[int]:
+    def __load_walls(self, model_folder, textures: str | Callable[[int], str] | list[str], nb_batches = None) -> list[int]:
         MAXIMUM_BATCH_SIZE = 16 # bullet doesn't accept multibodies with >16 bodies
 
         wall_dir = os.path.join(model_folder, "walls")
         wall_files = os.listdir(wall_dir)
         wall_files = map(lambda filename: os.path.join(wall_dir, filename), wall_files)
-        wall_files = filter(lambda filepath : os.path.isfile(filepath) and filepath[-4:] == '.obj', wall_files)
+        wall_files = filter(lambda filepath: os.path.isfile(filepath) and filepath[-4:] == '.obj', wall_files)
         wall_files = list(wall_files)
 
         if nb_batches is None:
@@ -248,7 +248,7 @@ class PybulletEnvironment:
                 nb_batches = len(textures)
                 batches = np.array_split(wall_files, nb_batches)
                 if len(batches[0]) > MAXIMUM_BATCH_SIZE:
-                    batches : List[List[str]] = list(list(itertools.batched(big_batch, MAXIMUM_BATCH_SIZE)) for big_batch in batches)
+                    batches: list[list[str]] = list(list(itertools.batched(big_batch, MAXIMUM_BATCH_SIZE)) for big_batch in batches)
                     textures = [ [ textures[i] ] * len(batches[i]) for i in range(len(batches)) ]
                     batches, textures = itertools.chain.from_iterable(batches), itertools.chain.from_iterable(textures)
             elif callable(textures): # assume the user wants to set each wall individually
@@ -259,7 +259,7 @@ class PybulletEnvironment:
                 textures = [ textures for _ in batches ]
 
         loaded_textures = {}
-        def load_texture(texture_name : str):
+        def load_texture(texture_name: str):
             if texture_name not in loaded_textures:
                 try:
                     loaded_textures[texture_name] = p.loadTexture(os.path.join(WALL_TEXTURE_PATH, texture_name))
@@ -293,7 +293,7 @@ class PybulletEnvironment:
         return walls
 
 
-    def __load_obj(self, objectFilename : str, texture : str) -> int:
+    def __load_obj(self, objectFilename: str, texture: str) -> int:
         """load object files with specified texture into the environment"""
 
         visualShapeId = p.createVisualShape(
@@ -392,9 +392,9 @@ class PybulletEnvironment:
 
     def straight_lidar(
         self,
-        agent_pos_orn : Optional[types.PositionAndOrientation] = None,
-        ray_length = WHISKER_LENGTH,
-        draw_debug_lines = False,
+        agent_pos_orn: Optional[types.PositionAndOrientation] = None,
+        ray_length=WHISKER_LENGTH,
+        draw_debug_lines=False,
         radius: float = 0.25,
         num_ray_dir: float = 3,
     ) -> list[float]:
@@ -441,7 +441,7 @@ class PybulletEnvironment:
         ray_length = WHISKER_LENGTH,
         draw_debug_lines = False,
         **angle_args
-    ) -> Tuple[LidarReading, List[Vector2D]]:
+    ) -> tuple[LidarReading, list[Vector2D]]:
         """
         returns the egocentric distance to obstacles in num_ray_dir directions
 
@@ -501,11 +501,11 @@ class Robot:
     def __init__(
         self,
         env: PybulletEnvironment,
-        base_position : types.Vector2D,
-        base_orientation : types.Angle = np.pi/2,
+        base_position: types.Vector2D,
+        base_orientation: types.Angle = np.pi/2,
         max_speed=5.5,
         frame_limit=5000,
-        build_data_set : bool = True,
+        build_data_set: bool = True,
         compass: Optional['Compass'] = None,
     ):
         """
@@ -556,7 +556,7 @@ class Robot:
             hook(self)
 
     @property
-    def position_and_angle(self) -> Tuple[types.Vector2D, types.Angle]:
+    def position_and_angle(self) -> tuple[types.Vector2D, types.Angle]:
         # Possible improvement: check if retrieving last value from data_collector is faster
         position, angle = p.getBasePositionAndOrientation(self.ID)
         assert position[2] > -10 #== PybulletEnvironment.ROBOT_Z_POS
@@ -587,14 +587,14 @@ class Robot:
         angle = p.getEulerFromQuaternion(linkWorldOrientation)[2]
         return tuple(linkWorldPosition), angle
 
-    def save_snapshot(self, goal_vector : Optional[types.Vector2D]):
+    def save_snapshot(self, goal_vector: Optional[types.Vector2D]):
         position, angle = self.position_and_angle
         linear_v = self.xy_speed
         self.data_collector.append(position, angle, linear_v, goal_vector)
         if self.buildDataSet:
             self.data_collector.images.append(self.env.camera((position, angle)))
 
-    def compute_gains(self, goal_vector, allow_backwards=False) -> Tuple[float, float]:
+    def compute_gains(self, goal_vector, allow_backwards=False) -> tuple[float, float]:
         """ computes the motor gains resulting from (inhibited) goal vector
         Arguments:
         :param allow_backwards: Whether to allow backwards movement.
@@ -686,7 +686,7 @@ class Robot:
         hit_points = np.array(hit_points)
         hit_points = hit_points[np.array(lidar.distances) != -1]
 
-        normal_vector : Vector2D = np.array([0.0, 0.0], dtype=float)
+        normal_vector: Vector2D = np.array([0.0, 0.0], dtype=float)
         if len(hit_points) == 0:
             return normal_vector
 
@@ -701,7 +701,7 @@ class Robot:
         self.env.add_debug_line([*self.position, height], [*(self.position + normal_vector), height], (0, 0, 1))
         return normal_vector
 
-    def calculate_obstacle_vector(self, lidar_data : Optional[Tuple[LidarReading, List[Vector2D]]] = None) -> Tuple[Vector2D, Vector2D]:
+    def calculate_obstacle_vector(self, lidar_data: Optional[tuple[LidarReading, list[Vector2D]]] = None) -> tuple[Vector2D, Vector2D]:
         """
         Calculates the obstacle_vector from the ray distances.
 
@@ -797,7 +797,7 @@ class Robot:
         p.removeBody(self.ID)
 
 class DatasetCollector:
-    DataPoint = Tuple[types.Vector2D, types.Angle, types.Vector2D, float, Optional[types.Vector2D]]
+    DataPoint = tuple[types.Vector2D, types.Angle, types.Vector2D, float, Optional[types.Vector2D]]
     class Index: # Namespace
         POSITION = 0
         ANGLE = 1
@@ -808,19 +808,19 @@ class DatasetCollector:
     def __init__(self, frame_limit = 50, collectImages = True):
         self.frame_limit = frame_limit
 
-        #self.xy_coordinates : List[Vector2D] = []  # keeps track of agent's coordinates at each time step
+        #self.xy_coordinates: list[Vector2D] = []  # keeps track of agent's coordinates at each time step
         #self.orientation_angle = []  # keeps track of agent's orientation at each time step
         #self.xy_speeds = []  # keeps track of agent's speed (vector) at each time step
         #self.speeds = []  # keeps track of agent's speed (value) at each time step
         #self.goal_vector_array = []  # keeps track of agent's goal vector at each time step
-        self.data : List[DatasetCollector.DataPoint] = []
-        self.images : List[types.Image] = [] # if buildDataSet: collect images
+        self.data: list[DatasetCollector.DataPoint] = []
+        self.images: list[types.Image] = [] # if buildDataSet: collect images
 
         if collectImages:
-            self.images : list[Image] = [] 
+            self.images: list[Image] = []
 
 
-    def append(self, position : types.Vector2D, angle : types.Angle, speed : types.Vector2D, goal_vector : Optional[types.Vector2D]):
+    def append(self, position: types.Vector2D, angle: types.Angle, speed: types.Vector2D, goal_vector: Optional[types.Vector2D]):
         self.data.append((
             np.array(position),
             angle,
@@ -842,7 +842,7 @@ class DatasetCollector:
     def __len__(self):
         return len(self.data)
 
-    def get_observations(self, deltaT = 3) -> List[Any]: # TODO: how is this different from a types.Image?
+    def get_observations(self, deltaT = 3) -> list[Any]: # TODO: how is this different from a types.Image?
         # observations with context length k=10 and delta T = 3
         assert len(self.images) != 0
         observations = self.images[::3][-1:]

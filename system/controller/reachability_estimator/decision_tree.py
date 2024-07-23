@@ -20,7 +20,7 @@ def relevant_info_from_lidar(batch_lidar: Batch[list[float]]) -> Batch[list[floa
     return batch_lidar[:, [0, 25, 26, 51]]
 
 class DecisionTree(Model):
-    def __init__(self, encoder : ImageEncoder, tree : tree.DecisionTreeClassifier, sample_config: SampleConfig):
+    def __init__(self, encoder: ImageEncoder, tree: tree.DecisionTreeClassifier, sample_config: SampleConfig):
         self.encoder = encoder
         self.tree = tree
         self.sample_config = sample_config
@@ -66,7 +66,7 @@ class DecisionTree(Model):
         result[:,0] = self.tree.predict(features)
         return result
 
-    def train(self, dataset : 'Dataset[Sample]'):
+    def train(self, dataset: 'Dataset[Sample]'):
         data = np.zeros((len(dataset), self.n_features()))
         labels = np.zeros((len(dataset), 1))
         i = 0

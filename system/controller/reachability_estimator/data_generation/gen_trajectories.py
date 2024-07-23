@@ -79,14 +79,14 @@ def display_trajectories(filepath):
         fig.colorbar(hh[3], ax=ax)
         plt.show()
 
-Dimensions = Tuple[float, float, float, float]
+Dimensions = tuple[float, float, float, float]
 
-def random_location(dimensions : Dimensions, generator : np.random.RandomState) -> types.Vector2D:
+def random_location(dimensions: Dimensions, generator: np.random.RandomState) -> types.Vector2D:
     x = np.around(generator.uniform(dimensions[0], dimensions[1]), 1)
     y = np.around(generator.uniform(dimensions[2], dimensions[3]), 1)
     return [x, y]
 
-def waypoint_movement(env : PybulletEnvironment, cam_freq, traj_length, map_layout: MapLayout, gc_network, seed: int) -> list[WaypointInfo]:
+def waypoint_movement(env: PybulletEnvironment, cam_freq, traj_length, map_layout: MapLayout, gc_network, seed: int) -> list[WaypointInfo]:
     ''' Calculates environment-specific waypoints from start to goal and creates
     trajectory by making agent follow them.
     

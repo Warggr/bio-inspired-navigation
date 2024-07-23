@@ -49,7 +49,7 @@ class Map:
     def __init__(self,
                  occupancy_grid,
                  resolution,
-                 origin : Vector2D,
+                 origin: Vector2D,
                  path_map=None,
                  path_map_division=7,
                  path_map_dilation=2,
@@ -189,7 +189,7 @@ class Map:
         """
         return self.reachable_locs
 
-    def suitable_position_for_robot(self, p : Vector2D) -> bool:
+    def suitable_position_for_robot(self, p: Vector2D) -> bool:
         # print(p, 'is suitable:', end='')
         map_coords = self.map_coord_to_path_coord(p[0], p[1])
         try:

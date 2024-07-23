@@ -28,24 +28,29 @@ from .types import Batch, Prediction, transpose_image
 
 from torch.optim import Optimizer
 
+
 def AutoAdamOptimizer(net=None, lr=3.0e-4, eps=1.0e-5) -> Optimizer|Callable[[nn.Module],Optimizer]:
     if net is None:
         return lambda net: torch.optim.Adam(net.parameters(), lr=lr, eps=eps)
     return torch.optim.Adam(net.parameters(), lr=lr, eps=eps)
 
+
 class NNModuleWithOptimizer:
     __slots__ = ('net', 'opt')
-    def __init__(self, net : nn.Module, opt : Optimizer|Callable[[nn.Module], Optimizer] = AutoAdamOptimizer):
+
+    def __init__(self, net: nn.Module, opt: Optimizer|Callable[[nn.Module], Optimizer] = AutoAdamOptimizer):
         if callable(opt):
             opt = opt(net)
         self.net = net
         self.opt = opt
 
+
 class Model(ABC):
     """ Interface for networks """
-    def __init__(self, nets : Dict[str, NNModuleWithOptimizer]):
-        self.nets = { name: val.net for name, val in nets.items() }
-        self.optimizers = { name: val.opt for name, val in nets.items() }
+
+    def __init__(self, nets: dict[str, NNModuleWithOptimizer]):
+        self.nets = {name: val.net for name, val in nets.items()}
+        self.optimizers = {name: val.opt for name, val in nets.items()}
 
     @abstractmethod
     def get_prediction(self,
@@ -57,8 +62,8 @@ class Model(ABC):
         ...
 
     @staticmethod
-    def create_from_config(backbone_classname : str, *model_args, **model_kwargs) -> 'Model':
-        backbone_classes : Dict[str, Type[Model]] = {
+    def create_from_config(backbone_classname: str, *model_args, **model_kwargs) -> 'Model':
+        backbone_classes: dict[str, Type[Model]] = {
             'convolutional': CNN, 'resnet': ResNet, 'siamese': Siamese
         }
         return backbone_classes[backbone_classname](*model_args, **model_kwargs)
@@ -209,7 +214,7 @@ class CNN(Model):
 
         return reachability_prediction, position_prediction, angle_prediction
 
-def initialize_regressors(nets) -> Dict[str, NNModuleWithOptimizer]:
+def initialize_regressors(nets) -> dict[str, NNModuleWithOptimizer]:
     nets["angle_regression"] = NNModuleWithOptimizer( AngleRegression(init_scale=1.0, no_weight_init=False))
     nets["position_regression"] = NNModuleWithOptimizer( PositionRegression(init_scale=1.0, no_weight_init=False))
     nets["reachability_regression"] = NNModuleWithOptimizer( ReachabilityRegression(init_scale=1.0, no_weight_init=False))

@@ -26,12 +26,11 @@ from system.controller.local_controller.compass import Compass, AnalyticalCompas
 from system.controller.local_controller.local_controller import LocalController, ObstacleAvoidance, StuckDetector, ObstacleBackoff, TurnToGoal
 from system.controller.local_controller.local_navigation import vector_navigation, setup_gc_network, PodGcCompass, LinearLookaheadGcCompass
 import system.plotting.plotResults as plot
-from system.types import Vector2D
 
 from system.debug import DEBUG, PLOTTING
 plotting = 'topo' in PLOTTING # if True plot results
 
-class TopologicalNavigation(object):
+class TopologicalNavigation:
     def __init__(self, env_model: str,
                  pc_network: PlaceCellNetwork, cognitive_map: CognitiveMapInterface,
                  #gc_network: GridCellNetwork,
@@ -57,7 +56,7 @@ class TopologicalNavigation(object):
 
     def navigate(self, start: PlaceCell, goal: PlaceCell, gc_network: GridCellNetwork,
         controller: Optional[LocalController] = None,
-        cognitive_map_filename: str = None,
+        cognitive_map_filename: Optional[str] = None,
         env: Optional[PybulletEnvironment] = None,
         robot: Optional[Robot] = None,
         *nav_args, **nav_kwargs,

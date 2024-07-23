@@ -12,13 +12,13 @@ class EnvironmentCache:
     default_env_kwargs = { 'build_data_set': True, 'contains_robot': False }
 
     def __init__(self, override_env_kwargs={}):
-        self.envs : Dict[types.AllowedMapName, PybulletEnvironment] = {}
+        self.envs: dict[types.AllowedMapName, PybulletEnvironment] = {}
         self.override_env_kwargs = override_env_kwargs
         self.env_kwargs = { key: value for key, value in override_env_kwargs.items() if value is not EnvironmentCache.DONT_CARE }
         self.env_kwargs = self.env_kwargs | self.default_env_kwargs
 
     # Singleton pattern
-    _instance : Optional[Self] = None
+    _instance: Optional[Self] = None
 
     @classmethod
     def create_instance(cls, override_env_kwargs) -> Self:
@@ -42,12 +42,12 @@ class EnvironmentCache:
         else:
             raise ValueError(f"Could not reuse already-launched configuration {cls._instance.override_env_kwargs} for requested {override_env_kwargs}")
 
-    def load(self, env_name : types.AllowedMapName):
+    def load(self, env_name: types.AllowedMapName):
         if env_name in self.envs:
             raise KeyError(f"Environment {env_name} already loaded")
         self.envs[env_name] = PybulletEnvironment(env_name, **self.env_kwargs)
 
-    def __getitem__(self, env_name : types.AllowedMapName) -> PybulletEnvironment:
+    def __getitem__(self, env_name: types.AllowedMapName) -> PybulletEnvironment:
         if env_name not in self.envs:
             self.load(env_name)
         return self.envs[env_name]

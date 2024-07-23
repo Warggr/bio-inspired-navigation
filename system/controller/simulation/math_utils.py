@@ -2,11 +2,11 @@ import numpy as np
 
 from system.types import Vector2D, Angle
 
-def vectors_in_one_direction(v1 : Vector2D, v2 : Vector2D) -> bool:
+def vectors_in_one_direction(v1: Vector2D, v2: Vector2D) -> bool:
     dot_product = np.dot(v1, v2)
     return dot_product >= 0
 
-def intersect(p1 : Vector2D, v1 : Vector2D, p2 : Vector2D, v2 : Vector2D) -> bool:
+def intersect(p1: Vector2D, v1: Vector2D, p2: Vector2D, v2: Vector2D) -> bool:
     # Calculate determinant
     det = v1[0] * v2[1] - v1[1] * v2[0]
 
@@ -21,7 +21,7 @@ def intersect(p1 : Vector2D, v1 : Vector2D, p2 : Vector2D, v2 : Vector2D) -> boo
     # Check if the intersection is in the direction of both rays
     return t >= 0 and u >= 0
 
-def compute_angle(vec_1 : Vector2D, vec_2 : Vector2D) -> Angle:
+def compute_angle(vec_1: Vector2D, vec_2: Vector2D) -> Angle:
     length_vector_1 = np.linalg.norm(vec_1)
     length_vector_2 = np.linalg.norm(vec_2)
     if length_vector_1 == 0 or length_vector_2 == 0:

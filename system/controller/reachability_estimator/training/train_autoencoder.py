@@ -41,7 +41,7 @@ def eval_performance(
             decoded = nets(image.float())
             log_loss += loss_function(decoded, image)
 
-    metrics : dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     metrics["Loss/Validation"] = log_loss / len(loader)
     return metrics
 
@@ -57,13 +57,13 @@ def log_performance(
 def train(
     nets: ImageAutoencoder, dataset: Dataset[Image],
     resume = False,
-    hyperparams : Hyperparameters = Hyperparameters(),
+    hyperparams: Hyperparameters = Hyperparameters(),
     n_dataset_worker = 0,
     log_interval = 20,
     save_interval = 5,
     model_dir = DATA_STORAGE_FOLDER,
     model_filename = 'autoencoder',
-    model_suffix : str = '',
+    model_suffix: str = '',
 ):
     """ Train the model on a multiframe dataset. """
 

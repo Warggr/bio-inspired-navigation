@@ -13,7 +13,7 @@ from system.types import Image
 
 Batch = list
 
-def show(net : ImageAutoencoder, images : np.ndarray[Image]):
+def show(net: ImageAutoencoder, images: np.ndarray[Image]):
     with torch.no_grad():
         decodeds = net(torch.tensor(images).float()).int().numpy()
     for image, decoded in zip(images, decodeds):

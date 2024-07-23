@@ -17,9 +17,9 @@ DEFAULT_FILENAME = os.path.join(DATA_PATH, "bc_model", "transformations.npz")
 
 class BoundaryCellNetwork:
     def __init__(self,
-        ego2trans : np.ndarray,
-        heading2trans : np.ndarray,
-        trans2BVC : np.ndarray,
+        ego2trans: np.ndarray,
+        heading2trans: np.ndarray,
+        trans2BVC: np.ndarray,
     ):
         self.ego2trans = ego2trans
         self.heading2trans = heading2trans
@@ -34,14 +34,14 @@ class BoundaryCellNetwork:
         #heading2trans = heading2trans * 15
 
     @staticmethod
-    def load(filename : str = DEFAULT_FILENAME) -> Self:
+    def load(filename: str = DEFAULT_FILENAME) -> Self:
         arrays = np.load(filename)
         return BoundaryCellNetwork(**arrays)
 
-    def save(self, filename : str = DEFAULT_FILENAME):
+    def save(self, filename: str = DEFAULT_FILENAME):
         np.savez(filename, ego2trans=self.ego2trans, heading2trans=self.heading2trans, trans2BVC=self.trans2BVC)
 
-    def calculateActivities(self, egocentricActivity : p.BoundaryCellActivity, heading : p.HeadingCellActivity) -> Tuple[Any, p.BoundaryCellActivity]:
+    def calculateActivities(self, egocentricActivity: p.BoundaryCellActivity, heading: p.HeadingCellActivity) -> tuple[Any, p.BoundaryCellActivity]:
         '''
         calculates activity of all transformation layers and the BVC layer by multiplying with respective weight tensors
         :param egocentricActivity: egocentric activity which was previously calculated in @BCActivity
@@ -74,12 +74,12 @@ random = np.random.default_rng()
 def random_angle(n=None) -> Angle:
     return 2 * math.pi * random.random(n)
 
-def to_cartesian(angle : Angle, distance : float) -> Vector2D:
+def to_cartesian(angle: Angle, distance: float) -> Vector2D:
     x = distance * np.cos(angle)  # convert to cartesian x,y in allocentric reference frame
     y = distance * np.sin(angle)
     return np.array([x, y])
 
-def random_segment(maxSize = p.maxR, n=None) -> Tuple[Vector2D, Vector2D]:
+def random_segment(maxSize = p.maxR, n=None) -> tuple[Vector2D, Vector2D]:
     angle_start = random_angle(n)
     distance = p.maxR * random.random(n)
 
@@ -87,7 +87,7 @@ def random_segment(maxSize = p.maxR, n=None) -> Tuple[Vector2D, Vector2D]:
 
     return to_cartesian(angle_start, distance), to_cartesian(angle_end, angle_end)
 
-def transformation_matrix(heading : Angle):
+def transformation_matrix(heading: Angle):
     return np.array([
         [np.cos(heading), np.sin(heading)],
         [-np.sin(heading), np.cos(heading)],

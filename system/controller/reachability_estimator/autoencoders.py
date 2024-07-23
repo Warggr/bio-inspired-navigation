@@ -66,7 +66,7 @@ class ImageAutoencoder(nn.Module):
 
         self.optimizer = torch.optim.Adam(self.parameters(), **optimizer_params)
 
-    def forward(self, x : Image) -> Image:
+    def forward(self, x: Image) -> Image:
         code = self.encoder.forward(x)
         decode = self.decoder.forward(code)
         return decode

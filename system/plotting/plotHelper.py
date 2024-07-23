@@ -115,13 +115,13 @@ def add_environment(ax, env_model: str):
         ax.set_ylim(-5, 4)
 
 
-def add_robot(ax, xy : Tuple[float, float], angle : float):
+def add_robot(ax, xy: tuple[float, float], angle: float):
     circle = plt.Circle((xy[0], xy[1]), 0.2, color=TUM_colors['TUMDarkGray'], alpha=1)
     ax.add_artist(circle)
 
     ax.quiver(xy[0], xy[1], np.cos(angle) * 0.4, np.sin(angle) * 0.4, color=TUM_colors['TUMDarkGray'], headwidth=7,
               angles='xy', scale_units='xy', scale=1)
 
-def add_goal(ax, goal : Tuple[float, float]):
+def add_goal(ax, goal: tuple[float, float]):
     circle = plt.Circle(goal, 0.2, color=TUM_colors['TUMAccentOrange'], alpha=1)
     ax.add_artist(circle)

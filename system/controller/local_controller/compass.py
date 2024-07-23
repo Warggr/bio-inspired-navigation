@@ -11,7 +11,7 @@ class Compass(ABC, Generic[PositionRepresentation]):
     """
 
     @abstractmethod
-    def parse(pc: 'PlaceInfo') -> PositionRepresentation:
+    def parse(self, pc: 'PlaceInfo') -> PositionRepresentation:
         ...
 
     @property
@@ -48,7 +48,7 @@ class Compass(ABC, Generic[PositionRepresentation]):
 
         return np.linalg.norm(goal_vector) < self.arrival_threshold
 
-    def step(self, robot : 'Robot', *args, **kwargs) -> bool:
+    def step(self, robot: 'Robot', *args, **kwargs) -> bool:
         goal_vector = self.calculate_goal_vector()
         if np.linalg.norm(goal_vector) == 0:
             return True
@@ -80,7 +80,7 @@ class AnalyticalCompass(Compass[Vector2D]):
         self.goal_pos = goal_pos
         self.current_pos = start_pos
 
-    def update_position(self, robot : 'Robot'):
+    def update_position(self, robot: 'Robot'):
         self.current_pos = robot.position
 
     def calculate_goal_vector(self) -> Vector2D:

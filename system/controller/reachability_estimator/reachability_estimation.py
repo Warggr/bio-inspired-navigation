@@ -7,17 +7,15 @@
 *
 ***************************************************************************************
 """
-import numpy
 import torch
 import numpy as np
 # import tabulate
 
 import os
 from abc import ABC, abstractmethod
-from typing import Iterable, Self, Tuple, List
+from typing import Iterable, Literal
 import system.controller.reachability_estimator.networks as networks
 from system.controller.simulation.environment.map_occupancy import MapLayout
-from system.bio_model.place_cell_model import PlaceCell
 import system.types as types
 from system.controller.reachability_estimator.types import Prediction, ReachabilityController, PlaceInfo
 
@@ -28,7 +26,10 @@ except ImportError:
 
 Batch = networks.Batch
 
-def reachability_estimator_factory(type: str = 'distance', /, debug: bool = False, **kwargs) -> 'ReachabilityEstimator':
+def reachability_estimator_factory(
+    type: Literal['distance', 'neural_network', 'simulation', 'view_overlap'],
+    *, debug: bool = False, **kwargs
+) -> 'ReachabilityEstimator':
     """ Returns an instance of the reachability estimator interface
 
     arguments:
@@ -73,7 +74,7 @@ class ReachabilityEstimator(ReachabilityController):
             print(*params)
 
     @abstractmethod
-    def reachability_factor(self, start : PlaceInfo, goal : PlaceInfo) -> float:
+    def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo) -> float:
         """
         Abstract function, determines reachability factor between two locations
         The meaning of the reachability factor depends on the implementation, but bigger is always better.
@@ -82,11 +83,11 @@ class ReachabilityEstimator(ReachabilityController):
         pass
 
     @override
-    def reachable(self, env, start : PlaceInfo, goal : PlaceInfo, path_l = None) -> bool:
+    def reachable(self, env, start: PlaceInfo, goal: PlaceInfo, path_l=None) -> bool:
         reachability_factor = self.reachability_factor(start, goal)
         return reachability_factor >= self.threshold_reachable
 
-    def get_reachability(self, start : PlaceInfo, goal : PlaceInfo) -> Tuple[bool, float]:
+    def get_reachability(self, start: PlaceInfo, goal: PlaceInfo) -> tuple[bool, float]:
         """ Determines whether two nodes are reachable based on the reachability threshold
 
         returns:
@@ -120,9 +121,9 @@ class DistanceReachabilityEstimator(ReachabilityEstimator):
         super().__init__(threshold_same=-self.THRESHOLD_SAME, threshold_reachable=-0.75, debug=debug)
 
     @override
-    def reachability_factor(self, env_model, src : PlaceInfo, dst : PlaceInfo, path_l=None) -> bool:
+    def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo, path_l=None) -> bool:
         """ Returns distance between start and goal as an estimation of reachability"""
-        return -np.linalg.norm(src.pos - dst.pos) # Since a bigger factor means better reachability, we use negative distance
+        return -np.linalg.norm(start.pos - goal.pos) # Since a bigger factor means better reachability, we use negative distance
 
 
 WEIGHTS_FOLDER = os.path.join(os.path.dirname(__file__), "data/models")
@@ -135,7 +136,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
     """ Creates a network-based reachability estimator that judges reachability
         between two locations based on observations and grid cell spikings """
 
-    def __init__(self, backbone: networks.Model, device: str = 'cpu', debug: bool = True, batch_size: int = 64, config : SampleConfig = SampleConfig()):
+    def __init__(self, backbone: networks.Model, device: str = 'cpu', debug: bool = True, batch_size: int = 64, config: SampleConfig = SampleConfig()):
         """
         arguments:
         backbone: str       -- neural network used as a backbone
@@ -225,7 +226,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         return np.array([args], dtype=cls.dtype)
 
     def is_same_batch(self, p: PlaceInfo, q: Iterable[PlaceInfo]) -> Batch[bool]:
-        batches: List[Batch['NetworkReachabilityEstimator.dtype']] = [self.to_batch(p, qi) for qi in q]
+        batches: list[Batch['NetworkReachabilityEstimator.dtype']] = [self.to_batch(p, qi) for qi in q]
         if batches == []: return []
         args_batch = np.concatenate(batches, axis=0)
         return self.reachability_factor_batch(args_batch) >= self.threshold_same
@@ -236,7 +237,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         return self.reachability_factor_batch(args)[0]
 
     def reachability_factor_batch(self,
-        data : np.ndarray['NetworkReachabilityEstimator.dtype']
+        data: np.ndarray['NetworkReachabilityEstimator.dtype']
     ) -> networks.Batch[float]:
         """ Predicts reachability for multiple location pairs
 
@@ -278,7 +279,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
 
         n = len(data)
 
-        results : np.ndarray[float] = np.array([])
+        results: np.ndarray[float] = np.array([])
         n_remaining = n
         batch_size = min(self.batch_size, n)
         while n_remaining > 0:
@@ -303,7 +304,7 @@ class SimulationReachabilityEstimator(ReachabilityEstimator):
         self.dt = 1e-2
 
     @override
-    def reachable(self, env : 'PybulletEnvironment', start: PlaceInfo, goal: PlaceInfo, path_l = None) -> bool:
+    def reachable(self, env: 'PybulletEnvironment', start: PlaceInfo, goal: PlaceInfo, path_l = None) -> bool:
         """ Determines reachability factor between two locations """
         from system.controller.simulation.pybullet_environment import Robot
         from system.controller.local_controller.local_navigation import setup_gc_network, vector_navigation, GcCompass
@@ -364,7 +365,7 @@ class ViewOverlapReachabilityEstimator(ReachabilityEstimator):
         self.distance_threshold = 0.7
         self.map_layout = MapLayout(self.env_model)
 
-    def reachability_factor(self, start: PlaceCell, goal: PlaceCell) -> float:
+    def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo) -> float:
         """ Reachability Score based on the view overlap of start and goal in the environment """
         # untested and unfinished
         start_pos = start.pos

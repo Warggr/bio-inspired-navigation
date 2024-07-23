@@ -7,13 +7,12 @@ from system.controller.reachability_estimator.types import ReachabilityControlle
 from dataset import SampleGenerator, get_path, TrajectoriesDataset
 from system.controller.simulation.environment_cache import EnvironmentCache
 
-from typing import Tuple
 
 def crosscheck_re(
-    res : Tuple[ReachabilityController, ReachabilityController], samples : SampleGenerator,
-    env_cache : EnvironmentCache,
-    num_samples : int,
-    flush_freq : int = 10,
+    res: tuple[ReachabilityController, ReachabilityController], samples: SampleGenerator,
+    env_cache: EnvironmentCache,
+    num_samples: int,
+    flush_freq: int = 10,
 ):
     from tqdm import tqdm
 

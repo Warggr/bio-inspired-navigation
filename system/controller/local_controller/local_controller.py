@@ -21,8 +21,8 @@ class LocalController(ABC):
     """
     def __init__(
         self,
-        on_reset_goal : List[ResetGoalHook] = [],
-        transform_goal_vector : List[TransformGoalHook] = [],
+        on_reset_goal: list[ResetGoalHook] = [],
+        transform_goal_vector: list[TransformGoalHook] = [],
         hooks: list[Hook] = [],
     ):
         self.on_reset_goal = on_reset_goal + [hook.on_reset_goal for hook in hooks]
@@ -32,7 +32,7 @@ class LocalController(ABC):
     def default(obstacles=True):
         return LocalController(on_reset_goal=[ TurnToGoal() ], transform_goal_vector=([ObstacleAvoidance()] if obstacles else []), hooks=[StuckDetector()])
 
-    def reset_goal(self, new_goal : Vector2D, robot: 'Robot'):
+    def reset_goal(self, new_goal: Vector2D, robot: 'Robot'):
         for hook in self.on_reset_goal:
             hook(new_goal, robot)
 
@@ -165,7 +165,7 @@ class TurnWhenNecessary:
 class TurnToGoal:
     def __init__(self, tolerance = 0.05):
         self.tolerance = tolerance
-    def __call__(self, goal_vector : Vector2D, robot: 'Robot'):
+    def __call__(self, goal_vector: Vector2D, robot: 'Robot'):
         ray_length = 0.28
         """
         for angle in map(np.radians, [-45, 45, 135, -135]):
