@@ -165,11 +165,20 @@ def tensor_log(
         loss_detail_names = ['Loss/Reachability', 'Loss/Position', 'Loss/Angle']
         log_scores = { key: 0 for key in list(metrics.keys()) + loss_detail_names }
 
+        true_pos, true_neg, false_pos, false_neg = (torch.tensor(0) for _ in range(4))
+
         for idx, item in enumerate(loader):
             model_args, ground_truth = process_batch(item, train_device=train_device)
 
-            prediction = nets.get_prediction(*model_args)
+            prediction = net.get_prediction(*model_args)
             loss, loss_details = loss_function(prediction, ground_truth, return_details=True)
+
+            pred_r = prediction[0] > 0.5
+            true_r = ground_truth[0].bool()
+            true_pos += sum(pred_r & true_r)
+            false_pos += sum(pred_r & ~true_r)
+            false_neg += sum(~pred_r & true_r)
+            true_neg += sum(~pred_r & ~true_r)
 
             loss_reachability, loss_position, loss_angle = loss_details
             reachability_prediction, position_prediction, angle_prediction = prediction
@@ -185,6 +194,14 @@ def tensor_log(
     metrics["Loss/Validation"] = log_loss / len(loader)
     for key, value in log_scores.items():
         metrics[key] = value / len(loader)
+
+    print("Confusion matrix:")
+    print("Real: True\tFalse")
+    print("P:True", true_pos.item(), false_pos.item(), sep='\t')
+    print("P:False", false_neg.item(), true_neg.item(), sep='\t')
+    print("Metrics:")
+    for key, value in metrics.items():
+        print(key, ':', value)
 
     for key, value in metrics.items():
         writer.add_scalar(key, value, epoch)
