@@ -10,30 +10,29 @@ For a detailed description and the reasoning behind this code, please refer to t
 
 
 ## Install packages
-The code is based on Python3. It has only been tested on Python3.9 and might not work on other versions.
+The code is based on Python3. It has been tested on Python 3.11 and 3.12 and might not work on other versions.
 
 Install the following packages to run the code:
 
 Install the required packages with
-
+```shell
         pip install -r requirements.txt
-
+```
 A gcc,g++ and latex installation are required and can be added with the following commands if not installed already. 
-
+```shell
         sudo apt install gcc
         sudo apt install g++
 
         sudo apt install texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super
         pip install latex
-
+```
 You also need to setup the modified version of range-libc, that can be found in this repository. The original version can be found at https://github.com/kctess5/range_libc.
-It had to be modified to work with Python3. Follow these instructions (https://github.com/kctess5/range_libc#python-wrappers) to install. Additionally it requires ros nav_msgs.
-        
-        conda install -c conda-forge ros-nav-msgs
+It had to be modified to work with Python3. Follow these instructions (https://github.com/kctess5/range_libc#python-wrappers) to install.
+```shell
         cd range_libc/pywrapper
-        python setup.py install
+        pip install .
         python test.py
-
+```
 
 ## More Setup
 
@@ -41,16 +40,41 @@ Precomputed weights for reachability estimator, place and grid cells,
 as well as multiple versions of cognitive maps can be found under 
 [this link](https://syncandshare.lrz.de/getlink/fi2PvsoTCgHNwra5QXrEwP/data.zip).
 
+To download the weights and put every file in the expected folder, you can use Make (see [here](./Makefile)) or the more modern Snakemake (see [here](./Snakefile)).
 
 This folder contains:
 - bio_data: model of grid cells, place cells and the cognitive map
 - re: trajectory and reachability dataset for training as well as the final model
 
+## Known bugs and corresponding fixes
+### If you encounter bugs related to OpenGL
+(@TUM students: this happens when running on LXHalle computers)
+
+This can fix the bug in some cases:
+```shell
+export LIBGL_DRIVERS_PATH=/lib/x86_64-linux-gnu/dri
+export LD_PRELOAD=/lib/x86_64-linux-gnu/libstdc++.so.6.0.30
+```
+
+### Interactions between Matplotlib and Bullet
+When Matplotlib plots are plotted before the simulation runs, really bizarre errors can happen, e.g. walls are horizontal instead of vertical, the car rolls sideways instead of horizontally on its wheels, and/or the car passes through the floor.
+See e.g. [here](https://github.com/bulletphysics/bullet3/issues/2125).
+
+A workaround is to create a shared memory server:
+```shell
+# run Bullet server in the background
+python -m pybullet_utils.runServer &
+# export environment variable to tell our code to use the server
+export BULLET_SHMEM_SERVER=True
+```
+
+You can reuse the same server for multiple script runs - each script should clean up the simulation environment after it has run.
+
 ## Code
 This code implements the methodology as well as performs the experiments described in the thesis.
 
 ### Simulation
-[system/controller/simulation/pybullet_environment.py](https://github.com/Fedannie/bio-inspired-navigation/blob/main/system/controller/simulation/pybullet_environment.py)
+[system/controller/simulation/pybullet_environment.py](system/controller/simulation/pybullet_environment.py)
 
 Test different environment and the camera by moving an agent with your keyboard and plotting its trajectory. Change between four different environments.
 Press arrow keys to move, SPACE to visualize egocentric rays with obstacle detection and  BACKSPACE to exit.
@@ -87,7 +111,7 @@ Calculation of movement vector:
 - obstacles = False: the movement vector is the goal vector
 
 #### Obstacle Avoidance Test
-[system/controller/local_controller/local_navigation.py](https://github.com/Fedannie/bio-inspired-navigation/blob/main/system/controller/local_controller/local_navigation.py)
+[system/controller/local_controller/local_navigation.py](system/controller/local_controller/local_navigation.py)
 
 Perform the experiments described in subsection 5.5.3 Obstacle Avoidance.
 Set ***experiment = "obstacle_avoidance"***
@@ -102,7 +126,7 @@ To plot any of the attempts set ***plot_it = True***.
 ----
 
 ### Reachability Estimator
-[system/controller/reachability_estimator/reachability_estimation.py](https://github.com/Fedannie/bio-inspired-navigation/blob/main/system/controller/reachability_estimator/reachability_estimation.py)
+[system/controller/reachability_estimator/reachability_estimation.py](system/controller/reachability_estimator/reachability_estimation.py)
 
 There are several methods of judging reachability available:
 - ***type = "distance"***: return distance between nodes
@@ -113,7 +137,7 @@ There are several methods of judging reachability available:
 To adjust what values are considered as reachable adjust the creation and connection thresholds in pc_network.py and cognitivemap.py.
 
 #### Trajectory Generation
-[system/controller/reachability_estimator/data_generation/gen_trajectories.py](https://github.com/Fedannie/bio-inspired-navigation/blob/main/system/controller/reachability_estimator/data_generation/gen_trajectories.py)
+[system/controller/reachability_estimator/data_generation/gen_trajectories.py](system/controller/reachability_estimator/data_generation/gen_trajectories.py)
 
 Generate trajectories through the environment storing grid cell spikings and coordinates.
 
@@ -128,7 +152,7 @@ Parameterized:
 Adjust filename, env_model, num_traj, traj_length and cam_freq 
 
 #### Reachability Dataset Generation
-[system/controller/reachability_estimator/data_generation/dataset.py](https://github.com/Fedannie/bio-inspired-navigation/blob/main/system/controller/reachability_estimator/data_generation/dataset.py)
+[system/controller/reachability_estimator/data_generation/dataset.py](system/controller/reachability_estimator/data_generation/dataset.py)
 
 Generate a dataset of reachability samples or load from an existing one.
     
@@ -147,7 +171,7 @@ Default: Time the generation of 50 samples
 ### Topological Navigation
 
 #### Exploration
-[system/controller/topological/exploration_phase.py](https://github.com/Fedannie/bio-inspired-navigation/blob/main/system/controller/topological/exploration_phase.py)
+[system/controller/topological/exploration_phase.py](system/controller/topological/exploration_phase.py)
 
 Perform the experiments described in subsection 5.3 Cognitive Map Construction
 
