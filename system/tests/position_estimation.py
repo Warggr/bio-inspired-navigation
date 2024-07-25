@@ -47,7 +47,7 @@ class PositionEstimation:
         if confidence < self.confidence_threshold:
             print("Correcting place cell")
             self.print_error()
-            priors = self.pc_network.compute_firing_values(self.gc_network.gc_modules)
+            priors = self.pc_network.compute_firing_values(self.gc_network)
             priors = list(enumerate(priors))
             priors.sort(key=lambda index_and_value: index_and_value[1], reverse=True) # sort by ascending probability
             max_posterior = (0, -1)

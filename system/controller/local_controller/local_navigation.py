@@ -11,6 +11,8 @@
 import os
 import sys
 
+from system.controller.reachability_estimator.types import PlaceInfo
+
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
@@ -320,8 +322,15 @@ def vector_navigation(env: PybulletEnvironment, compass: Compass, gc_network: Op
         if pc_network is not None and cognitive_map is not None:
             observations = robot.data_collector.get_observations()
             assert len(observations) != 0
-            [firing_values, created_new_pc] = pc_network.track_movement(gc_network, observations,
-                                                                        robot.position, exploration_phase)
+            firing_values, created_new_pc = pc_network.track_movement(
+                PlaceInfo(
+                    pos=robot.position,
+                    angle=NotImplemented,
+                    spikings=gc_network.consolidate_gc_spiking(),
+                    img=observations[-1], lidar=None
+                ),
+                creation_allowed=exploration_phase,
+            )
 
             lidar = env.lidar()
             assert lidar is not None

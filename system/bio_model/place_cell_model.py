@@ -33,7 +33,11 @@ def get_path_top():
 
 
 class PlaceCell(PlaceInfo):
-    """Class to keep track of an individual Place Cell"""
+    """
+    Class to keep track of an individual Place Cell
+    TODO Pierre: there should be no distinction between this and the pure data class PlaceInfo,
+    both methods of this class should be moved to the reachability estimator
+    """
 
     def __init__(self, gc_connections, observations, coordinates: Vector2D):
         # explicitly not call super().__init__ because we'll provide data members ourselves (as aliases)
@@ -45,6 +49,10 @@ class PlaceCell(PlaceInfo):
         self.observations = observations
         assert observations[0] is not None
         self.lidar: Optional['LidarReading'] = None
+
+    @staticmethod
+    def from_data(data: PlaceInfo):
+        return PlaceCell(gc_connections=data.spikings, observations=[data.img], coordinates=data.pos, lidar=data.lidar)
 
     def compute_firing(self, s_vectors):
         """Computes firing value based on current grid cell spiking"""
@@ -152,41 +160,35 @@ class PlaceCellNetwork:
                 pc = PlaceCell(gc_connection, observations[idx], env_coordinates[idx])
                 self.place_cells.append(pc)
 
-    def create_new_pc(self, *args, **kwargs):
+    def create_new_pc(self, data: PlaceInfo):
         if len(self.place_cells) == self.max_capacity:
             raise PlaceCellNetwork.TooManyPlaceCells()
         # Consolidate grid cell spiking vectors to matrix of size n^2 x M
-        pc = PlaceCell(*args, **kwargs)
+        pc = PlaceCell.from_data(data)
         self.place_cells.append(pc)
 
     def in_range(self, reach: list[float]) -> bool:
         """ Determine whether one value meets the threshold """
         return any(reach_value > self.reach_estimator.threshold_same for reach_value in reach)
 
-    def track_movement(self, gc_network, observations, coordinates, creation_allowed):
+    def track_movement(self, current_position: PlaceInfo, creation_allowed):
         """Keeps track of current grid cell firing"""
-        firing_values = self.compute_firing_values(gc_network.gc_modules)
+        firing_values = [ self.reach_estimator.reachability_factor(current_position, node) for node in self.place_cells ]
 
         if not creation_allowed:
             return [firing_values, False]
 
         created_new_pc = False
         if len(firing_values) == 0 or not self.in_range(firing_values):
-            self.create_new_pc(gc_network.consolidate_gc_spiking(), observations, coordinates)
+            self.create_new_pc(current_position)
             firing_values.append(1)
             created_new_pc = True
 
         return [firing_values, created_new_pc]
 
-    def compute_firing_values(self, gc_modules: list['GridCellModule'], virtual=False, axis=None, plot=False):
+    def compute_firing_values(self, gc_network: 'GridCellNetwork', axis=None, plot=False):
 
-        s_vectors = np.empty((len(gc_modules), len(gc_modules[0].s)))
-        # Consolidate grid cell spiking vectors that we want to consider
-        for m, gc in enumerate(gc_modules):
-            if virtual:
-                s_vectors[m] = gc.s_virtual
-            else:
-                s_vectors[m] = gc.s
+        s_vectors = gc_network.consolidate_gc_spiking()
 
         firing_values = []
         for i, pc in enumerate(self.place_cells):

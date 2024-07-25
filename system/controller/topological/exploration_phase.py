@@ -182,7 +182,7 @@ if __name__ == "__main__":
         assert len(cognitive_map.node_network.nodes) > 1
         break
 
-    pc_network.save_pc_network()
+    pc_network.save_pc_network(filename=(f'-{args.env_model}' if args.env_model != 'Savinov_val3' else ''))
     cognitive_map.save(filename=cognitive_map_filename)
 
     if plotting:

@@ -14,6 +14,7 @@ import numpy as np
 import os
 from abc import ABC, abstractmethod
 from typing import Iterable, Literal
+from system.bio_model.place_cell_model import PlaceCell
 import system.controller.reachability_estimator.networks as networks
 from system.controller.simulation.environment.map_occupancy import MapLayout
 import system.types as types
@@ -376,6 +377,18 @@ class ViewOverlapReachabilityEstimator(ReachabilityEstimator):
         overlap_ratios = self.map_layout.view_overlap(start_pos, heading1, goal_pos, heading1, self.fov, mode='plane')
 
         return (overlap_ratios[0] + overlap_ratios[1]) / 2
+
+
+class SpikingsReachabilityEstimator(ReachabilityEstimator):
+    def __init__(self, axis=None):
+        self.axis = axis
+
+    def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo) -> float:
+        assert isinstance(goal, PlaceCell)
+        if self.axis is None:
+            return goal.compute_firing(start.spikings)
+        else:
+            return goal.compute_firing_2x(start.spikings, axis=self.axis)
 
 
 def spikings_reshape(img_array):
