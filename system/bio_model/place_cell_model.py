@@ -239,12 +239,12 @@ if __name__ == '__main__':
 
     fr = random.choice(list(cognitive_map.node_network.nodes))
     to = random.choice(list(cognitive_map.node_network.nodes))
-    env = PybulletEnvironment(env_model, visualize=False, mode="combo", build_data_set=True,
+    env = PybulletEnvironment(env_model, visualize=False, build_data_set=True,
                               start=list(fr.env_coordinates))
     compass = ComboGcCompass(gc_network, pod, goal_pos=to.pos)
     gc_network.set_as_current_state(fr.gc_connections)
-    stop, pc = vector_navigation(env, compass, gc_network, to.gc_connections, model="combo",
-                                 obstacles=True, exploration_phase=False, pc_network=pc_network,
+    stop, pc = vector_navigation(env, compass, gc_network, to.gc_connections,
+                                 exploration_phase=False, pc_network=pc_network,
                                  cognitive_map=cognitive_map, plot_it=True, step_limit=1000)
 
     fig, ax = plt.subplots()

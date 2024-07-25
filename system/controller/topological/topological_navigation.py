@@ -222,9 +222,10 @@ if __name__ == "__main__":
     parser.add_argument('map_file_after_lifelong_learning', nargs='?', default='after_lifelong_learning.gpickle')
     parser.add_argument('--visualize', action='store_true')
     parser.add_argument('--seed', type=int, default=None, help='Seed for random index generation.') # for reproducibility / debugging purposes
+    parser.add_argument('--num-topo-nav', '-n', help='number of topological navigations', type=int, default=100)
+    parser.add_argument('--re-type', help='Type of the reachability estimator', choices=['neural_network', 'view_overlap'], default='neural_network')
     args = parser.parse_args()
 
-    re_type = "neural_network"
     re_weights_file = "re_mse_weights.50"
     map_file, map_file_after_lifelong_learning = args.map_file, args.map_file_after_lifelong_learning
     if args.env_model != 'Savinov_val3':
@@ -235,7 +236,7 @@ if __name__ == "__main__":
     model = "combo"
     input_config = SampleConfig(grid_cell_spikings=True)
 
-    re = reachability_estimator_factory(re_type, weights_file=re_weights_file, config=input_config)
+    re = reachability_estimator_factory(args.re_type, weights_file=re_weights_file, config=input_config)
     pc_network = PlaceCellNetwork(from_data=True, reach_estimator=re)
     cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from=map_file, debug=('cogmap' in DEBUG))
     assert len(cognitive_map.node_network.nodes) > 1
@@ -258,7 +259,7 @@ if __name__ == "__main__":
         place_cells = list(tj.cognitive_map.node_network.nodes)
 
         successful = 0
-        for navigation_i in range(100):
+        for navigation_i in range(args.num_topo_nav):
             start_index, goal_index = None, None
             while start_index == goal_index:
                 start_index, goal_index = random.integers(0, len(place_cells), size=2)

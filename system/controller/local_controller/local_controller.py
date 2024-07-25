@@ -2,9 +2,9 @@ import numpy as np
 from system.utils import normalize
 from system.controller.simulation.math_utils import vectors_in_one_direction, intersect, compute_angle
 
-from abc import ABC, abstractmethod
-from system.types import Vector2D
-from typing import List, Callable
+from abc import ABC
+from system.types import Vector2D, Angle
+from typing import Callable
 
 ResetGoalHook = Callable[[Vector2D, 'Robot'], None]
 TransformGoalHook = Callable[[Vector2D, 'Robot'], Vector2D|tuple[Vector2D, dict]]

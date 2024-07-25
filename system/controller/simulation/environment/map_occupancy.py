@@ -467,6 +467,12 @@ class Map:
         # def visible(x, y, pos, heading, fov):
         #     return inside_fov(x, y, pos, heading, fov) and self.visible(x, y, pos[0], pos[1])
 
+        if vis:
+            import matplotlib.pyplot as plt
+            plt.scatter(xy1[:, 0], xy1[:, 1])
+            plt.scatter(xy2[:, 0], xy2[:, 1])
+            plt.show()
+
         def inside_fov(xy, pos, heading, fov):
             xy2 = xy - np.array(pos, np.float32)
             norm = np.linalg.norm(xy2, axis=1, ord=2, keepdims=True) + 1e-5
@@ -544,6 +550,24 @@ class Map:
         overlaps /= n_test_rays
 
         return overlaps
+
+from system.utils import normalize
+
+
+def angle(frm: Vector2D, to: Vector2D) -> Angle:
+    heading = np.array(to) - np.array(frm)
+    heading = normalize(heading)
+    return np.arctan(heading[1] / heading[0])
+
+def add_angles_to_trajectory(trajectory: list[Vector2D]) -> list[PositionAndOrientation]:
+    if len(trajectory) == 1:
+        return [(trajectory[0], 0)]
+    result: list[PositionAndOrientation] = []
+    result[0] = (trajectory[0], angle(trajectory[0], trajectory[1]))
+    for i in range(1, len(trajectory) - 1):
+        result[i] = (trajectory[i], angle(trajectory[i-1], trajectory[i+1]))
+    result[-1] = (trajectory[-1], angle(trajectory[-2], trajectory[-1]))
+    return result
 
 
 def environment_dimensions(env_model: AllowedMapName):

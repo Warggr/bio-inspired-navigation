@@ -73,7 +73,7 @@ class CognitiveMapInterface(ABC):
         self.prior_idx_pc_firing = None
 
     @abstractmethod
-    def track_vector_movement(self, pc_firing: list[float], created_new_pc: bool, pc: PlaceCell, **kwargs):
+    def track_vector_movement(self, pc_firing: list[float], created_new_pc: bool, pc: PlaceCell, **kwargs) -> Optional[PlaceCell]:
         """ Abstract function used to incorporate changes to the map after each vector navigation
 
         arguments:
@@ -81,7 +81,7 @@ class CognitiveMapInterface(ABC):
         created_new_pc: bool -- indicates if a new place cell was created after vector navigation
         pc: PlaceCell        -- current location of the agent
         """
-        pass
+        ...
 
     def find_path(self, start: PlaceCell, goal: PlaceCell) -> Optional[list[PlaceCell]]:
         """ Returns a path in the graph from start to goal nodes"""
@@ -164,18 +164,20 @@ class CognitiveMapInterface(ABC):
         if self.debug:
             self.draw()
 
-    def draw(self, with_labels: bool = True):
+    def draw(self, with_labels: bool = True, colors: Optional[list[float]] = None):
         """ Plot the cognitive map
 
         arguments:
         with_labels: bool -- flag to include node indices as labels
         """
         pos = nx.get_node_attributes(self.node_network, 'pos')
+        kwargs = dict(node_color='#0065BD', node_size=120, edge_color='#4A4A4A80', width=2)
         if with_labels:
             node_list = list(self.node_network.nodes)
-            nx.draw(self.node_network, pos, labels={i: str(node_list.index(i)) for i in node_list})
-        else:
-            nx.draw(self.node_network, pos, node_color='#0065BD', node_size=120, edge_color='#4A4A4A80', width=2)
+            kwargs['labels'] = {i: str(node_list.index(i)) for i in node_list}
+        if colors:
+            kwargs['node_color'] = colors
+        nx.draw(self.node_network, pos, **kwargs)
         plt.show()
 
     def print_debug(self, *params):
@@ -360,7 +362,7 @@ class CognitiveMap(CognitiveMapInterface):
             self._connect_single_node(p)
             self.print_debug("connecting finished")
 
-    def track_vector_movement(self, pc_firing: list[float], created_new_pc: bool, pc: PlaceCell, lidar: list[float] = None, **kwargs):
+    def track_vector_movement(self, pc_firing: list[float], created_new_pc: bool, pc: PlaceCell, lidar: list[float]|None = None, **kwargs) -> Optional[PlaceCell]:
         """Keeps track of current place cell firing and creation of new place cells"""
 
         # get the currently active place cell
@@ -453,7 +455,7 @@ class LifelongCognitiveMap(CognitiveMapInterface):
         pc: PlaceCell                 -- current active node if it exists
         """
         exploration_phase = kwargs.get('exploration_phase', True)
-        pc_network = kwargs.get('pc_network', None)
+        pc_network: PlaceCellNetwork = kwargs.get('pc_network', None)
         if exploration_phase and created_new_pc:
             is_mergeable, mergeable_values = self.is_mergeable(pc)
             if is_mergeable:
