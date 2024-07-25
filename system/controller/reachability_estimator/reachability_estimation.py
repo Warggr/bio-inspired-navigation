@@ -28,7 +28,7 @@ except ImportError:
 Batch = networks.Batch
 
 def reachability_estimator_factory(
-    type: Literal['distance', 'neural_network', 'simulation', 'view_overlap'],
+    type: Literal['distance', 'neural_network', 'simulation', 'view_overlap', 'spikings'],
     *, debug: bool = False, **kwargs
 ) -> 'ReachabilityEstimator':
     """ Returns an instance of the reachability estimator interface
@@ -52,6 +52,8 @@ def reachability_estimator_factory(
         return SimulationReachabilityEstimator(debug=debug)
     elif type == 'view_overlap':
         return ViewOverlapReachabilityEstimator(debug=debug)
+    elif type == 'spikings':
+        return SpikingsReachabilityEstimator(**kwargs)
     else:
         raise ValueError("Reachability estimator type not defined: " + type)
 
@@ -170,6 +172,8 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         # self.print_debug('loaded %s' % weights_file)
 
         global_args = state_dict.get('global_args', {})
+        if type(global_args) is not dict: # fix for some networks being saved with Hyperparameters
+            global_args = {}
 
         # self.print_debug('global args:')
         # self.print_debug(tabulate.tabulate(global_args.items()))
