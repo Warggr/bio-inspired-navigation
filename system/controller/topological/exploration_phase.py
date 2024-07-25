@@ -97,7 +97,7 @@ def waypoint_movement(
 
 
 if __name__ == "__main__":
-    """ 
+    """
     Create a cognitive map by exploring the environment. 
     Agent follows a hard-coded path to explore the environment and build the cognitive map. 
     """

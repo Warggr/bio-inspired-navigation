@@ -237,7 +237,7 @@ if __name__ == "__main__":
     input_config = SampleConfig(grid_cell_spikings=True)
 
     re = reachability_estimator_factory(args.re_type, weights_file=re_weights_file, config=input_config)
-    pc_network = PlaceCellNetwork(from_data=True, reach_estimator=re)
+    pc_network = PlaceCellNetwork(from_data=True, reach_estimator=re, map_name=env_model)
     cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from=map_file, debug=('cogmap' in DEBUG))
     assert len(cognitive_map.node_network.nodes) > 1
     gc_network = setup_gc_network(1e-2)

@@ -39,7 +39,7 @@ class PlaceCell(PlaceInfo):
     both methods of this class should be moved to the reachability estimator
     """
 
-    def __init__(self, gc_connections, observations, coordinates: Vector2D):
+    def __init__(self, gc_connections, observations, coordinates: Vector2D, lidar: Optional['LidarReading'] = None):
         # explicitly not call super().__init__ because we'll provide data members ourselves (as aliases)
         self.gc_connections = gc_connections  # Connection matrix to grid cells of all modules; has form (n^2 x M)
         self.env_coordinates = coordinates  # Save x and y coordinate at moment of creation
@@ -48,7 +48,7 @@ class PlaceCell(PlaceInfo):
 
         self.observations = observations
         assert observations[0] is not None
-        self.lidar: Optional['LidarReading'] = None
+        self.lidar = lidar
 
     @staticmethod
     def from_data(data: PlaceInfo):
@@ -135,7 +135,7 @@ class PlaceCellNetwork:
     class TooManyPlaceCells(Exception):
         pass
 
-    def __init__(self, reach_estimator: 'ReachabilityEstimator', from_data=False, max_capacity=float('inf')):
+    def __init__(self, reach_estimator: 'ReachabilityEstimator', from_data=False, max_capacity=float('inf'), map_name=None):
         """ Place Cell Network  of the environment.
 
         arguments:
@@ -143,6 +143,7 @@ class PlaceCellNetwork:
         re_type     -- type of reachability estimator determining whether a new node gets created
                     see ReachabilityEstimator class for explanation of different types (default distance)
                     plus additional type "firing" that uses place cell spikings
+        map_name    -- the map name; only used when from_data is True so the PC network for the correct map is loaded
         """
         self.reach_estimator = reach_estimator
         self.place_cells: list[PlaceCell] = []
@@ -150,11 +151,11 @@ class PlaceCellNetwork:
 
         if from_data:
             # Load place cells if wanted
-            directory = os.path.join(get_path_top(), "data/pc_model")
+            directory = os.path.join(get_path_top(), "data", "pc_model")
 
-            gc_connections = np.load(directory + "/gc_connections.npy")
-            env_coordinates = np.load(directory + "/env_coordinates.npy")
-            observations = np.load(directory + "/observations.npy", allow_pickle=True)
+            gc_connections = np.load(directory + f"/gc_connections-{map_name}.npy")
+            env_coordinates = np.load(directory + f"/env_coordinates-{map_name}.npy")
+            observations = np.load(directory + f"/observations-{map_name}.npy", allow_pickle=True)
 
             for idx, gc_connection in enumerate(gc_connections):
                 pc = PlaceCell(gc_connection, observations[idx], env_coordinates[idx])
@@ -232,7 +233,7 @@ if __name__ == '__main__':
 
     re = reachability_estimator_factory("neural_network", weights_file=weights_file, env_model=env_model,
                                         with_spikings=True)
-    pc_network = PlaceCellNetwork(from_data=True, reach_estimator=re)
+    pc_network = PlaceCellNetwork(from_data=True, reach_estimator=re, map_name=env_model)
     cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from="after_exploration.gpickle")
     gc_network = setup_gc_network(1e-2)
     pod = PhaseOffsetDetectorNetwork(16, 9, 40)

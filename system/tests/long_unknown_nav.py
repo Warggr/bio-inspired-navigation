@@ -21,7 +21,7 @@ model = "combo"
 input_config = SampleConfig(grid_cell_spikings=True)
 visualize = True
 re = reachability_estimator_factory(re_type, weights_file=re_weights_file, config=input_config)
-pc_network = PlaceCellNetwork(from_data=True, reach_estimator=SpikingsReachabilityEstimator())
+pc_network = PlaceCellNetwork(from_data=True, reach_estimator=SpikingsReachabilityEstimator(), map_name=env_model)
 cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from=map_file, debug=False)
 gc_network = setup_gc_network(1e-2)
 pod = PhaseOffsetDetectorNetwork(16, 9, 40)
