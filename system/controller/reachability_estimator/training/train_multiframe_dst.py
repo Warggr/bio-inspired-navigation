@@ -139,7 +139,7 @@ def make_loss_function(position_loss_weight = 0.6, angle_loss_weight = 0.3) -> L
         loss = loss.sum()
         assert not loss.isnan()
         if return_details:
-            return loss, (loss_reachability, loss_position, loss_angle)
+            return loss, (loss_reachability, reachability @ loss_position / sum(reachability), reachability @ loss_angle / sum(reachability))
         else:
             return loss
     loss_function.hparams = { 'position_loss_weight': position_loss_weight, 'angle_loss_weight': angle_loss_weight }
@@ -152,6 +152,7 @@ def tensor_log(
     epoch: int,
     net: Model,
     loss_function: LossFunction,
+    print_confusion_matrix=False,
 ):
     """ Log accuracy, precision, recall and f1score for dataset in loader."""
     with torch.no_grad():
@@ -166,7 +167,8 @@ def tensor_log(
         loss_detail_names = ['Loss/Reachability', 'Loss/Position', 'Loss/Angle']
         log_scores = { key: 0 for key in list(metrics.keys()) + loss_detail_names }
 
-        true_pos, true_neg, false_pos, false_neg = (torch.tensor(0) for _ in range(4))
+        if print_confusion_matrix:
+            confusion_matrix = { key: torch.tensor(0) for key in [(True, True), (True, False), (False, True), (False, False)] }
 
         for idx, item in enumerate(loader):
             model_args, ground_truth = process_batch(item, train_device=train_device)
@@ -174,12 +176,13 @@ def tensor_log(
             prediction = net.get_prediction(*model_args)
             loss, loss_details = loss_function(prediction, ground_truth, return_details=True)
 
-            pred_r = prediction[0] > 0.5
-            true_r = ground_truth[0].bool()
-            true_pos += sum(pred_r & true_r)
-            false_pos += sum(pred_r & ~true_r)
-            false_neg += sum(~pred_r & true_r)
-            true_neg += sum(~pred_r & ~true_r)
+            if print_confusion_matrix:
+                pred_r = prediction[0] > 0.5
+                true_r = ground_truth[0].bool()
+                confusion_matrix[(True, True)] += sum(pred_r & true_r)
+                confusion_matrix[(True, False)] += sum(pred_r & ~true_r)
+                confusion_matrix[(False, True)] += sum(~pred_r & true_r)
+                confusion_matrix[(False, False)] += sum(~pred_r & ~true_r)
 
             loss_reachability, loss_position, loss_angle = loss_details
             reachability_prediction, position_prediction, angle_prediction = prediction
@@ -189,20 +192,21 @@ def tensor_log(
             for key, metric in metrics.items():
                 log_scores[key] += metric(reachability_prediction, reachability.int())
             for key, loss_detail in zip(loss_detail_names, loss_details):
-                log_scores[key] += loss_detail.sum().item()
+                log_scores[key] += loss_detail.item()
 
     metrics: dict[str, Any] = {}
     metrics["Loss/Validation"] = log_loss / len(loader)
     for key, value in log_scores.items():
         metrics[key] = value / len(loader)
 
-    print("Confusion matrix:")
-    print("Real: True\tFalse")
-    print("P:True", true_pos.item(), false_pos.item(), sep='\t')
-    print("P:False", false_neg.item(), true_neg.item(), sep='\t')
-    print("Metrics:")
-    for key, value in metrics.items():
-        print(key, ':', value)
+    if print_confusion_matrix:
+        print("Confusion matrix:")
+        print("Real: True\tFalse")
+        print("P:True", confusion_matrix[(True, True)].item(), confusion_matrix[(True, False)].item(), sep='\t')
+        print("P:False", confusion_matrix[(False, True)].item(), confusion_matrix[(False, False)].item(), sep='\t')
+        print("Metrics:")
+        for key, value in metrics.items():
+            print(key, ':', value)
 
     for key, value in metrics.items():
         writer.add_scalar(key, value, epoch)
@@ -370,7 +374,7 @@ def validate_func(net: Model, dataset: ReachabilityDataset, batch_size, train_de
                               num_workers=0)
 
     # log performance on the validation set
-    tensor_log(valid_loader, train_device, writer, epoch, net, loss_function)
+    tensor_log(valid_loader, train_device, writer, epoch, net, loss_function, print_confusion_matrix=True)
     writer.flush()
     print("Run info written to", writer.log_dir)
 
