@@ -1,0 +1,39 @@
+import sysconfig
+import os
+import pybind11
+
+extension = sysconfig.get_config_var('EXT_SUFFIX')
+flags = ['-O3', '-Wall', '-fPIC', '-shared', '-std=c++11']
+flags.append('-I ' + pybind11.get_include())
+flags.append('-I ' + sysconfig.get_paths()['include'])
+
+# TODO:
+# probably not all flags are required on Linux
+# On Windows, -fPIC and -l are ignored and -o is deprecated
+
+if os.name == 'posix':
+    flags += ["-static-libstdc++","-Wl,-rpath,$ORIGIN"]
+    compiler = 'g++'
+    #$(shell python3 -m pybind11 --includes) \
+else:
+    #compiler = r'c:\MinGW\bin\c++'
+    #compiler = r'c:\Users\Pierre/Downloads/llvm-mingw-20240726-msvcrt-x86_64/llvm-mingw-20240726-msvcrt-x86_64/bin/x86_64-w64-mingw32-c++.exe'
+    compiler = r'C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.40.33807\bin\HostX86\x86\cl.exe'
+    #flags += [f'-l {sysconfig.get_paths('stdlib')}']
+    flags += ['/MD', '/EHsc', r'/IC:\Users\Pierre\Downloads\llvm-mingw-20240726-msvcrt-x86_64\llvm-mingw-20240726-msvcrt-x86_64\include'] #
+
+# On Windows:
+# - Clang / any MinGW64 compiler does not recognize __declspec(dllimport)
+# - cl.exe does not find io.h
+
+flags = ' '.join(flags)
+
+all = ["math_utils", "map_utils"]
+
+rule all:
+    input: [f"{mod}_cpp{extension}" for mod in all]
+
+rule:
+    output: f"{{mod}}_cpp{extension}"
+    input: f"{{mod}}.cpp"
+    shell: f'"{compiler}" {flags} {{input}} -o {{output}}'

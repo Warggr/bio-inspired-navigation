@@ -13,3 +13,9 @@ def batched(iterable, n):
 # override is a type hinting decorator, so we don't need it to do anything useful
 def override(fun):
     return fun
+
+
+try:
+    from typing import Self
+except ImportError:
+    Self = 'Self'

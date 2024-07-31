@@ -1,6 +1,8 @@
 from .pybullet_environment import PybulletEnvironment
 from system.types import types
-from typing import Dict, Self, Optional
+from typing import Optional
+from system.polyfill import Self
+
 
 # TODO Pierre: this is not compatible with PybulletEnvironment as a context manager
 # nor with having a shared memory server

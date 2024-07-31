@@ -43,7 +43,7 @@ import pybullet_data
 import numpy as np
 import math
 import itertools
-from typing import List, Optional, Any, Tuple, Callable, Self
+from typing import Optional, Any, Callable
 from random import Random
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../.."))
@@ -59,6 +59,11 @@ try:
 except AttributeError:
     from system.polyfill import batched
     itertools.batched = batched
+
+try:
+    from typing import Self
+except ImportError:
+    Self = 'Self'
 
 def closest_subsegment(values: list[float]) -> tuple[int, int]:
     values = np.array(values)

@@ -1,2 +1,6 @@
 *.so
 *.dylib
+*.lib
+*.exp
+*.dll
+*.obj

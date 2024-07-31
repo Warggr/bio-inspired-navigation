@@ -3,7 +3,8 @@ from system.types import LidarReading
 import numpy as np
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
-from typing import Self, Optional
+from typing import Optional
+from system.polyfill import Self
 
 def img_reshape(img_array) -> types.Image:
     """ image stored in array form to image in correct shape for nn """

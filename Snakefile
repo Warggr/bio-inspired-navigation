@@ -1,4 +1,13 @@
 rule:
+	output: "data/data.zip"
+	shell: """
+	wget https://syncandshare.lrz.de/dl/fi2PvsoTCgHNwra5QXrEwP/data.zip -O data/data.zip.part --continue
+	mv data/data.zip.part data/data.zip
+	"""
+
+
+
+rule:
 	output: "system/controller/simulation/environment/{map}/maze_topview_binary.png"
 	input: "system/controller/simulation/environment/{map}/plane.urdf"
 	shell: "python scripts/create_occupancy_map.py {wildcards.map}"

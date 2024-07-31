@@ -1,8 +1,9 @@
 import math
 import numpy as np
-from typing import Tuple, Any, Self, Optional
+from typing import Any
 import sys, os
 from tqdm import tqdm
+from system.polyfill import Self
 
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
