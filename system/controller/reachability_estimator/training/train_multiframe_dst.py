@@ -8,26 +8,25 @@
 ***************************************************************************************
 '''
 
+import sys
+import os
 import torch
 import time
 from torchmetrics.classification import BinaryPrecision, BinaryRecall, BinaryAccuracy, BinaryF1Score
 from torch.utils.data import DataLoader, RandomSampler
 from torch.utils.tensorboard import SummaryWriter
-
-import sys
-import os
-from typing import Literal, Callable, Any
-
-if __name__ == "__main__":
-    sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
-
 from system.controller.reachability_estimator.networks import Model
 from system.controller.reachability_estimator.ReachabilityDataset import ReachabilityDataset, SampleConfig
 from system.controller.reachability_estimator.training.utils import load_model, DATA_STORAGE_FOLDER
 from system.controller.reachability_estimator.types import Prediction
+from typing import Literal, Callable, Any
+
+TrainDevice = Literal['cpu', 'cuda']
+TRAIN_DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+print('Using device', TRAIN_DEVICE, file=sys.stderr)
 
 def _load_weights(model_file, nets: Model, **kwargs) -> int:
-    state, epoch = load_model( model_file, load_to_cpu=True, **kwargs)
+    state, epoch = load_model(model_file, load_to_cpu=True, **kwargs)
 
     for name, net in nets.nets.items():
         if name == "img_encoder" and 'conv1.weight' in state['nets'][name].keys(): # Backwards compatibility
@@ -36,6 +35,10 @@ def _load_weights(model_file, nets: Model, **kwargs) -> int:
                     state['nets'][name][f'layers.{2*i}.{value_type}'] = state['nets'][name][f'conv{i+1}.{value_type}']
                     del state['nets'][name][f'conv{i+1}.{value_type}']
         net.load_state_dict(state['nets'][name])
+        for net_state in net.state.values():
+            for k, v in net_state.items():
+                if torch.is_tensor(v):
+                    net_state[k] = v.to(TRAIN_DEVICE)
 
     for name, opt in nets.optimizers.items():
         opt.load_state_dict(state['optims'][name])
@@ -43,7 +46,7 @@ def _load_weights(model_file, nets: Model, **kwargs) -> int:
         for opt_state in opt.state.values():
             for k, v in opt_state.items():
                 if torch.is_tensor(v):
-                    opt_state[k] = v.to(device='cpu')
+                    opt_state[k] = v.to(device=TRAIN_DEVICE)
     return epoch
 
 
@@ -69,16 +72,16 @@ def run_test_model(dataset, filename = "trained_model_new.50"):
     test_recall = 0
     test_f1 = 0
 
-    accuracy = BinaryAccuracy()
-    precision = BinaryPrecision()
-    recall = BinaryRecall()
-    f1 = BinaryF1Score()
+    accuracy = BinaryAccuracy().to(TRAIN_DEVICE)
+    precision = BinaryPrecision().to(TRAIN_DEVICE)
+    recall = BinaryRecall().to(TRAIN_DEVICE)
+    f1 = BinaryF1Score().to(TRAIN_DEVICE)
     for idx, item in enumerate(loader):
         print(f"Processing batch {idx} out of {n_samples // reach_estimator.batch_size}")
         batch_src_imgs, batch_dst_imgs, batch_reachability, batch_transformation = item
-        src_img = batch_src_imgs.to(device="cpu", non_blocking=True)
-        dst_imgs = batch_dst_imgs.to(device="cpu", non_blocking=True)
-        r = batch_reachability.to(device="cpu", non_blocking=True)
+        src_img = batch_src_imgs.to(device=TRAIN_DEVICE, non_blocking=True)
+        dst_imgs = batch_dst_imgs.to(device=TRAIN_DEVICE, non_blocking=True)
+        r = batch_reachability.to(device=TRAIN_DEVICE, non_blocking=True)
 
         src_batch = src_img.float()
         dst_batch = dst_imgs.float()
@@ -105,12 +108,11 @@ def run_test_model(dataset, filename = "trained_model_new.50"):
     writer.add_scalar("fscore/Testing", test_f1, 1)
 
 Batch = Any # TODO
-TrainDevice = Literal['cpu', 'gpu'] # TODO (Pierre): not sure about how exactly 'gpu' is called
 
-def process_batch(item: Batch, train_device: TrainDevice):
+def process_batch(item: Batch):
     model_args, ground_truth = item
-    model_args = [ data.to(device=train_device, non_blocking=True) for data in model_args ]
-    ground_truth = [ data.to(device=train_device, non_blocking=True) for data in ground_truth ]
+    model_args = [data.to(device=TRAIN_DEVICE, non_blocking=True) for data in model_args ]
+    ground_truth = [data.to(device=TRAIN_DEVICE, non_blocking=True) for data in ground_truth ]
     return model_args, ground_truth
 
 LossFunction = Callable[[Prediction, Prediction], torch.Tensor]
@@ -147,7 +149,6 @@ def make_loss_function(position_loss_weight = 0.6, angle_loss_weight = 0.3) -> L
 
 def tensor_log(
     loader: DataLoader,
-    train_device: TrainDevice,
     writer: SummaryWriter,
     epoch: int,
     net: Model,
@@ -159,10 +160,10 @@ def tensor_log(
         log_loss = 0
 
         metrics = {
-            'Metrics/Accuracy': BinaryAccuracy(),
-            'Metrics/Precision': BinaryPrecision(),
-            'Metrics/Recall': BinaryRecall(),
-            'Metrics/Fscore': BinaryF1Score(),
+            'Metrics/Accuracy': BinaryAccuracy().to(TRAIN_DEVICE),
+            'Metrics/Precision': BinaryPrecision().to(TRAIN_DEVICE),
+            'Metrics/Recall': BinaryRecall().to(TRAIN_DEVICE),
+            'Metrics/Fscore': BinaryF1Score().to(TRAIN_DEVICE),
         }
         loss_detail_names = ['Loss/Reachability', 'Loss/Position', 'Loss/Angle']
         log_scores = { key: 0 for key in list(metrics.keys()) + loss_detail_names }
@@ -171,7 +172,7 @@ def tensor_log(
             confusion_matrix = { key: torch.tensor(0) for key in [(True, True), (True, False), (False, True), (False, False)] }
 
         for idx, item in enumerate(loader):
-            model_args, ground_truth = process_batch(item, train_device=train_device)
+            model_args, ground_truth = process_batch(item)
 
             prediction = net.get_prediction(*model_args)
             loss, loss_details = loss_function(prediction, ground_truth, return_details=True)
@@ -226,7 +227,6 @@ class Hyperparameters:
 
 def train_multiframedst(
     nets: Model, dataset: ReachabilityDataset,
-    train_device: TrainDevice,
     resume: bool = False,
     hyperparams: Hyperparameters = Hyperparameters(),
     n_dataset_worker = 0,
@@ -276,6 +276,8 @@ def train_multiframedst(
         for name, opt in nets.optimizers.items()
     }
 
+    nets.to(TRAIN_DEVICE)
+
     n_samples = hyperparams.samples_per_epoch
 
     # Splitting the Dataset into Train/Validation:
@@ -304,7 +306,7 @@ def train_multiframedst(
             for _, opt in nets.optimizers.items():
                 opt.zero_grad()
 
-            model_args, ground_truth = process_batch(item, train_device=train_device)
+            model_args, ground_truth = process_batch(item)
 
             prediction = nets.get_prediction(*model_args)
             loss = loss_function(prediction, ground_truth)
@@ -341,11 +343,11 @@ def train_multiframedst(
                                   num_workers=n_dataset_worker)
 
         # log performance on the validation set
-        latest_metrics = tensor_log(valid_loader, train_device, writer, epoch, nets, loss_function)
+        latest_metrics = tensor_log(valid_loader, writer, epoch, nets, loss_function)
 
     if latest_metrics is None:
         valid_loader = DataLoader(valid_dataset, batch_size=hyperparams.batch_size, num_workers=n_dataset_worker)
-        latest_metrics = tensor_log(valid_loader, train_device, writer, hyperparams.max_epochs, nets, loss_function)
+        latest_metrics = tensor_log(valid_loader, writer, hyperparams.max_epochs, nets, loss_function)
     nets_hparams = { 'image_encoder': nets.image_encoder, 'with_conv_layer': nets.image_encoder == 'conv' } # with_conv_layer is for backwards compatibility
     hparams = vars(nets.sample_config) | nets_hparams | vars(hyperparams) | getattr(loss_function, 'hparams', {})
     latest_metrics = { "Final/"+key: value for key, value in latest_metrics.items() }
@@ -353,7 +355,7 @@ def train_multiframedst(
     writer.add_hparams(hparams, latest_metrics)
 
 
-def validate_func(net: Model, dataset: ReachabilityDataset, batch_size, train_device,
+def validate_func(net: Model, dataset: ReachabilityDataset, batch_size,
     loss_function: LossFunction,
     model_suffix: str,
     model_filename = "reachability_network",
@@ -374,7 +376,7 @@ def validate_func(net: Model, dataset: ReachabilityDataset, batch_size, train_de
                               num_workers=0)
 
     # log performance on the validation set
-    tensor_log(valid_loader, train_device, writer, epoch, net, loss_function, print_confusion_matrix=True)
+    tensor_log(valid_loader, writer, epoch, net, loss_function, print_confusion_matrix=True)
     writer.flush()
     print("Run info written to", writer.log_dir)
 
@@ -456,11 +458,10 @@ if __name__ == '__main__':
     # Defining the NN and optimizers
     hyperparameters = Hyperparameters(batch_size=64)
 
-    nets = Model.create_from_config(backbone, config, image_encoder=args.image_encoder, **{ key: getattr(args, key) for key in ['hidden_fc_layers', 'dropout'] if getattr(args, key) is not None })
+    nets = Model.create_from_config(backbone, config, image_encoder=args.image_encoder, **{key: getattr(args, key) for key in ['hidden_fc_layers', 'dropout'] if getattr(args, key) is not None})
 
     loss_function = make_loss_function(position_loss_weight=0.6, angle_loss_weight=0.3)
     global_args = {
-        'train_device': "cpu",
         'loss_function': loss_function,
         'model_filename': model_basename,
         'model_suffix': suffix,

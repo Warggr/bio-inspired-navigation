@@ -214,6 +214,10 @@ class CNN(Model):
 
         return reachability_prediction, position_prediction, angle_prediction
 
+    def to(self, device):
+        for net in self.nets.values():
+            net.to(device)
+
 def initialize_regressors(nets) -> dict[str, NNModuleWithOptimizer]:
     nets["angle_regression"] = NNModuleWithOptimizer( AngleRegression(init_scale=1.0, no_weight_init=False))
     nets["position_regression"] = NNModuleWithOptimizer( PositionRegression(init_scale=1.0, no_weight_init=False))
@@ -386,9 +390,9 @@ class ReachabilityRegression(nn.Module):
 
     def forward(self, x):
         x = self.fc(x)
-        assert not np.isnan(sum(x.detach().numpy()))
+        assert not torch.any(x.isnan())
         x = self.sigmoid(x)
-        assert not np.isnan(sum(x.detach().numpy()))
+        assert not torch.any(x.isnan())
         return x.squeeze(1)
 
 
