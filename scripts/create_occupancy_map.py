@@ -4,6 +4,11 @@ from PIL import Image, ImageDraw, ImageOps
 import numpy as np
 import sys, os
 
+
+def parse_coords(coords: str):
+    return tuple(float(i) for i in coords.split(" "))
+
+
 img_root = "system/controller/simulation/environment/"
 folder = sys.argv[1]
 
@@ -14,29 +19,26 @@ root = tree.getroot()
 links = [el for el in root if el.tag == "link"]
 joints = [el for el in root if el.tag == "joint"]
 
-children = set()
+children = dict()
 for joint in joints:
     assert joint.find("parent").attrib["link"] == "planeLink"
-    assert joint.find("origin").attrib["xyz"] == "0 0 0"
-    children.add(joint.find("child").attrib["link"])
+    origin = parse_coords(joint.find("origin").attrib["xyz"])
+    children[joint.find("child").attrib["link"]] = origin
 
 starts = np.zeros((len(links), 2), dtype=float)
 stops = np.zeros((len(links), 2), dtype=float)
 
-def parse_coords(coords: str):
-    return np.array([float(i) for i in coords.split(" ")])
-
 for i, link in enumerate(links):
     if link.attrib["name"] == "planeLink":
         continue
-    else:
-        assert link.attrib["name"] in children
+    origin = children[link.attrib["name"]]
     link = link.find("collision")
-    origin = link.find("origin").attrib["xyz"]
+    obj_origin = link.find("origin").attrib["xyz"]
     size = link.find("geometry").find("box").attrib["size"]
-    origin, size = parse_coords(origin), parse_coords(size)
-    assert origin[2] == 0 and size[2] == 1
-    origin, size = origin[:2], size[:2]
+    obj_origin, size = parse_coords(obj_origin), parse_coords(size)
+    origin = np.array(obj_origin) + np.array(origin)
+    #assert origin[2] == 0 and size[2] == 1, (origin, size)
+    origin, size = origin[:2], np.array(size[:2])
     starts[i] = origin - size / 2
     stops[i] = origin + size / 2
 
