@@ -335,7 +335,7 @@ def train_multiframedst(
         if (save_interval is not None and epoch % save_interval == 0) or epoch == hyperparams.max_epochs:
             print('saving model...')
             writer.flush()
-            nets.save(epoch, hyperparams, model_file)
+            nets.save(epoch, model_file)
 
         # Validation
         valid_loader = DataLoader(valid_dataset,

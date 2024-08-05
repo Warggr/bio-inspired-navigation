@@ -101,6 +101,10 @@ class ReachabilityEstimator(ReachabilityController):
         """ Determine whether two nodes are close to each other sufficiently to consider them the same node """
         return self.reachability_factor(p, q) >= self.threshold_same
 
+    def is_same_batch(self, p: PlaceInfo, qs: Iterable[PlaceInfo]) -> Batch[bool]:
+        """ Batch version of is_same. Implementations that can do this efficiently (e.g. NetworkRE) override this. """
+        return [self.is_same(p, q) for q in qs]
+
     def get_connectivity_probability(self, reachability_factor):
         """
         Computes connectivity probability based on reachability factor.

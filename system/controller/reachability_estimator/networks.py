@@ -21,7 +21,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from torchmetrics import MeanSquaredError
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, Literal, Type
+from typing import Callable, Literal, Type, Any
 from itertools import pairwise
 
 from .types import Batch, Prediction, transpose_image
@@ -61,6 +61,11 @@ class Model(ABC):
     ) -> Batch[Prediction]:
         ...
 
+    @abstractmethod
+    def get_args(self) -> dict[str, Any]:
+        """ Any arguments that define the Model. With these arguments, the Model can be retrieved from a snapshot. """
+        ...
+
     @staticmethod
     def create_from_config(backbone_classname: str, *model_args, **model_kwargs) -> 'Model':
         backbone_classes: dict[str, Type[Model]] = {
@@ -68,11 +73,12 @@ class Model(ABC):
         }
         return backbone_classes[backbone_classname](*model_args, **model_kwargs)
 
-    def save(self, epoch, global_args, model_file):
+    def save(self, epoch, model_file, global_args: dict[str, Any] = {}):
+        args = self.get_args().update(global_args)
         """ save current state of the model """
         state = {
             'epoch': epoch,
-            'global_args': global_args,
+            'global_args': args,
             'optims': {
                 name: opt.state_dict() for name, opt in self.optimizers.items()
             },
@@ -147,6 +153,13 @@ class CNN(Model):
         )
 
         super().__init__(nets)
+
+    def get_args(self) -> dict[str, Any]:
+        return {
+            'backbone_classname': 'convolutional',
+            'with_conv_layer': self.image_encoder == 'conv',
+            # TODO: #'hidden_fc_layers': 
+        }
 
     def load_pretrained_model(self):
         from system.controller.reachability_estimator.autoencoders import ImageEncoder
