@@ -171,10 +171,12 @@ class CognitiveMapInterface(ABC):
         with_labels: bool -- flag to include node indices as labels
         """
         pos = nx.get_node_attributes(self.node_network, 'pos')
-        kwargs = dict(node_color='#0065BD', node_size=120, edge_color='#4A4A4A80', width=2)
+        kwargs = {}
         if with_labels:
             node_list = list(self.node_network.nodes)
             kwargs['labels'] = {i: str(node_list.index(i)) for i in node_list}
+        else:
+            kwargs.update(dict(node_color='#0065BD', node_size=120, edge_color='#4A4A4A80', width=2))
         if colors:
             kwargs['node_color'] = colors
         nx.draw(self.node_network, pos, **kwargs)

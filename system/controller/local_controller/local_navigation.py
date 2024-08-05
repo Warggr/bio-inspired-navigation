@@ -128,8 +128,8 @@ class GcCompass(Compass[Spikings]):
 class PodGcCompass(GcCompass):
     arrival_threshold = 0.5
 
-    def __init__(self, pod_network: Optional['PhaseOffsetDetectorNetwork'] = None, *args, **kwargs):
-        if pod_network is None:  # TODO Pierre this is ugly
+    def __init__(self, pod_network: Optional[PhaseOffsetDetectorNetwork] = None, *args, **kwargs):
+        if pod_network is None:  # TODO (Pierre): this is ugly
             pod_network = PhaseOffsetDetectorNetwork(16, 9, 40)
         super().__init__(*args, **kwargs)
         self.pod_network = pod_network
@@ -147,12 +147,11 @@ class LinearLookaheadGcCompass(GcCompass):
 
     def calculate_goal_vector(self):
         goal_vector, goal_info = perform_look_ahead_2xnr(self.gc_network, self.arena_size)
-        print(goal_info)
         return goal_vector
 
 
 class ComboGcCompass(GcCompass):
-    def __init__(self, gc_network: GridCellNetwork, pod_network: Optional['PhaseOffsetDetectorNetwork'] = None, *args, **kwargs):
+    def __init__(self, gc_network: GridCellNetwork, pod_network: Optional[PhaseOffsetDetectorNetwork] = None, *args, **kwargs):
         super().__init__(gc_network, *args, **kwargs)
         # self.gc_network = gc_network # already done by the super().__init__
         compass = PodGcCompass(pod_network, gc_network, *args, **kwargs)
@@ -368,7 +367,7 @@ def vector_navigation(env: PybulletEnvironment, compass: Compass, gc_network: Op
         robot.navigation_hooks.remove(on_nav_step)
 
     if not last_pc and not exploration_phase and pc_network:
-        pc_network.create_new_pc(gc_network.consolidate_gc_spiking(), observations, robot.position)
+        pc_network.create_new_pc(PlaceInfo(spikings=gc_network.consolidate_gc_spiking(), img=observations[-1], pos=robot.position, angle=NotImplemented, lidar=robot.env.lidar()[0]))
         last_pc = pc_network.place_cells[-1]
     return goal_reached, last_pc
 

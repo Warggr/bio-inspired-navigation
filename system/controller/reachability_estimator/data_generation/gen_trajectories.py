@@ -244,7 +244,7 @@ if __name__ == "__main__":
         filename = "trajectories"
         if args.env_model != "Savinov_val3":
             filename = args.env_model + "." + filename
-        extension = getattr(args, 'extension', ".hd5")
+        extension = ".hd5" if args.extension is None else args.extension
         filepath = os.path.join(get_path(), "data", "trajectories", filename + extension)
 
     assert not (args.no_display and args.only_display)

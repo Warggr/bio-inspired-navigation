@@ -127,15 +127,14 @@ class TopologicalNavigation:
         i = 0
         curr_path_length = 0
         while i + 1 < len(path) and curr_path_length < self.path_length_limit:
-            goal = path[i + 1]
-            self.compass.reset_goal(new_goal=self.compass.parse(goal))
-            goal_spiking = path[i + 1].gc_connections
+            self.compass.reset_goal(new_goal=self.compass.parse(path[i+1]))
+            goal_spiking = path[i+1].gc_connections
             if gc_network:
                 gc_network.set_as_target_state(goal_spiking)
             success, pc = vector_navigation(env, self.compass, gc_network=gc_network,
                                          controller=controller, exploration_phase=False, pc_network=self.pc_network,
                                          cognitive_map=self.cognitive_map, plot_it=plotting,
-                                         step_limit=self.step_limit, goal_pos=goal.pos, *nav_args, **nav_kwargs)
+                                         step_limit=self.step_limit, goal_pos=path[i+1].pos, *nav_args, **nav_kwargs)
             self.cognitive_map.postprocess_vector_navigation(node_p=path[i], node_q=path[i + 1],
                                                              observation_p=last_pc, observation_q=pc, success=success)
             print('Vector navigation success:', success)

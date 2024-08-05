@@ -31,11 +31,8 @@ def reachability_estimator_factory(
     type: Literal['distance', 'neural_network', 'simulation', 'view_overlap', 'spikings'],
     *, debug: bool = False, **kwargs
 ) -> 'ReachabilityEstimator':
-    """ Returns an instance of the reachability estimator interface
-
+    """
     arguments:
-    type: str -- type of the reachability estimator, possible values:
-                 ['distance' (default), 'neural_network', 'simulation', 'view_overlap']
     kwargs:
         device: str         -- type of the computations, possible values: ['cpu' (default), 'gpu']
         weights_file: str   -- filename of the weights for network-based estimator if exists
@@ -51,7 +48,7 @@ def reachability_estimator_factory(
     elif type == 'simulation':
         return SimulationReachabilityEstimator(debug=debug)
     elif type == 'view_overlap':
-        return ViewOverlapReachabilityEstimator(debug=debug)
+        return ViewOverlapReachabilityEstimator(debug=debug, env_model=kwargs['env_model'])
     elif type == 'spikings':
         return SpikingsReachabilityEstimator(**kwargs)
     else:
@@ -117,16 +114,17 @@ class DistanceReachabilityEstimator(ReachabilityEstimator):
 
     def __init__(self, debug=False):
         """ Creates a reachability estimator that judges reachability between two locations based on the distance
-            
+
         arguments:
         debug  -- is in debug mode
         """
         super().__init__(threshold_same=-self.THRESHOLD_SAME, threshold_reachable=-0.75, debug=debug)
 
     @override
-    def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo, path_l=None) -> bool:
+    def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo, path_l=None) -> float:
         """ Returns distance between start and goal as an estimation of reachability"""
-        return -np.linalg.norm(start.pos - goal.pos) # Since a bigger factor means better reachability, we use negative distance
+        # Since a bigger factor means better reachability, we use negative distance
+        return -np.linalg.norm(np.array(start.pos) - np.array(goal.pos))
 
 
 WEIGHTS_FOLDER = os.path.join(os.path.dirname(__file__), "data/models")
@@ -139,7 +137,15 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
     """ Creates a network-based reachability estimator that judges reachability
         between two locations based on observations and grid cell spikings """
 
-    def __init__(self, backbone: networks.Model, device: str = 'cpu', debug: bool = True, batch_size: int = 64, config: SampleConfig = SampleConfig()):
+    def __init__(
+        self,
+        backbone: networks.Model,
+        device: str = 'cpu',
+        debug: bool = True,
+        batch_size: int = 64,
+        config: SampleConfig = SampleConfig(),
+        **_kwargs, # kwargs ignored for compatibility with reachability_estimator_factory
+    ):
         """
         arguments:
         backbone: str       -- neural network used as a backbone
@@ -230,8 +236,8 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         )
         return np.array([args], dtype=cls.dtype)
 
-    def is_same_batch(self, p: PlaceInfo, q: Iterable[PlaceInfo]) -> Batch[bool]:
-        batches: list[Batch['NetworkReachabilityEstimator.dtype']] = [self.to_batch(p, qi) for qi in q]
+    def is_same_batch(self, p: PlaceInfo, qs: Iterable[PlaceInfo]) -> Batch[bool]:
+        batches: list[Batch['NetworkReachabilityEstimator.dtype']] = [self.to_batch(p, q) for q in qs]
         if batches == []: return []
         args_batch = np.concatenate(batches, axis=0)
         return self.reachability_factor_batch(args_batch) >= self.threshold_same
@@ -384,7 +390,8 @@ class ViewOverlapReachabilityEstimator(ReachabilityEstimator):
 
 
 class SpikingsReachabilityEstimator(ReachabilityEstimator):
-    def __init__(self, axis=None):
+    def __init__(self, axis=None, debug=False):
+        super().__init__(threshold_same=0.9, threshold_reachable=0.4, debug=debug)
         self.axis = axis
 
     def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo) -> float:

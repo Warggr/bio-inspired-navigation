@@ -37,15 +37,17 @@ class LocalController(ABC):
             hook(new_goal, robot)
 
     def step(self, goal_vector: Vector2D, robot: 'Robot'):
+        all_kwargs = {}
         for hook in self.transform_goal_vector:
             match hook(goal_vector, robot):
                 case (goal_vector, kwargs):
                     pass
                 case goal_vector:
                     kwargs = {}
+            all_kwargs = { **all_kwargs, **kwargs } # TODO Pierre: this is ugly
 
         robot.env.add_debug_line(robot.position, np.array(robot.position) + goal_vector, color=(0, 0, 1), width=3)
-        robot.navigation_step(goal_vector, **kwargs)
+        robot.navigation_step(goal_vector, **all_kwargs)
 
 
 class FajenObstacleAvoidance:

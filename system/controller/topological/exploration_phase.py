@@ -105,7 +105,7 @@ if __name__ == "__main__":
     from system.controller.reachability_estimator.ReachabilityDataset import SampleConfig
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("env_model", default="Savinov_val3", choices=["Savinov_val3", "linear_sunburst_map"])
+    parser.add_argument("env_model", default="Savinov_val3", choices=["Savinov_val3", "linear_sunburst"])
     parser.add_argument('-n', dest='desired_nb_of_place_cells', help='desired number of place cells', type=int, default=30)
     parser.add_argument('-t', '--threshold-same-hint', help='The first value that will be tried as the sameness threshold', type=float)
     parser.add_argument('--re', dest='re_type', default='neural_network', choices=['neural_network', 'view_overlap'])
@@ -121,7 +121,7 @@ if __name__ == "__main__":
             [-8.5, -4], [-7.5, -3.5], [1.5, -3.5], [-6, -2.5]
         ]
         cognitive_map_filename = "after_exploration.gpickle"
-    elif args.env_model == "linear_sunburst_map":
+    elif args.env_model == "linear_sunburst":
         goals = [
              [5.5, 4.5],
              [1.5, 4.5],
