@@ -201,13 +201,15 @@ class TurnToGoal:
         try:
             for _ in range(40): # 40 is, empirically, the number of steps needed to get away from an obstacle
                 robot.navigation_step(-np.array(robot.heading_vector()), allow_backwards=True)
+            goal_vector += 0.16 * np.array(robot.heading_vector()) # 0.16 is, also empirically, the distance it goes during that time
             robot.turn_to_goal(goal_vector, tolerance=self.tolerance, report_stuck=True)
             return
         except RobotStuck:
             pass
         try:
             for _ in range(40):
-                robot.navigation_step(+np.array(robot.heading_vector()), allow_backwards=True)
+                robot.navigation_step(+np.array(robot.heading_vector()))
+            goal_vector -= 0.16 * np.array(robot.heading_vector())
             robot.turn_to_goal(goal_vector, tolerance=self.tolerance, report_stuck=True)
             return
         except RobotStuck:
