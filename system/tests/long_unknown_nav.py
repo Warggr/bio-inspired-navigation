@@ -1,6 +1,8 @@
 import os
 import sys
 
+from system.bio_model.grid_cell_model import GridCellNetwork
+
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from system.bio_model.cognitive_map import LifelongCognitiveMap
@@ -23,7 +25,7 @@ visualize = True
 re = reachability_estimator_factory(re_type, weights_file=re_weights_file, config=input_config)
 pc_network = PlaceCellNetwork(from_data=True, reach_estimator=SpikingsReachabilityEstimator(), map_name=env_model)
 cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from=map_file, debug=False)
-gc_network = setup_gc_network(1e-2)
+gc_network = GridCellNetwork(dt=1e-2, from_data=True)
 pod = PhaseOffsetDetectorNetwork(16, 9, 40)
 #compass = ComboGcCompass(gc_network, pod)
 #compass = LinearLookaheadGcCompass(arena_size=15, gc_network=gc_network)

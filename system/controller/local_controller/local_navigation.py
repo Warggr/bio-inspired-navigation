@@ -227,17 +227,15 @@ def create_gc_spiking(start: Vector2D, goal: Vector2D, gc_network_at_start: Opti
     if plotting: plot.plotTrajectoryInEnvironment(env_model="plane", xy_coordinates=history)
     return gc_network.consolidate_gc_spiking(virtual=True)
 
+from deprecation import deprecated
 
+@deprecated()
 def setup_gc_network(dt) -> GridCellNetwork:
     """ Initialize the grid cell newtork """
     # Grid-Cell Initialization
-    M = 6  # 6 for default, number of modules
-    n = 40  # 40 for default, size of sheet -> nr of neurons is squared
-    gmin = 0.2  # 0.2 for default, maximum arena size, 0.5 -> ~10m | 0.05 -> ~105m
-    gmax = 2.4  # 2.4 for default, determines resolution, dont pick to high (>2.4 at speed = 0.5m/s)
 
     # note that if gc modules are created from data n and M are overwritten
-    gc_network = GridCellNetwork(n, M, dt, gmin, gmax=gmax, from_data=True)
+    gc_network = GridCellNetwork(dt, from_data=True)
 
     return gc_network
 

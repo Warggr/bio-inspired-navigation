@@ -10,7 +10,7 @@
 from system.bio_model.grid_cell_model import GridCellNetwork
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.controller.simulation.pybullet_environment import PybulletEnvironment
-from system.controller.local_controller.local_navigation import vector_navigation, setup_gc_network
+from system.controller.local_controller.local_navigation import vector_navigation
 from system.controller.local_controller.local_controller import LocalController, controller_rules
 from system.controller.local_controller.compass import AnalyticalCompass
 from system.bio_model.place_cell_model import PlaceCellNetwork
@@ -22,7 +22,6 @@ import os
 PLOTTING = os.getenv('PLOTTING', '').split('&')
 plotting = 'exploration' in PLOTTING  # if True: plot paths
 debug = True  # if True: print debug output
-dt = 1e-2
 
 
 def print_debug(*params):
@@ -72,7 +71,7 @@ def waypoint_movement(
     )
     #controller.transform_goal_vector.append(controller_rules.TurnWhenNecessary())
 
-    with PybulletEnvironment(env_model, dt=dt, build_data_set=True, start=path[0], visualize=visualize) as env:
+    with PybulletEnvironment(env_model, dt=gc_network.dt, build_data_set=True, start=path[0], visualize=visualize) as env:
 
         from tqdm import tqdm
 
@@ -153,7 +152,7 @@ if __name__ == "__main__":
     else:
         raise ValueError(f"Unsupported map: {args.env_model}")
 
-    gc_network = setup_gc_network(dt)
+    gc_network = GridCellNetwork(from_data=False)
     re = reachability_estimator_factory(args.re_type, weights_file=re_weights_file, debug=debug, config=SampleConfig(grid_cell_spikings=True))
 
     too_strict_threshold = 1.4
@@ -187,5 +186,5 @@ if __name__ == "__main__":
 
     if plotting:
         cognitive_map.draw()
-        with PybulletEnvironment(args.env_model, dt=dt, build_data_set=True) as env:
+        with PybulletEnvironment(args.env_model, dt=gc_network.dt, build_data_set=True) as env:
             plot.plotTrajectoryInEnvironment(env, goal=False, cognitive_map=cognitive_map, trajectory=False)

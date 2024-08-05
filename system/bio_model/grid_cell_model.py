@@ -154,7 +154,16 @@ class GridCellModule:
 class GridCellNetwork:
     """GridCellNetwork holds all Grid Cell Modules"""
 
-    def __init__(self, n, M, dt, gmin, gmax=None, from_data=False, gc_name="gc_model_6"):
+    def __init__(
+        self,
+        dt=1e-2,
+        M = 6,  # 6 for default, number of modules
+        n = 40,  # 40 for default, size of sheet -> nr of neurons is squared
+        gmin = 0.2,  # 0.2 for default, maximum arena size, 0.5 -> ~10m | 0.05 -> ~105m
+        gmax: float|None = 2.4,  # 2.4 for default, determines resolution, dont pick to high (>2.4 at speed = 0.5m/s)
+        from_data=False,
+        gc_name="gc_model_6"
+    ):
 
         self.gc_modules: list[GridCellModule] = []
         self.dt = dt
