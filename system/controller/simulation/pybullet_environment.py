@@ -94,7 +94,7 @@ class PybulletEnvironment:
     ROBOT_Z_POS = 0.02 # see p3dx model
 
     def __init__(self,
-        env_model: str = "Savinov_val3",
+        env_model: types.AllowedMapName = "Savinov_val3",
         dt: float = 1e-2,
         visualize=False,
         realtime=False,
@@ -169,6 +169,9 @@ class PybulletEnvironment:
         elif "obstacle" in env_model:
             plane = resource_path(self.env_model, "plane.urdf")
             self.planeID = p.loadURDF(plane)
+            if env_model == "obstacle_map_0":
+                self.switch_variant(variant)
+
         elif env_model == "linear_sunburst":
             base_position = [5.5, 0.55]
             if variant == None:
@@ -234,6 +237,14 @@ class PybulletEnvironment:
             self.robot.env = new_env
             self.robot.ID = new_robot.ID
         return new_env
+
+    def switch_variant(self, new_variant):
+        if self.env_model == 'obstacle_map_0':
+            if self.mazeID:
+                p.removeBody(self.mazeID[0])
+            distance = 0 if new_variant is None else float(new_variant)
+            distance = distance * np.array([1, -1, 0])
+            self.mazeID = [p.loadURDF(resource_path(self.env_model, 'moveable_wall.urdf'), basePosition=distance)]
 
     @property
     def dimensions(self):
@@ -857,27 +868,19 @@ class DatasetCollector:
 all_possible_textures = [ file for file in sorted(os.listdir(WALL_TEXTURE_PATH)) if file[-4:] == '.jpg' ]
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description=
     """
     Test keyboard movement an plotting in different environments. 
     Press arrow keys to move, SPACE to visualize egocentric rays with obstacle detection and BACKSPACE to exit.
-
-    Available environments:
-    - plane
-    - obstacle_map_0
-    - obstacle_map_1
-    - obstacle_map_2
-    - obstacle_map_3
-    - Savinov_test7
-    - Savinov_val2
-    - Savinov_val3
     """
-    try:
-        env_model = sys.argv[1]
-    except IndexError:
-        env_model = "Savinov_val3"
+    )
+    parser.add_argument('env_model', choices=AllowedMapName.options, default='Savinov_val3')
+    parser.add_argument('--env-variant', '--variant', help='Environment model variant')
+    args = parser.parse_args()
 
     random = Random(0)
-    with PybulletEnvironment(env_model, visualize=True, realtime=True, start=(-0.5, 0),
+    with PybulletEnvironment(args.env_model, variant=args.env_variant, visualize=True, realtime=True, start=(-0.5, 0),
         wall_kwargs={
             'textures': lambda i: random.choice(all_possible_textures)
         }

@@ -89,7 +89,7 @@ def plotTrajectory(xy_coordinates):
 
 
 def plotTrajectoryInEnvironment(env: Optional['PybulletEnvironment'] = None, title="", xy_coordinates=None, env_model=None, cognitive_map=None, path=None,
-                                goal=None, trajectory=True, start=None, end=None):
+                                goal=None, trajectory=True, start=None, end=None, show=True):
     if xy_coordinates is None and env is not None and env.robot is not None:
         xy_coordinates = env.robot.data_collector.xy_coordinates
     if not env_model:
@@ -136,7 +136,8 @@ def plotTrajectoryInEnvironment(env: Optional['PybulletEnvironment'] = None, tit
 
     # add title
     plt.title(title)
-    plt.show()
+    if show:
+        plt.show()
 
 
 def plotStartGoalDataset(env_model, starts_goals):

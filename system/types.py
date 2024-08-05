@@ -44,9 +44,9 @@ Spikings = 'np.ndarray[float, (40, 40, 6)]' # TODO: actual non-string type hint
 Image = 'np.ndarray[float, (64, 64, 4)]'
 
 allowed_map_names = [
-    'Savinov_val3', 'linear_sunburst'
+    'Savinov_val3', 'linear_sunburst', 'obstacle_map_0'
 ]
-AllowedMapName = Literal['Savinov_val3', 'linear_sunburst']
+AllowedMapName = Literal['Savinov_val3', 'linear_sunburst', 'obstacle_map_0']
 AllowedMapName.options = allowed_map_names
 
 

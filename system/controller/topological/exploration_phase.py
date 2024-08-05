@@ -16,7 +16,7 @@ from system.controller.local_controller.compass import AnalyticalCompass
 from system.bio_model.place_cell_model import PlaceCellNetwork
 from system.bio_model.cognitive_map import LifelongCognitiveMap, CognitiveMapInterface
 import system.plotting.plotResults as plot
-from system.types import Vector2D
+from system.types import AllowedMapName, Vector2D
 import os
 
 PLOTTING = os.getenv('PLOTTING', '').split('&')
@@ -35,7 +35,7 @@ class TooManyPlaceCells(Exception):
         self.progress = progress
 
 def waypoint_movement(
-    path: list[Vector2D], env_model: str, gc_network: GridCellNetwork, pc_network: PlaceCellNetwork,
+    path: list[Vector2D], env_model: AllowedMapName, gc_network: GridCellNetwork, pc_network: PlaceCellNetwork,
     cognitive_map: CognitiveMapInterface,
     visualize=False,
 ):

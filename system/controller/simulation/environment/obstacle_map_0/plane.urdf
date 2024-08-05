@@ -25,34 +25,6 @@
       </geometry>
     </collision>
   </link>
-
-  <joint name="box_2_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0 0.05"/>
-    <parent link="planeLink"/>
-    <child link="box_2"/>
-  </joint>
-
-  <link name="box_2">
-  	<visual>
-      <origin rpy="0 0 0" xyz="-2 -0.5 0"/>
-      <geometry>
-	 	<box size="1 0.5 0.5"/>
-      </geometry>
-      <material name="grey">
-	    <color rgba="0.5 0.5 0.5 1"/>
-	  </material>
-    </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="-2 -0.5 0"/>
-      <geometry>
-	 	<box size="1 0.5 0.5"/>
-      </geometry>
-    </collision>
-    <inertial>
-      <mass value="1"/>
-      <inertia ixx="0.0" ixy="0.0" ixz="0.0" iyy="0.0" iyz="0.0" izz="0.0"/>
-    </inertial>
-  </link>
   
     <joint name="box_1_joint" type="fixed">
       <origin rpy="0 0 0" xyz="0 0 0.05"/>
@@ -81,64 +53,6 @@
         <inertia ixx="0.0" ixy="0.0" ixz="0.0" iyy="0.0" iyz="0.0" izz="0.0"/>
       </inertial>
     </link>
-    
-    <joint name="box_3_joint" type="fixed">
-      <origin rpy="0 0 0" xyz="0 0 0.05"/>
-      <parent link="planeLink"/>
-      <child link="box_3"/>
-    </joint>
-
-    <link name="box_3">
-    	<visual>
-        <origin rpy="0 0 0" xyz="0 -0.5 0"/>
-        <geometry>
-  	 	<box size="0.5 3 0.5"/>
-        </geometry>
-        <material name="grey">
-  	    <color rgba="0.5 0.5 0.5 1"/>
-  	  </material>
-      </visual>
-      <collision>
-        <origin rpy="0 0 0" xyz="0 -0.5 0"/>
-        <geometry>
-  	 	<box size="0.5 3 0.5"/>
-        </geometry>
-      </collision>
-      <inertial>
-        <mass value="1"/>
-        <inertia ixx="0.0" ixy="0.0" ixz="0.0" iyy="0.0" iyz="0.0" izz="0.0"/>
-      </inertial>
-    </link>
-
-
-    <joint name="box_4_joint" type="fixed">
-      <origin rpy="0 0 0" xyz="0 0 0.05"/>
-      <parent link="planeLink"/>
-      <child link="box_4"/>
-    </joint>
-
-    <link name="box_4">
-    	<visual>
-        <origin rpy="0 0 0" xyz="1 0.5 0"/>
-        <geometry>
-  	 	<box size="1.5 1 0.5"/>
-        </geometry>
-        <material name="grey">
-  	    <color rgba="0.5 0.5 0.5 1"/>
-  	  </material>
-      </visual>
-      <collision>
-        <origin rpy="0 0 0" xyz="1 0.5 0"/>
-        <geometry>
-  	 	<box size="1.5 1 0.5"/>
-        </geometry>
-      </collision>
-      <inertial>
-        <mass value="1"/>
-        <inertia ixx="0.0" ixy="0.0" ixz="0.0" iyy="0.0" iyz="0.0" izz="0.0"/>
-      </inertial>
-    </link>
-
 
     <joint name="box_5_joint" type="fixed">
       <origin rpy="0 0 0" xyz="0 0 0.05"/>
@@ -279,6 +193,6 @@
         <inertia ixx="0.0" ixy="0.0" ixz="0.0" iyy="0.0" iyz="0.0" izz="0.0"/>
       </inertial>
     </link>    
-    
+
 </robot>
 

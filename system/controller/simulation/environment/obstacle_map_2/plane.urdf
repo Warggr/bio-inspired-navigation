@@ -1,9 +1,9 @@
 <?xml version="0.0" ?>
 <robot name="plane">
   <link name="planeLink">
-  <contact>
+    <contact>
       <lateral_friction value="1"/>
-  </contact>
+    </contact>
     <inertial>
       <origin rpy="0 0 0" xyz="0 0 0"/>
        <mass value=".0"/>
@@ -21,7 +21,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 -5"/>
       <geometry>
-	 	<box size="200 200 10"/>
+	 	    <box size="200 200 10"/>
       </geometry>
     </collision>
   </link>
@@ -165,8 +165,8 @@
         <mass value="1"/>
         <inertia ixx="0.0" ixy="0.0" ixz="0.0" iyy="0.0" iyz="0.0" izz="0.0"/>
       </inertial>
-    </link>    
-    
+    </link>
+
     <joint name="wall_4_joint" type="fixed">
       <origin rpy="0 0 0" xyz="0 0 0.05"/>
       <parent link="planeLink"/>
@@ -194,6 +194,6 @@
         <inertia ixx="0.0" ixy="0.0" ixz="0.0" iyy="0.0" iyz="0.0" izz="0.0"/>
       </inertial>
     </link>    
-    
+
 </robot>
 

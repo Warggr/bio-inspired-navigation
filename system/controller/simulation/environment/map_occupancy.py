@@ -570,7 +570,7 @@ def add_angles_to_trajectory(trajectory: list[Vector2D]) -> list[PositionAndOrie
     return result
 
 
-def environment_dimensions(env_model: AllowedMapName):
+def environment_dimensions(env_model: AllowedMapName) -> tuple[Vector2D, Vector2D]|None:
     if env_model == "Savinov_val3":
         return np.array([-9, -5]), np.array([6, 4])
     elif env_model == "Savinov_val2":

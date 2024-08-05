@@ -361,7 +361,7 @@ class SimulationReachabilityEstimator(ReachabilityEstimator):
 
 
 class ViewOverlapReachabilityEstimator(ReachabilityEstimator):
-    def __init__(self, debug=False):
+    def __init__(self, env_model: types.AllowedMapName, debug=False):
         """ Creates a reachability estimator that judges reachability
             between two locations based the overlap of their fields of view
 
@@ -371,7 +371,7 @@ class ViewOverlapReachabilityEstimator(ReachabilityEstimator):
         debug: bool                -- enables logging
         """
         super().__init__(threshold_same=0.4, threshold_reachable=0.3, debug=debug)
-        self.env_model = "Savinov_val3"
+        self.env_model = env_model
         self.fov = 120 * np.pi / 180
         self.distance_threshold = 0.7
         self.map_layout = MapLayout(self.env_model)
