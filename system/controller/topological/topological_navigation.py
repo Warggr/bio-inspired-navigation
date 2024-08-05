@@ -153,8 +153,14 @@ class TopologicalNavigation:
                         new_path = self.cognitive_map.find_path(node, goal)
                         j += 1
                     if new_path is None:
-                        new_path = [path[i]] + [goal]
-                    new_path = [path[i]] + new_path
+                        new_path = [goal]
+                        if len(path) == 2:
+                            # if the previous path was already just start <-> goal
+                            # (which can happen if the goal is not connected to anything)
+                            # and it failed once, don't just try the same thing again
+                            # instead, try to put some node in the middle
+                            new_path = [np.random.choice(list(self.cognitive_map.node_network.nodes))] + [goal]
+                    new_path = [last_pc] + new_path
 
                 path[i:] = new_path
                 if plotting:
