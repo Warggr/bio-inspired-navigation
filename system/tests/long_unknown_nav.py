@@ -21,8 +21,8 @@ map_file = "after_exploration.gpickle"
 env_model = "Savinov_val3"
 model = "combo"
 input_config = SampleConfig(grid_cell_spikings=True)
-visualize = True
-re = reachability_estimator_factory(re_type, weights_file=re_weights_file, config=input_config)
+visualize = False
+re = reachability_estimator_factory(re_type, weights_file=re_weights_file, config=input_config, env_model=env_model)
 pc_network = PlaceCellNetwork(from_data=True, reach_estimator=SpikingsReachabilityEstimator(), map_name=env_model)
 cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from=map_file, debug=False)
 gc_network = GridCellNetwork(dt=1e-2, from_data=True)

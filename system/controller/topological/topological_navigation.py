@@ -64,8 +64,8 @@ class TopologicalNavigation:
         """ Navigates the agent through the environment with topological navigation.
 
         arguments:
-        start_ind: int              -- index of start node in the cognitive map
-        goal_ind: int               -- index of goal node in the cognitive map
+        start_ind: int              -- start node in the cognitive map
+        goal_ind: int               -- goal node in the cognitive map
         cognitive_map_filename: str -- name of file to save the cognitive map to
 
         returns:
@@ -118,7 +118,7 @@ class TopologicalNavigation:
         if controller is None:
             controller = LocalController(
                 on_reset_goal=[TurnToGoal()],
-                transform_goal_vector=[ObstacleAvoidance(), ObstacleBackoff(backoff_on_distance=0.25, backoff_off_distance=0.35)],
+                transform_goal_vector=[ObstacleAvoidance()],
                 hooks=[StuckDetector()],
             )
 
@@ -235,8 +235,8 @@ if __name__ == "__main__":
     model = "combo"
     input_config = SampleConfig(grid_cell_spikings=True)
 
-    re = reachability_estimator_factory(args.re_type, weights_file=re_weights_file, config=input_config)
-    pc_network = PlaceCellNetwork(from_data=True, reach_estimator=re, map_name=env_model)
+    re = reachability_estimator_factory(args.re_type, env_model=args.env_model, weights_file=re_weights_file, config=input_config)
+    pc_network = PlaceCellNetwork(from_data=True, map_name=args.env_model)
     cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from=map_file, debug=('cogmap' in DEBUG))
     assert len(cognitive_map.node_network.nodes) > 1
     gc_network = setup_gc_network(1e-2)
@@ -270,7 +270,7 @@ if __name__ == "__main__":
             success = tj.navigate(start, goal, cognitive_map_filename=map_file_after_lifelong_learning, env=env, gc_network=gc_network)
             if success:
                 successful += 1
-            tj.cognitive_map.draw()
+            #tj.cognitive_map.draw()
             print(f"Navigation {navigation_i} finished")
             if plotting:
                 plot.plotTrajectoryInEnvironment(env, goal=False, cognitive_map=tj.cognitive_map, trajectory=False)

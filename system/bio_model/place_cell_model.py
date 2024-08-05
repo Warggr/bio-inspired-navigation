@@ -135,7 +135,7 @@ class PlaceCellNetwork:
     class TooManyPlaceCells(Exception):
         pass
 
-    def __init__(self, reach_estimator: 'ReachabilityEstimator', from_data=False, max_capacity=float('inf'), map_name=None):
+    def __init__(self, reach_estimator: Optional['ReachabilityEstimator'] = None, from_data=False, max_capacity=float('inf'), map_name=None):
         """ Place Cell Network  of the environment.
 
         arguments:
@@ -145,7 +145,12 @@ class PlaceCellNetwork:
                     plus additional type "firing" that uses place cell spikings
         map_name    -- the map name; only used when from_data is True so the PC network for the correct map is loaded
         """
-        self.reach_estimator = reach_estimator
+        if reach_estimator is None:
+            from system.controller.reachability_estimator.reachability_estimation import SpikingsReachabilityEstimator
+            self.reach_estimator = SpikingsReachabilityEstimator()
+        else:
+            self.reach_estimator = reach_estimator
+
         self.place_cells: list[PlaceCell] = []
         self.max_capacity = max_capacity
 

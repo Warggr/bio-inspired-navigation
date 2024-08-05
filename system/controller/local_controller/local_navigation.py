@@ -31,10 +31,11 @@ from system.utils import normalize
 
 import system.plotting.plotResults as plot
 import numpy as np
-from typing import Callable, Iterable, Optional, List, Sequence, Tuple, Any, Generic, TypeVar
+from typing import Callable, Iterable, Optional, Sequence, Any, Generic, TypeVar
+from system.debug import PLOTTING, DEBUG
 
-plotting = True  # if True: plot everything
-debug = os.getenv('DEBUG', False)  # if True: print debug output
+plotting = ('localctrl' in PLOTTING)  # if True: plot everything
+debug = ('localctrl' in DEBUG)  # if True: print debug output
 
 
 def print_debug(*params):
@@ -202,7 +203,7 @@ def create_gc_spiking(start: Vector2D, goal: Vector2D, gc_network_at_start: Opti
 
     compass = AnalyticalCompass(start_pos=start, goal_pos=goal)
     robot_position = np.array(start, dtype=float)
-    history: list[Vector2D] = [ robot_position ]
+    history: list[Vector2D] = [robot_position]
 
     if compass.reached_goal():
         assert False, "Positions are too close to each other!"
@@ -240,9 +241,10 @@ def setup_gc_network(dt) -> GridCellNetwork:
     return gc_network
 
 
-def vector_navigation(env: PybulletEnvironment, compass: Compass, gc_network: Optional[GridCellNetwork] = None, controller: Optional[LocalController] = None, target_gc_spiking=None,
-    step_limit=float('inf'), plot_it=False,
-                      collect_data_freq=False, collect_data_reachable=False, collect_nr_steps=False, exploration_phase=False,
+def vector_navigation(
+    env: PybulletEnvironment, compass: Compass, gc_network: Optional[GridCellNetwork] = None, controller: Optional[LocalController] = None, target_gc_spiking=None,
+    step_limit=float('inf'), plot_it=plotting,
+    collect_data_freq=False, collect_data_reachable=False, collect_nr_steps=False, exploration_phase=False,
     pc_network: Optional[PlaceCellNetwork] = None, cognitive_map: Optional[CognitiveMapInterface] = None,
     goal_pos: Optional[Vector2D] = None,
 ) -> tuple[bool, Any]:
@@ -288,14 +290,18 @@ def vector_navigation(env: PybulletEnvironment, compass: Compass, gc_network: Op
     if gc_network and (target_gc_spiking is not None):
         gc_network.set_as_target_state(target_gc_spiking)
 
+    n = 0  # time steps
     goal_vector = compass.calculate_goal_vector()
-    controller.reset_goal(goal_vector, robot)
+    try:
+        controller.reset_goal(goal_vector, robot)
+    except RobotStuck:
+        # a possible reason is e.g. TurnToGoal failing -> we can safely ignore that
+        pass
 
     if collect_data_reachable:
         sample_after_turn = (robot.data_collector[-1][0], robot.data_collector[-1][1])
         first_goal_vector = goal_vector
 
-    n = 0  # time steps
     goal_reached = False
     end_state = ""  # for plotting
     last_pc = None
@@ -313,8 +319,6 @@ def vector_navigation(env: PybulletEnvironment, compass: Compass, gc_network: Op
 
         # TODO: feature suggestion: attach "nav step hooks" to the robot
         # so that we could run gc_network.track_movement and e.g. buildDataSet automatically
-        if robot.buildDataSet:
-            assert len(robot.data_collector.images) != 0
 
         if pc_network is not None and cognitive_map is not None:
             observations = robot.data_collector.get_observations()

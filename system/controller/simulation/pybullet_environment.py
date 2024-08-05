@@ -48,11 +48,11 @@ from random import Random
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../.."))
 import system.plotting.plotResults as plot
-from system.bio_model.grid_cell_model import GridCellNetwork
 
-from system.controller.simulation.math_utils import vectors_in_one_direction, intersect, compute_angle
-from system.types import types, LidarReading, Vector2D
+from system.controller.simulation.math_utils import compute_angle
+from system.types import AllowedMapName, types, LidarReading, Vector2D
 from system.controller.simulation.environment_config import environment_dimensions
+from system.debug import DEBUG
 
 try:
     itertools.batched
@@ -80,7 +80,6 @@ def closest_subsegment(values: list[float]) -> tuple[int, int]:
     return start_index, end_index
 
 DIRNAME = os.path.dirname(__file__)
-DEBUG = os.getenv('DEBUG', False)
 
 def resource_path(*filepath):
     return os.path.realpath(os.path.join(DIRNAME, "environment", *filepath))
@@ -410,7 +409,7 @@ class PybulletEnvironment:
         self,
         agent_pos_orn: Optional[types.PositionAndOrientation] = None,
         ray_length=WHISKER_LENGTH,
-        draw_debug_lines=False,
+        draw_debug_lines=('lidar' in DEBUG),
         radius: float = 0.25,
         num_ray_dir: float = 3,
     ) -> list[float]:
@@ -455,7 +454,7 @@ class PybulletEnvironment:
         self,
         agent_pos_orn: Optional[types.PositionAndOrientation] = None,
         ray_length = WHISKER_LENGTH,
-        draw_debug_lines = False,
+        draw_debug_lines = ('lidar' in DEBUG),
         **angle_args
     ) -> tuple[LidarReading, list[Vector2D]]:
         """
@@ -511,6 +510,10 @@ class PybulletEnvironment:
                 ray_return.append(distance)
 
         return LidarReading(ray_return, ray_angles), [it[3] for it in results]
+
+
+class RobotStuck(Exception):
+    pass
 
 
 class Robot:
@@ -771,18 +774,22 @@ class Robot:
         direction_vector = direction_vector * 1.5 / min(lidar[start_index:end_index + 1])
         return hit_points[0], direction_vector
 
-    def turn_to_goal(self, goal_vector: Vector2D, tolerance: types.Angle = 0.05):
+    def turn_to_goal(self, goal_vector: Vector2D, tolerance: types.Angle = 0.05, report_stuck = False):
         """ Agent turns to face in goal vector direction """
 
         i = 0
         MAX_ITERATIONS = 1000
         diff_angle = None
+        prev_diff_angle = None
         while i < MAX_ITERATIONS and (diff_angle is None or abs(diff_angle) > tolerance):
             i += 1
             normed_goal_vector = np.array(goal_vector) / np.linalg.norm(np.array(goal_vector))
 
             current_heading = self.heading_vector()
             diff_angle = compute_angle(current_heading, normed_goal_vector) / np.pi
+            if report_stuck and prev_diff_angle is not None and abs(diff_angle - prev_diff_angle) < 1e-5:
+                raise RobotStuck
+            prev_diff_angle = diff_angle
             #print("Turning in place, diff_angle is", diff_angle, end="...\r")
 
             gain = min(np.linalg.norm(normed_goal_vector) * 5, 1)

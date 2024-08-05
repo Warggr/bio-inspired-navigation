@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
 from system.controller.simulation.pybullet_environment import PybulletEnvironment, Robot
 from system.controller.simulation.environment_config import environment_dimensions
-from system.controller.simulation.environment_cache import EnvironmentCache
+from system.controller.local_controller.local_controller import LocalController, controller_rules
 from system.controller.local_controller.compass import AnalyticalCompass
 from system.controller.local_controller.local_navigation import setup_gc_network, vector_navigation, WaypointInfo
 from system.controller.simulation.environment.map_occupancy import MapLayout
@@ -131,9 +131,14 @@ def waypoint_movement(env: PybulletEnvironment, cam_freq, traj_length, map_layou
                 if len(samples) > traj_length / cam_freq:
                     break
 
+                controller = LocalController(
+                    on_reset_goal=[controller_rules.TurnToGoal()],
+                    transform_goal_vector=[], # not using ObstacleAvoidance because the waypoints are not in obstacles anyway
+                    hooks=[],
+                )
                 compass = AnalyticalCompass(robot.position, g)
                 env.add_debug_line(start=robot.position, end=g, color=(1, 0, 0), width=2)
-                goal_reached, data = vector_navigation(env, compass, gc_network, step_limit=5000, plot_it=False,
+                goal_reached, data = vector_navigation(env, compass, gc_network, controller=controller, step_limit=5000, plot_it=False,
                                             collect_data_freq=cam_freq)
                 samples += data
                 if not goal_reached:

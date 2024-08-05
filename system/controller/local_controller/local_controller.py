@@ -1,4 +1,5 @@
 import numpy as np
+from system.controller.simulation.pybullet_environment import Robot, RobotStuck
 from system.utils import normalize
 from system.controller.simulation.math_utils import vectors_in_one_direction, intersect, compute_angle
 
@@ -6,14 +7,16 @@ from abc import ABC
 from system.types import Vector2D, Angle
 from typing import Callable
 
-ResetGoalHook = Callable[[Vector2D, 'Robot'], None]
-TransformGoalHook = Callable[[Vector2D, 'Robot'], Vector2D|tuple[Vector2D, dict]]
+ResetGoalHook = Callable[[Vector2D, Robot], None]
+TransformGoalHook = Callable[[Vector2D, Robot], Vector2D|tuple[Vector2D, dict]]
+
 
 class Hook:
-    def on_reset_goal(self, new_goal: Vector2D, robot: 'Robot'):
+    def on_reset_goal(self, new_goal: Vector2D, robot: Robot):
         pass
-    def transform_goal_vector(self, goal_vector: Vector2D, robot: 'Robot') -> Vector2D:
+    def transform_goal_vector(self, goal_vector: Vector2D, robot: Robot) -> Vector2D:
         return goal_vector
+
 
 class LocalController(ABC):
     """
@@ -32,11 +35,11 @@ class LocalController(ABC):
     def default(obstacles=True):
         return LocalController(on_reset_goal=[ TurnToGoal() ], transform_goal_vector=([ObstacleAvoidance()] if obstacles else []), hooks=[StuckDetector()])
 
-    def reset_goal(self, new_goal: Vector2D, robot: 'Robot'):
+    def reset_goal(self, new_goal: Vector2D, robot: Robot):
         for hook in self.on_reset_goal:
             hook(new_goal, robot)
 
-    def step(self, goal_vector: Vector2D, robot: 'Robot'):
+    def step(self, goal_vector: Vector2D, robot: Robot):
         all_kwargs = {}
         for hook in self.transform_goal_vector:
             match hook(goal_vector, robot):
@@ -65,7 +68,7 @@ class FajenObstacleAvoidance:
         self.c4 = c4
         self.angle_velocity = 0
 
-    def __call__(self, goal_vector: Vector2D, robot: 'Robot') -> Vector2D:
+    def __call__(self, goal_vector: Vector2D, robot: Robot) -> Vector2D:
         dX = -self.b * self.angle_velocity - self.kg * (compute_angle(robot.heading_vector(), goal_vector)) * (np.exp(-self.c1 * np.linalg.norm(goal_vector)) + self.c2)
         lidar, _ = robot.env.lidar(tactile_cone=120, num_ray_dir=13, ray_length=2)
         for angle, distance in zip(lidar.angles, lidar.distances):
@@ -89,7 +92,7 @@ class ObstacleAvoidance:
         self.follow_walls = follow_walls
         self.lidar_kwargs = dict(tactile_cone=tactile_cone, num_ray_dir=num_ray_dir, ray_length=ray_length)
 
-    def __call__(self, goal_vector: Vector2D, robot: 'Robot') -> Vector2D:
+    def __call__(self, goal_vector: Vector2D, robot: Robot) -> Vector2D:
         lidar = robot.env.lidar(**self.lidar_kwargs, blind_spot_cone=0, agent_pos_orn=robot.lidar_sensor_position)
         point, obstacle_vector = robot.calculate_obstacle_vector(lidar)
         #print(f"{self.position=}, {obstacle_vector=}, {goal_vector=}")
@@ -115,7 +118,7 @@ class ObstacleBackoff:
         self.backoff_off_distance = backoff_off_distance
         self.backing_off = False
         assert self.backoff_on_distance <= self.backoff_off_distance
-    def __call__(self, goal_vector: Vector2D, robot: 'Robot') -> Vector2D|tuple[Vector2D,dict]:
+    def __call__(self, goal_vector: Vector2D, robot: Robot) -> Vector2D|tuple[Vector2D,dict]:
         distances = robot.env.straight_lidar(
             radius=0.18,
             num_ray_dir=3,
@@ -133,9 +136,6 @@ class ObstacleBackoff:
             return goal_vector
 
 
-class RobotStuck(Exception):
-    pass
-
 class StuckDetector(Hook):
     def __init__(self, stuck_threshold = 200):
         self.stuck_threshold = stuck_threshold
@@ -143,7 +143,7 @@ class StuckDetector(Hook):
         self.previous_position = None
     def on_reset_goal(self, new_goal, robot):
         self.nr_ofsteps = 0
-    def transform_goal_vector(self, goal_vector: Vector2D, robot: 'Robot') -> Vector2D:
+    def transform_goal_vector(self, goal_vector: Vector2D, robot: Robot) -> Vector2D:
         if self.previous_position is not None and np.linalg.norm(robot.position - self.previous_position) < 0.001:
             self.nr_ofsteps += 1
             if self.nr_ofsteps >= self.stuck_threshold:
@@ -154,8 +154,9 @@ class StuckDetector(Hook):
         self.previous_position = robot.position
         return goal_vector
 
+
 class TurnWhenNecessary:
-    def __call__(self, goal_vector: Vector2D, robot: 'Robot'):
+    def __call__(self, goal_vector: Vector2D, robot: Robot):
         current_heading = robot.heading_vector()
         diff_angle = compute_angle(current_heading, goal_vector)
         if abs(diff_angle) > np.radians(90) and np.linalg.norm(goal_vector) > 0.5:
@@ -164,10 +165,11 @@ class TurnWhenNecessary:
             print(np.linalg.norm(goal_vector))
         return goal_vector
 
+
 class TurnToGoal:
     def __init__(self, tolerance = 0.05):
         self.tolerance = tolerance
-    def __call__(self, goal_vector: Vector2D, robot: 'Robot'):
+    def __call__(self, goal_vector: Vector2D, robot: Robot):
         ray_length = 0.28
         """
         for angle in map(np.radians, [-45, 45, 135, -135]):
@@ -190,7 +192,27 @@ class TurnToGoal:
             else: # no break encountered, i.e. timeout
                 raise RobotStuck()
         """
-        robot.turn_to_goal(goal_vector, tolerance=self.tolerance)
+
+        try:
+            robot.turn_to_goal(goal_vector, tolerance=self.tolerance, report_stuck=True)
+            return
+        except RobotStuck:
+            pass
+        try:
+            for _ in range(40): # 40 is, empirically, the number of steps needed to get away from an obstacle
+                robot.navigation_step(-np.array(robot.heading_vector()), allow_backwards=True)
+            robot.turn_to_goal(goal_vector, tolerance=self.tolerance, report_stuck=True)
+            return
+        except RobotStuck:
+            pass
+        try:
+            for _ in range(40):
+                robot.navigation_step(+np.array(robot.heading_vector()), allow_backwards=True)
+            robot.turn_to_goal(goal_vector, tolerance=self.tolerance, report_stuck=True)
+            return
+        except RobotStuck:
+            pass
+        raise RobotStuck()
 
 class controller_rules: # namespace
     ObstacleAvoidance = ObstacleAvoidance
