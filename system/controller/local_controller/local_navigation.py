@@ -217,7 +217,8 @@ def create_gc_spiking(start: Vector2D, goal: Vector2D, gc_network_at_start: Opti
         goal_vector = compass.calculate_goal_vector()
         if np.linalg.norm(goal_vector) == 0:
             break
-        ROBOT_MAX_SPEED = 5.5 # see pybullet_environment.py
+        ROBOT_MAX_SPEED = 0.5 # This is empirically the maximum speed of the robot, but I don't know why
+        # (pybullet_environment.py says 5.5, but this value probably gets multiplied with something somewhere)
         xy_speed = ROBOT_MAX_SPEED * normalize(goal_vector)
 
         robot_position += xy_speed * dt
