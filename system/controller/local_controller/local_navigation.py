@@ -516,7 +516,7 @@ if __name__ == "__main__":
             angle = np.random.uniform(0, 2 * np.pi)
             goal = start + np.array([np.cos(angle), np.sin(angle)]) * distance
 
-            with PybulletEnvironment(env_model, dt=dt, start=start) as env:
+            with PybulletEnvironment(env_model, dt=dt, start=start, visualize=args.visualize) as env:
                 model = args.decoder
                 # changes the update fraction and arrival threshold according to the chosen model
                 compass: Compass
@@ -554,8 +554,7 @@ if __name__ == "__main__":
                     actual_error_goal = np.linalg.norm(env.robot.position - goal)
                     actual_error_goal_array.append(actual_error_goal)
                     # TODO Pierre: env.nr_ofsteps = 0
-                    compass.reset_goal(new_goal=start)
-                    gc_network.set_as_target_state(start_spiking)
+                    compass.reset_goal(new_goal=(start if type(compass)==AnalyticalCompass else start_spiking))
                     vector_navigation(env, compass, gc_network, step_limit=8000, plot_it=False)
 
                     trial_time = time.time() - start_time

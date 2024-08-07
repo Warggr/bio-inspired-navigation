@@ -110,9 +110,10 @@ def add_environment(ax, env_model: str):
         ax.add_artist(wall)
         ax.set_xlim(-4, 2.1)
         ax.set_ylim(-3, 3.1)
-    else:
-        ax.set_xlim(-9, 6)
-        ax.set_ylim(-5, 4)
+    else: # plane
+        pass
+        #ax.set_xlim(-9, 6)
+        #ax.set_ylim(-5, 4)
 
 
 def add_robot(ax, xy: tuple[float, float], angle: float):

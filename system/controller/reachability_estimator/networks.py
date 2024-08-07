@@ -74,7 +74,7 @@ class Model(ABC):
         return backbone_classes[backbone_classname](*model_args, **model_kwargs)
 
     def save(self, epoch, model_file, global_args: dict[str, Any] = {}):
-        args = self.get_args().update(global_args)
+        args = self.get_args(); args.update(global_args)
         """ save current state of the model """
         state = {
             'epoch': epoch,
