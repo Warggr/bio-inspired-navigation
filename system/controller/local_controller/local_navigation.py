@@ -195,7 +195,7 @@ def create_gc_spiking(start: Vector2D, goal: Vector2D, gc_network_at_start: Opti
     # Grid-Cell Initialization
     dt = 1e-2
     if gc_network_at_start is None:
-        gc_network = setup_gc_network(dt)
+        gc_network = GridCellNetwork(from_data=True, dt=dt)
     else:
         assert gc_network_at_start.dt == dt
         gc_network_at_start.reset_s_virtual()
@@ -484,7 +484,7 @@ if __name__ == "__main__":
 
         dt = 1e-2
         # initialize grid cell network and create target spiking
-        gc_network = setup_gc_network(dt)
+        gc_network = GridCellNetwork(from_data=True, dt=dt)
         target_spiking = create_gc_spiking(args.start, args.goal)
 
         compass = Compass.factory(mode=args.decoder, gc_network=gc_network, goal_pos=args.goal)
@@ -507,7 +507,7 @@ if __name__ == "__main__":
 
         for i in range(0, nr_trials):
             # initialize grid cell network and create target spiking
-            gc_network = setup_gc_network(dt)
+            gc_network = GridCellNetwork(from_data=True, dt=dt)
 
             start: Vector2D = np.array([0.0, 0.0])
 
@@ -616,7 +616,7 @@ if __name__ == "__main__":
 
                 # initialize grid cell network and create target spiking
                 if model == "combo":
-                    gc_network = setup_gc_network(1e-2)
+                    gc_network = GridCellNetwork(from_data=True, dt=1e-2)
                     target_spiking = create_gc_spiking(start, goal)
                 else:
                     gc_network = None

@@ -245,7 +245,7 @@ if __name__ == "__main__":
     pc_network = PlaceCellNetwork(from_data=True, map_name=args.env_model)
     cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from=map_file, debug=('cogmap' in DEBUG))
     assert len(cognitive_map.node_network.nodes) > 1
-    gc_network = setup_gc_network(1e-2)
+    gc_network = GridCellNetwork(from_data=True, dt=1e-2)
     pod = PhaseOffsetDetectorNetwork(16, 9, 40)
     compass = Compass.factory(model, gc_network=gc_network, pod_network=pod)
 
