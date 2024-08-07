@@ -24,10 +24,6 @@ plotting = 'exploration' in PLOTTING  # if True: plot paths
 debug = True  # if True: print debug output
 
 
-def print_debug(*params):
-    """ output only when in debug mode """
-    if debug:
-        print(*params)
 
 class TooManyPlaceCells(Exception):
     def __init__(self, progress: float):
@@ -153,7 +149,7 @@ if __name__ == "__main__":
         raise ValueError(f"Unsupported map: {args.env_model}")
 
     gc_network = GridCellNetwork(from_data=False)
-    re = reachability_estimator_factory(args.re_type, weights_file=re_weights_file, debug=debug, config=SampleConfig(grid_cell_spikings=True))
+    re = reachability_estimator_factory(args.re_type, weights_file=re_weights_file, debug=('plan' in DEBUG), config=SampleConfig(grid_cell_spikings=True))
 
     too_strict_threshold = 1.4
     too_lax_threshold = 0.2

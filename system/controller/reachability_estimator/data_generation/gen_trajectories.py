@@ -55,13 +55,14 @@ def display_trajectories(filepath):
     env_model = hf.attrs['map_type']
     print("number of datasets: ", len(hf.keys()))
 
+    from tqdm import tqdm
+
     # plot all trajectories in one map
     xy_coordinates = []
-    for key in list(hf.keys()):
+    for key in tqdm(hf.keys()):
         ds_array = hf[key][()]
         coord = [i[0] for i in ds_array]
         xy_coordinates += coord
-        print(key)
 
     #     # plot individual trajectories:
     #     # plot.plotTrajectoryInEnvironment(None,None,None,"title",xy_coordinates=coord,env_model="SMTP")
