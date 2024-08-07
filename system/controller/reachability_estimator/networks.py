@@ -57,7 +57,7 @@ class Model(ABC):
         batch_src_images=None, batch_dst_images=None,
         batch_transformation=None,
         batch_src_spikings=None, batch_dst_spikings=None,
-        batch_src_distances=None, batch_dst_distances=None,
+        batch_src_lidar=None, batch_dst_lidar=None,
     ) -> Batch[Prediction]:
         ...
 
@@ -105,7 +105,7 @@ class Siamese(Model):
         batch_src_images=None, batch_dst_images=None,
         batch_transformation=None,
         batch_src_spikings=None, batch_dst_spikings=None,
-        batch_src_distances=None, batch_dst_distances=None
+        batch_src_lidar=None, batch_dst_lidar=None
     ) -> Batch[Prediction]:
         return get_grid_cell(batch_src_spikings, batch_dst_spikings), None, None
 
@@ -174,7 +174,7 @@ class CNN(Model):
         batch_src_images=None, batch_dst_images=None,
         batch_transformation=None,
         batch_src_spikings=None, batch_dst_spikings=None,
-        batch_src_distances=None, batch_dst_distances=None,
+        batch_src_lidar=None, batch_dst_lidar=None,
     ) -> Batch[Prediction]:
         # Extract features
         all_x = []
@@ -203,10 +203,10 @@ class CNN(Model):
             all_x.append(batch_transformation)
 
         if self.sample_config.lidar:
-            assert not torch.any(batch_src_distances.isnan())
-            assert not torch.any(batch_dst_distances.isnan())
+            assert not torch.any(batch_src_lidar.isnan())
+            assert not torch.any(batch_dst_lidar.isnan())
             assert not torch.any(self.nets['lidar_encoder'].fc.weight.isnan())
-            lidar_features = self.nets['lidar_encoder'](batch_src_distances, batch_dst_distances)
+            lidar_features = self.nets['lidar_encoder'](batch_src_lidar, batch_dst_lidar)
             assert not torch.any(lidar_features.isnan())
             all_x.append(lidar_features)
 
@@ -263,7 +263,7 @@ class ResNet(Model):
         src_batch, dst_batch,
         batch_transformation=None,
         batch_src_spikings=None, batch_dst_spikings=None,
-        batch_src_distances=None, batch_dst_distances=None,
+        batch_src_lidar=None, batch_dst_lidar=None,
     ) -> Batch[Prediction]:
         # Extract features
         src_features = self.nets['res_net'](src_batch.view(batch_size, c, h, w))

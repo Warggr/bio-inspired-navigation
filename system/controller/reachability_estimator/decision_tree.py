@@ -42,7 +42,7 @@ class DecisionTree(Model):
         batch_src_images=None, batch_dst_images=None,
         batch_transformation=None,
         batch_src_spikings=None, batch_dst_spikings=None,
-        batch_src_distances=None, batch_dst_distances=None,
+        batch_src_lidar=None, batch_dst_lidar=None,
     ):
         features = []
         if self.sample_config.images:
@@ -54,7 +54,7 @@ class DecisionTree(Model):
         if self.sample_config.with_grid_cell_spikings:
             features += [ get_grid_cell(batch_src_spikings, batch_dst_spikings) ]
         if self.sample_config.lidar == "raw_lidar":
-            features += [ relevant_info_from_lidar(batch_src_distances), relevant_info_from_lidar(batch_dst_distances) ]
+            features += [ relevant_info_from_lidar(batch_src_lidar), relevant_info_from_lidar(batch_dst_lidar) ]
         features = np.concatenate(features, axis=1)
         return features
 
