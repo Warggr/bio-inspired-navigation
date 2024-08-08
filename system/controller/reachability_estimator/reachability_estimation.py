@@ -82,6 +82,10 @@ class ReachabilityEstimator(ReachabilityController):
         """
         pass
 
+    def reachability_factor_batch(self, p: PlaceInfo, qs: Iterable[PlaceInfo]) -> list[float]:
+        """ Batch version of reachability_factor. Implementations that can do this efficiently (e.g. NetworkRE) override this """
+        return [self.reachability_factor(p, q) for q in qs]
+
     @override
     def reachable(self, env, start: PlaceInfo, goal: PlaceInfo, path_l=None) -> bool:
         reachability_factor = self.reachability_factor(start, goal)
@@ -241,17 +245,20 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         return np.array([args], dtype=cls.dtype)
 
     def is_same_batch(self, p: PlaceInfo, qs: Iterable[PlaceInfo]) -> Batch[bool]:
-        batches: list[Batch['NetworkReachabilityEstimator.dtype']] = [self.to_batch(p, q) for q in qs]
-        if batches == []: return []
-        args_batch = np.concatenate(batches, axis=0)
-        return self.reachability_factor_batch(args_batch) >= self.threshold_same
+        return self.reachability_factor_batch(p, qs) >= self.threshold_same
 
     def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo) -> float:
         """ Predicts reachability value between two locations """
         args = self.to_batch(start, goal)
-        return self.reachability_factor_batch(args)[0]
+        return self.reachability_factor_of_array(args)[0]
 
-    def reachability_factor_batch(self,
+    def reachability_factor_batch(self, p: PlaceInfo, qs: Iterable[PlaceInfo]) -> list[float]:
+        batches: list[Batch['NetworkReachabilityEstimator.dtype']] = [self.to_batch(p, q) for q in qs]
+        if batches == []: return []
+        args_batch = np.concatenate(batches, axis=0)
+        return self.reachability_factor_of_array(args_batch)
+
+    def reachability_factor_of_array(self,
         data: np.ndarray['NetworkReachabilityEstimator.dtype']
     ) -> networks.Batch[float]:
         """ Predicts reachability for multiple location pairs

@@ -204,6 +204,20 @@ class CognitiveMapInterface(ABC):
         """
         pass
 
+    def get_place_cell_network(self, reach_estimator: ReachabilityEstimator = None) -> PlaceCellNetwork:
+        """
+        Exports a PlaceCellNetwork from the current nodes.
+        I (Pierre) don't understand why these are two different classes in the first place.
+
+        arguments:
+        reach_estimator -- reachability estimator for the PC network. If not set, `self.reach_estimator` will be used.
+        """
+        reach_estimator = reach_estimator or self.reach_estimator
+
+        pc_network = PlaceCellNetwork(self.reach_estimator)
+        pc_network.place_cells = list(self.node_network.nodes.keys())
+        return pc_network
+
     def test_place_cell_network(self, env: 'PybulletEnvironment', gc_network, from_data=False):
         """ Test the drift error of place cells stored in the cognitive map """
         from system.controller.local_controller.local_navigation import LinearLookaheadGcCompass
