@@ -39,7 +39,7 @@ class PlaceCell(PlaceInfo):
     both methods of this class should be moved to the reachability estimator
     """
 
-    def __init__(self, gc_connections, observations, coordinates: Vector2D, lidar: Optional['LidarReading'] = None):
+    def __init__(self, gc_connections, observations, coordinates: Vector2D, angle: float = NotImplemented, lidar: Optional['LidarReading'] = None):
         # explicitly not call super().__init__ because we'll provide data members ourselves (as aliases)
         self.gc_connections = gc_connections  # Connection matrix to grid cells of all modules; has form (n^2 x M)
         self.env_coordinates = coordinates  # Save x and y coordinate at moment of creation
@@ -49,10 +49,12 @@ class PlaceCell(PlaceInfo):
         self.observations = observations
         assert observations[0] is not None
         self.lidar = lidar
+        self.angle = angle
+        assert self.angle is not NotImplemented
 
     @staticmethod
     def from_data(data: PlaceInfo):
-        return PlaceCell(gc_connections=data.spikings, observations=[data.img], coordinates=data.pos, lidar=data.lidar)
+        return PlaceCell(gc_connections=data.spikings, observations=[data.img], coordinates=data.pos, lidar=data.lidar, angle=data.angle)
 
     def compute_firing(self, s_vectors):
         """Computes firing value based on current grid cell spiking"""
@@ -118,9 +120,6 @@ class PlaceCell(PlaceInfo):
     # Introducing aliases for some properties so this can be used as a PlaceInfo
     @property
     def pos(self): return self.env_coordinates
-    @property
-    def angle(self):
-        return NotImplemented # TODO Pierre: place cells were saved without angles
     @property
     def img(self):
         if self.observations[-1].shape == (4, 64, 64): # backwards compatibiliy: Anna saved images in the transposed format
@@ -205,6 +204,20 @@ class PlaceCellNetwork:
                 firing = pc.compute_firing(s_vectors)  # overall firing
             firing_values.append(firing)
         return firing_values
+
+    def add_angles_and_lidar(self, env: 'PybulletEnvironment'):
+        """
+        For PC networks saved without angles or lidar data, add a reasonable guess of these
+        """
+        prev_pos = None
+        for pc in self.place_cells:
+            if prev_pos is None:
+                angle = 0
+            else:
+                dist = pc - prev_pos
+                angle = np.angle(dist[0] + 1.0j*dist[1])
+            pc.lidar = env.lidar((pc.pos, angle))[0]
+            pc.observations = [env.camera((pc.pos, angle))]
 
     def save_pc_network(self, filename=""):
         """ Save current place cell network """

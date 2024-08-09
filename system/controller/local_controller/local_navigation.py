@@ -326,10 +326,9 @@ def vector_navigation(
             assert len(observations) != 0
             firing_values, created_new_pc = pc_network.track_movement(
                 PlaceInfo(
-                    pos=robot.position,
-                    angle=NotImplemented,
+                    *robot.position_and_angle,
                     spikings=gc_network.consolidate_gc_spiking(),
-                    img=observations[-1], lidar=None
+                    img=observations[-1], lidar=robot.env.lidar()[0],
                 ),
                 creation_allowed=exploration_phase,
             )

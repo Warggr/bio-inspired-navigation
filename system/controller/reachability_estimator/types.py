@@ -82,12 +82,11 @@ class ReachabilityController(ABC):
     """ Any algorithm that decides whether one place is reachable from another. """
 
     @abstractmethod
-    def reachable(self, env: 'PybulletEnvironment', src: PlaceInfo, dst: PlaceInfo, path_l: Optional[float]=None) -> bool:
+    def reachable(self, src: PlaceInfo, dst: PlaceInfo, path_l: Optional[float]=None) -> bool:
         """
         Decides whether dst is reachable from dst.
 
         Arguments:
-        env       -- environment used
         src       -- source
         dst       -- destination
         path_l    -- the path arc length from src to dst, if it is known that both lie on the same trajectory

@@ -28,7 +28,7 @@ except ImportError:
 Batch = networks.Batch
 
 def reachability_estimator_factory(
-    type: Literal['distance', 'neural_network', 'simulation', 'view_overlap', 'spikings'],
+    type: Literal['distance', 'neural_network', 'simulation', 'view_overlap', 'spikings', 'bvc'],
     *, debug: bool = False, **kwargs
 ) -> 'ReachabilityEstimator':
     """
@@ -51,6 +51,8 @@ def reachability_estimator_factory(
         return ViewOverlapReachabilityEstimator(debug=debug, env_model=kwargs['env_model'])
     elif type == 'spikings':
         return SpikingsReachabilityEstimator(**kwargs)
+    elif type == 'bvc':
+        return BVCReachabilityEstimator()
     else:
         raise ValueError("Reachability estimator type not defined: " + type)
 
@@ -87,8 +89,8 @@ class ReachabilityEstimator(ReachabilityController):
         return [self.reachability_factor(p, q) for q in qs]
 
     @override
-    def reachable(self, env, start: PlaceInfo, goal: PlaceInfo, path_l=None) -> bool:
-        reachability_factor = self.reachability_factor(start, goal)
+    def reachable(self, src: PlaceInfo, dst: PlaceInfo, path_l=None) -> bool:
+        reachability_factor = self.reachability_factor(src, dst)
         return reachability_factor >= self.threshold_reachable
 
     def get_reachability(self, start: PlaceInfo, goal: PlaceInfo) -> tuple[bool, float]:
@@ -317,39 +319,44 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
 
 
 class SimulationReachabilityEstimator(ReachabilityEstimator):
-    def __init__(self, debug=False):
+    def __init__(self, env: 'PybulletEnvironment', debug=False):
         """ Creates a reachability estimator that judges reachability
             between two locations based success of navigation simulation
         """
         super().__init__(threshold_same=None, threshold_reachable=1.0, debug=debug) # we can't decide whether two points are the same, only whether they are reachable
         self.fov = 120 * np.pi / 180
         self.dt = 1e-2
+        self.env = env
 
     @override
-    def reachable(self, env: 'PybulletEnvironment', start: PlaceInfo, goal: PlaceInfo, path_l = None) -> bool:
+    def reachable(self, start: PlaceInfo, goal: PlaceInfo, path_l = None) -> bool:
         """ Determines reachability factor between two locations """
         from system.controller.simulation.pybullet_environment import Robot
-        from system.controller.local_controller.local_navigation import setup_gc_network, vector_navigation, GcCompass
+        from system.controller.local_controller.local_navigation import vector_navigation, GcCompass
+        from system.bio_model.grid_cell_model import GridCellNetwork
 
         """ Return reachability estimate from start to goal using the re_type """
 
         """ Simulate movement between start and goal and return whether goal was reached """
 
         # initialize grid cell network and create target spiking
-        gc_network = setup_gc_network(self.dt)
+        gc_network = GridCellNetwork(self.dt, from_data=True)
         gc_network.set_as_current_state(start.spikings)
         target_spiking = goal.spikings
 
-        compass = GcCompass.factory(mode="combo", gc_network=gc_network, goal_pos=goal.pos)
-        with Robot(env=env, base_position=start.pos, base_orientation=start.angle) as robot:
-            goal_reached, _ = vector_navigation(env, compass, gc_network, target_gc_spiking=target_spiking,
+        compass = GcCompass.factory(mode="combo", gc_network=gc_network)
+        compass.reset_goal(compass.parse(goal))
+        angle = start.angle
+        angle = 0.0 if angle is NotImplemented else angle
+        with Robot(env=self.env, base_position=start.pos, base_orientation=angle) as robot:
+            goal_reached, _ = vector_navigation(self.env, compass, gc_network, target_gc_spiking=target_spiking,
                                         step_limit=750, plot_it=False)
             final_position, final_angle = robot.position_and_angle
 
         if goal_reached:
-            map_layout = MapLayout(env.env_model)
+            map_layout = MapLayout(self.env.env_model)
 
-            overlap_ratios = map_layout.view_overlap(final_position, final_angle, goal.pos, goal.angle, self.fov, mode='plane')
+            overlap_ratios = map_layout.view_overlap(final_position, final_angle, goal.pos, (0.0 if goal.angle is NotImplemented else goal.angle), self.fov, mode='plane')
 
             if overlap_ratios[0] < 0.1 and overlap_ratios[1] < 0.1:
                 # Agent is close to the goal, but seperated by a wall.
@@ -417,3 +424,24 @@ def spikings_reshape(img_array):
     """ Helper function, image stored in array form to image in correct shape for nn """
     img = np.reshape(img_array, (6, 40, 40))
     return img
+
+
+class BVCReachabilityEstimator(ReachabilityEstimator):
+    def __init__(self):
+        # can't decide whether nodes are similar - we just want to detect same nodes
+        super().__init__(threshold_reachable=0.4, threshold_same=0.9)
+        from system.bio_model.bc_network.bc_encoding import BoundaryCellNetwork
+        self.boundaryCellEncoder = BoundaryCellNetwork.load()
+
+    def _allo_bc_spikinigs(self, p: PlaceInfo) -> 'HDCActivity':
+        from system.bio_model.bc_network.bc_encoding import HDCActivity
+        from system.bio_model.bc_network.bc_activity import bcActivityForLidar
+
+        heading = HDCActivity.headingCellsActivityTraining(p.angle)
+        ego = bcActivityForLidar(p.lidar)
+        _, allo = self.boundaryCellEncoder.calculateActivities(ego, heading)
+        return allo
+
+    def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo) -> float:
+        spikings_start, spikings_goal = self._allo_bc_spikinigs(start), self._allo_bc_spikinigs(goal)
+        return np.cov(spikings_start, spikings_goal)[0, 1] # np.cov returns a full covariance matrix

@@ -48,6 +48,13 @@ class SampleConfig:
 
 DATA_STORAGE_FOLDER = os.path.join(os.path.dirname(__file__), "data", "reachability")
 
+
+def ego_to_allo(ego, angle):
+    heading = HDCActivity.headingCellsActivityTraining(angle)
+    _, allo = boundaryCellEncoder.calculateActivities(ego, heading)
+    return allo
+
+
 # TODO Pierre: this is conceptually the dataset that is created by data_generation/dataset.py, why aren't they in the same file?
 class ReachabilityDataset(torch.utils.data.Dataset):
     """ create a pytorch compatible dataset from a reachability sample hd5 file
@@ -143,10 +150,6 @@ class ReachabilityDataset(torch.utils.data.Dataset):
             assert not np.isnan(np.min(src_lidar))
 
             if self.config.lidar == 'allo_bc':
-                def ego_to_allo(ego, angle):
-                    heading = HDCActivity.headingCellsActivityTraining(angle)
-                    _, allo = boundaryCellEncoder.calculateActivities(ego, heading)
-                    return allo
                 src_lidar = ego_to_allo(src_lidar, sample.src.angle)
                 dst_lidar = ego_to_allo(dst_lidar, sample.dst.angle)
             assert not np.isnan(np.min(src_lidar))

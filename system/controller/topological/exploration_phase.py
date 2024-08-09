@@ -17,11 +17,9 @@ from system.bio_model.place_cell_model import PlaceCellNetwork
 from system.bio_model.cognitive_map import LifelongCognitiveMap, CognitiveMapInterface
 import system.plotting.plotResults as plot
 from system.types import AllowedMapName, Vector2D
-import os
+from system.debug import DEBUG, PLOTTING
 
-PLOTTING = os.getenv('PLOTTING', '').split('&')
 plotting = 'exploration' in PLOTTING  # if True: plot paths
-debug = True  # if True: print debug output
 
 
 
@@ -103,7 +101,7 @@ if __name__ == "__main__":
     parser.add_argument("env_model", default="Savinov_val3", choices=["Savinov_val3", "linear_sunburst"])
     parser.add_argument('-n', dest='desired_nb_of_place_cells', help='desired number of place cells', type=int, default=30)
     parser.add_argument('-t', '--threshold-same-hint', help='The first value that will be tried as the sameness threshold', type=float)
-    parser.add_argument('--re', dest='re_type', default='neural_network', choices=['neural_network', 'view_overlap'])
+    parser.add_argument('--re', dest='re_type', default='neural_network', choices=['neural_network', 'view_overlap', 'bvc'])
     parser.add_argument('--visualize', action='store_true')
     args = parser.parse_args()
 
