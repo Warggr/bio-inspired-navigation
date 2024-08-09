@@ -9,12 +9,7 @@
 """
 import numpy as np
 
-import sys
-import os
 from typing import Optional
-
-if __name__ == "__main__":
-    sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 from system.bio_model.grid_cell_model import GridCellNetwork
 from system.controller.local_controller.decoder.phase_offset_detector import PhaseOffsetDetectorNetwork
@@ -26,15 +21,21 @@ from system.controller.local_controller.compass import Compass, AnalyticalCompas
 from system.controller.local_controller.local_controller import LocalController, ObstacleAvoidance, StuckDetector, ObstacleBackoff, TurnToGoal
 from system.controller.local_controller.local_navigation import vector_navigation, setup_gc_network, PodGcCompass, LinearLookaheadGcCompass
 import system.plotting.plotResults as plot
+from system.types import AllowedMapName
 
 from system.debug import DEBUG, PLOTTING
 plotting = 'topo' in PLOTTING # if True plot results
 
+def _printable_path(path: list[int]) -> str:
+    """ Helper function to print a path of node indices"""
+    return ','.join((str(i) for i in path))
+
 class TopologicalNavigation:
-    def __init__(self, env_model: str,
-                 pc_network: PlaceCellNetwork, cognitive_map: CognitiveMapInterface,
-                 #gc_network: GridCellNetwork,
+    def __init__(
+        self, env_model: AllowedMapName,
+        pc_network: PlaceCellNetwork, cognitive_map: CognitiveMapInterface,
         compass: Compass,
+        log = False,
     ):
         """
         Handles interactions between local controller and cognitive_map to navigate the environment.
@@ -48,11 +49,11 @@ class TopologicalNavigation:
         """
         self.pc_network = pc_network
         self.cognitive_map = cognitive_map
-        #self.gc_network = gc_network
         self.env_model = env_model
         self.path_length_limit = 30  # max number of topological navigation steps
         self.step_limit = 2000  # max number of vector navigation steps
         self.compass = compass
+        self.log = log
 
     def navigate(self, start: PlaceCell, goal: PlaceCell, gc_network: GridCellNetwork,
         controller: Optional[LocalController] = None,
@@ -88,8 +89,9 @@ class TopologicalNavigation:
                 path = [goal]
             path = [start] + path
 
-        for i, p in enumerate(path):
-            print("path_index", i, list(self.cognitive_map.node_network.nodes).index(p))
+        path_indices = [self.cognitive_map._place_cell_number(p) for p in path]
+        if self.log:
+            print('Path:', _printable_path(path_indices))
 
         src_pos = list(path[0].env_coordinates)
 
@@ -137,10 +139,16 @@ class TopologicalNavigation:
                                          step_limit=self.step_limit, goal_pos=path[i+1].pos, *nav_args, **nav_kwargs)
             self.cognitive_map.postprocess_vector_navigation(node_p=path[i], node_q=path[i + 1],
                                                              observation_p=last_pc, observation_q=pc, success=success)
-            print('Vector navigation success:', success)
+            if self.log:
+                print(f'Vector navigation: goal={path_indices[i+1]}, {success=}')
             curr_path_length += 1
             if not success:
                 last_pc, new_path = self.locate_node(self.compass, pc, goal)
+                if self.log:
+                    if not last_pc:
+                        print('Last PC: status=not found/assuming current place cell still correct')
+                    else:
+                        print('Last PC: status=found,', f'#={self.cognitive_map._place_cell_number(last_pc)}')
                 if not last_pc:
                     last_pc = path[i]
 
@@ -163,6 +171,9 @@ class TopologicalNavigation:
                     new_path = [last_pc] + new_path
 
                 path[i:] = new_path
+                if self.log:
+                    path_indices[i:] = [self.cognitive_map._place_cell_number(p) for p in new_path]
+                    print(f'Recomputed path: so_far={_printable_path(path_indices[:i])}, continue={_printable_path(path_indices[i:])}')
                 if plotting:
                     plot.plotTrajectoryInEnvironment(env, cognitive_map=self.cognitive_map, path=path)
             else:
@@ -225,6 +236,8 @@ if __name__ == "__main__":
     parser.add_argument('--env-variant', '--variant', help='Environment model variant')
     parser.add_argument('map_file', nargs='?', default='after_exploration.gpickle')
     parser.add_argument('map_file_after_lifelong_learning', nargs='?', default='after_lifelong_learning.gpickle')
+    parser.add_argument('--compass', choices=['analytical', 'pod', 'linear_lookahead', 'combo'], default='combo')
+    parser.add_argument('--log', help='Log everything to stdout', action='store_true')
     parser.add_argument('--visualize', action='store_true')
     parser.add_argument('--seed', type=int, default=None, help='Seed for random index generation.') # for reproducibility / debugging purposes
     parser.add_argument('--num-topo-nav', '-n', help='number of topological navigations', type=int, default=100)
@@ -243,13 +256,13 @@ if __name__ == "__main__":
 
     re = reachability_estimator_factory(args.re_type, env_model=args.env_model, weights_file=re_weights_file, config=input_config)
     pc_network = PlaceCellNetwork(from_data=True, map_name=args.env_model)
-    cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from=map_file, debug=('cogmap' in DEBUG))
+    cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from=map_file, debug=('cogmap' in DEBUG or args.log))
     assert len(cognitive_map.node_network.nodes) > 1
     gc_network = GridCellNetwork(from_data=True, dt=1e-2)
     pod = PhaseOffsetDetectorNetwork(16, 9, 40)
     compass = Compass.factory(model, gc_network=gc_network, pod_network=pod)
 
-    tj = TopologicalNavigation(args.env_model, pc_network, cognitive_map, compass)
+    tj = TopologicalNavigation(args.env_model, pc_network, cognitive_map, compass, log=args.log)
 
     with PybulletEnvironment(args.env_model, variant=args.env_variant, build_data_set=True, visualize=args.visualize, contains_robot=False) as env:
         # TODO Pierre figure out how to remove unnecessary xy_coordinates

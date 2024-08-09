@@ -11,12 +11,8 @@ import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
 
-import sys
 import os
 from abc import ABC, abstractmethod
-
-if __name__ == "__main__":
-    sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from system.plotting.helper import plot_cognitive_map_path
 from system.plotting.plotThesis import plot_grid_cell
@@ -38,9 +34,9 @@ def sample_normal(m, s):
 from functools import wraps
 def report(fun):
     @wraps(fun)
-    def _wrapper(*args, **kwargs):
-        print('Calling', fun.__name__)
-        return fun(*args, **kwargs)
+    def _wrapper(self: 'CognitiveMapInterface', *args, **kwargs):
+        self.print_debug('Calling', fun.__name__)
+        return fun(self, *args, **kwargs)
     return _wrapper
 
 class CognitiveMapInterface(ABC):
@@ -93,10 +89,15 @@ class CognitiveMapInterface(ABC):
 
         return path
 
+    def _place_cell_number(self, p: PlaceCell) -> int:
+        return list(self.node_network.nodes).index(p)
+
     def add_node_to_map(self, p: PlaceCell):
         """ Adds a new node to the cognitive map """
+        self.print_debug(f'Adding node: #={len(self.node_network.nodes)}, position={p.env_coordinates}')
         self.node_network.add_node(p, pos=tuple(p.env_coordinates))
 
+    @report
     def add_edge_to_map(self, p: PlaceCell, q: PlaceCell, w: float = 1, **kwargs):
         """ Adds a new directed weighted edge to the cognitive map with given weight and parameters
 
@@ -108,6 +109,7 @@ class CognitiveMapInterface(ABC):
         """
         self.node_network.add_edge(p, q, weight=w, **kwargs)
 
+    @report
     def add_bidirectional_edge_to_map_no_weight(self, p: PlaceCell, q: PlaceCell, **kwargs):
         """ Adds a new bidirectional edge to the cognitive map with given parameters
 
@@ -130,6 +132,7 @@ class CognitiveMapInterface(ABC):
         """
         self.node_network.add_edge(p, q, weight=w, **kwargs)
         self.node_network.add_edge(q, p, weight=w, **kwargs)
+        self.print_debug(f'Adding bidirectional edge: p={self._place_cell_number(p)}, q={self._place_cell_number(q)}, weight={w}')
 
     def save(self, filename: str, absolute_path=False):
         """ Stores the current state of the node_network to the file
@@ -161,8 +164,6 @@ class CognitiveMapInterface(ABC):
             #    raise ValueError("cognitive map not found")
             filename = os.path.join(directory, filename)
         self.node_network = nx.read_gpickle(filename)
-        if self.debug:
-            self.draw()
 
     def draw(self, with_labels: bool = True, colors: Optional[list[float]] = None):
         """ Plot the cognitive map
@@ -191,8 +192,8 @@ class CognitiveMapInterface(ABC):
         """ Performs map processing after one full topological navigation cycle """
         pass
 
-    def postprocess_vector_navigation(self, node_p: PlaceCell, node_q: PlaceCell, observation_q: PlaceCell,
-                                      observation_p: PlaceCell, success: bool):
+    def postprocess_vector_navigation(self, node_p: PlaceCell, node_q: PlaceCell, observation_p: PlaceCell,
+                                      observation_q: PlaceCell, success: bool):
         """ Performs map processing after one full vector navigation
 
         arguments:
@@ -352,7 +353,9 @@ class CognitiveMap(CognitiveMapInterface):
 
     def _connect_single_node(self, p):
         """ Calculate reachability of node p with other nodes """
-        for q in list(self.node_network.nodes):
+        if self.debug:
+            i = self._place_cell_number(p)
+        for j, q in enumerate(list(self.node_network.nodes)):
 
             if q == p:
                 continue
@@ -365,8 +368,10 @@ class CognitiveMap(CognitiveMapInterface):
             reachable_qp, reachability_factor_qp = self.reach_estimator.get_reachability(q, p)
 
             if reachable_pq:
+                self.print_debug(f"Connecting new node: p={i}, q={j}, factor={reachability_factor_pq}")
                 self.node_network.add_weighted_edges_from([(p, q, reachability_factor_pq)])
             if reachable_qp:
+                self.print_debug(f"Connecting new node: q={j}, p={i}, factor={reachability_factor_qp}")
                 self.node_network.add_weighted_edges_from([(q, p, reachability_factor_qp)])
 
     def add_node_to_map(self, p: PlaceCell):
@@ -374,9 +379,7 @@ class CognitiveMap(CognitiveMapInterface):
 
         if self.connection[1] == "instant":
             # Connect the new node to all other nodes in the graph
-            self.print_debug("connecting new node")
             self._connect_single_node(p)
-            self.print_debug("connecting finished")
 
     def track_vector_movement(self, pc_firing: list[float], created_new_pc: bool, pc: PlaceCell, lidar: list[float]|None = None, **kwargs) -> Optional[PlaceCell]:
         """Keeps track of current place cell firing and creation of new place cells"""
@@ -640,6 +643,7 @@ class LifelongCognitiveMap(CognitiveMapInterface):
                             self.add_bidirectional_edge_to_map_no_weight(node_q, neighbor, **edge_attributes_dict)
                     deleted.append(node_p)
         for node in deleted:
+            self.print_debug(f'Remove node: reason=dedup, #={self._place_cell_number(node)}')
             self.node_network.remove_node(node)
 
     def are_duplicates(self, node_p: PlaceCell, node_q: PlaceCell):
