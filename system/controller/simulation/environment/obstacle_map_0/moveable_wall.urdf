@@ -2,12 +2,12 @@
 <robot name="plane">
   <link name="planeLink">
   <contact>
-      <lateral_friction value="1"/>
+    <lateral_friction value="1"/>
   </contact>
     <inertial>
       <origin rpy="0 0 0" xyz="0 0 0"/>
-       <mass value=".0"/>
-       <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+      <mass value=".0"/>
+      <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
     </inertial>
   </link>
     <joint name="box_3_joint" type="fixed">
@@ -17,19 +17,19 @@
     </joint>
 
     <link name="box_3">
-    	<visual>
-        <origin rpy="0 0 0" xyz="0 -0.5 0"/>
+      <visual>
+        <origin rpy="0 0 0" xyz="1.5 -1.75 0"/>
         <geometry>
-  	 	<box size="0.5 3 0.5"/>
+          <box size="3.5 5 0.5"/>
         </geometry>
         <material name="grey">
-  	    <color rgba="0.5 0.5 0.5 1"/>
-  	  </material>
+          <color rgba="0.5 0.5 0.5 1"/>
+        </material>
       </visual>
       <collision>
-        <origin rpy="0 0 0" xyz="0 -0.5 0"/>
+        <origin rpy="0 0 0" xyz="1.5 -1.75 0"/>
         <geometry>
-  	 	<box size="0.5 3 0.5"/>
+          <box size="3.5 5 0.5"/>
         </geometry>
       </collision>
       <inertial>
@@ -37,34 +37,4 @@
         <inertia ixx="0.0" ixy="0.0" ixz="0.0" iyy="0.0" iyz="0.0" izz="0.0"/>
       </inertial>
     </link>
-
-
-        <joint name="box_4_joint" type="fixed">
-      <origin rpy="0 0 0" xyz="0 0 0.05"/>
-      <parent link="planeLink"/>
-      <child link="box_4"/>
-    </joint>
-
-    <link name="box_4">
-    	<visual>
-        <origin rpy="0 0 0" xyz="1 0.5 0"/>
-        <geometry>
-  	 	<box size="1.5 1 0.5"/>
-        </geometry>
-        <material name="grey">
-  	    <color rgba="0.5 0.5 0.5 1"/>
-  	  </material>
-      </visual>
-      <collision>
-        <origin rpy="0 0 0" xyz="1 0.5 0"/>
-        <geometry>
-  	 	<box size="1.5 1 0.5"/>
-        </geometry>
-      </collision>
-      <inertial>
-        <mass value="1"/>
-        <inertia ixx="0.0" ixy="0.0" ixz="0.0" iyy="0.0" iyz="0.0" izz="0.0"/>
-      </inertial>
-    </link>
-
 </robot>

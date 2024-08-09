@@ -139,6 +139,7 @@ class PybulletEnvironment:
             p.setRealTimeSimulation(1)
 
         self.env_model = env_model
+        self.variant = variant
         self.arena_size = 15
 
         base_position = [0, 0.05]  # [0, 0.05] ensures that it actually starts at origin
@@ -238,12 +239,13 @@ class PybulletEnvironment:
         return new_env
 
     def switch_variant(self, new_variant):
+        self.variant = new_variant
         if self.env_model == 'obstacle_map_0':
             if self.mazeID:
                 p.removeBody(self.mazeID[0])
-            distance = 0 if new_variant is None else float(new_variant)
-            distance = distance * np.array([1, -1, 0])
-            self.mazeID = [p.loadURDF(resource_path(self.env_model, 'moveable_wall.urdf'), basePosition=distance)]
+            offset = 0 if new_variant is None else float(new_variant) - 1
+            offset = offset * np.array([1, -1, 0])
+            self.mazeID = [p.loadURDF(resource_path(self.env_model, 'moveable_wall.urdf'), basePosition=offset)]
 
     @property
     def dimensions(self):

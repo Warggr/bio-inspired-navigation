@@ -24,8 +24,8 @@ def width_test(
         success, _ = vector_navigation(env, compass, controller=controller, goal_pos=goal)
     return success
 
-min_fail_width = -2
-max_succ_width = 2
+max_fail_width = 0
+min_succ_width = 2
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -43,13 +43,13 @@ controller = LocalController(
 )
 
 with PybulletEnvironment(env_model="obstacle_map_0", visualize=args.visualize, contains_robot=False) as env:
-    while(max_succ_width - min_fail_width > args.precision):
-        width = (max_succ_width + min_fail_width) / 2
+    while(min_succ_width - max_fail_width > args.precision):
+        width = (min_succ_width + max_fail_width) / 2
         print(f"Trying {width=}...", file=sys.stderr)
         success = width_test(width, controller, env)
         print("Success!" if success else "Fail :(", file=sys.stderr)
         if success:
-            max_succ_width = width
+            min_succ_width = width
         else:
-            min_fail_width = width
-    print(f"Minimum handle-able width is {min_fail_width} ~ {max_succ_width}")
+            max_fail_width = width
+    print(f"Minimum handle-able width is {max_fail_width} ~ {min_succ_width}")

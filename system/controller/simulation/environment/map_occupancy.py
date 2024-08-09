@@ -580,7 +580,7 @@ def environment_dimensions(env_model: AllowedMapName) -> tuple[Vector2D, Vector2
     elif env_model == "plane":
         return None
     elif "obstacle" in env_model:
-        return None
+        return np.array([-4, -3]), np.array([2.1, 3.1])
     elif env_model == "linear_sunburst":
         return np.array([0, 0]), np.array([11, 11])
     else:

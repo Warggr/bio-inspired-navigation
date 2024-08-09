@@ -46,7 +46,7 @@ Image = 'np.ndarray[float, (64, 64, 4)]'
 allowed_map_names = [
     'Savinov_val3', 'linear_sunburst', 'obstacle_map_0'
 ]
-AllowedMapName = Literal['Savinov_val3', 'linear_sunburst', 'obstacle_map_0']
+AllowedMapName = Literal['Savinov_val3', 'Savinov_val2', 'Savinov_test7', 'linear_sunburst', 'obstacle_map_0', 'obstacle_map_1', 'plane']
 AllowedMapName.options = allowed_map_names
 
 
