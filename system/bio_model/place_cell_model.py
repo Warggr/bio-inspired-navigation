@@ -50,7 +50,6 @@ class PlaceCell(PlaceInfo):
         assert observations[0] is not None
         self.lidar = lidar
         self.angle = angle
-        assert self.angle is not NotImplemented
 
     @staticmethod
     def from_data(data: PlaceInfo):
