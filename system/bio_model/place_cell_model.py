@@ -210,13 +210,18 @@ class PlaceCellNetwork:
         """
         prev_pos = None
         for pc in self.place_cells:
-            if prev_pos is None:
-                angle = 0
-            else:
-                dist = pc - prev_pos
-                angle = np.angle(dist[0] + 1.0j*dist[1])
-            pc.lidar = env.lidar((pc.pos, angle))[0]
-            pc.observations = [env.camera((pc.pos, angle))]
+            try:
+                pc.angle
+            except AttributeError:
+                if prev_pos is None:
+                    angle = 0
+                else:
+                    dist = pc - prev_pos
+                    angle = np.angle(dist[0] + 1.0j*dist[1])
+                pc.angle = angle
+                # overwriting previous image and (possibly) lidar, because we don't know from what angle they were
+                pc.lidar = env.lidar((pc.pos, angle))[0]
+                pc.observations = [env.camera((pc.pos, angle))]
 
     def save_pc_network(self, filename=""):
         """ Save current place cell network """

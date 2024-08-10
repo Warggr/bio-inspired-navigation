@@ -1,10 +1,4 @@
-import os
-import sys
-
 from system.bio_model.grid_cell_model import GridCellNetwork
-
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
-
 from system.bio_model.cognitive_map import LifelongCognitiveMap
 from system.bio_model.place_cell_model import PlaceCellNetwork
 from system.controller.local_controller.compass import AnalyticalCompass
@@ -14,6 +8,12 @@ from system.controller.reachability_estimator.reachability_estimation import rea
 from system.controller.reachability_estimator.ReachabilityDataset import SampleConfig
 from system.controller.simulation.pybullet_environment import PybulletEnvironment
 from system.controller.topological.topological_navigation import TopologicalNavigation
+
+import argparse
+from system.parsers import controller_parser
+
+parser = argparse.ArgumentParser(parents=[controller_parser])
+args = parser.parse_args()
 
 re_type = 'view_overlap' #"neural_network"
 re_weights_file = "re_mse_weights.50"
@@ -41,7 +41,7 @@ vector_step_counter = Counter()
 compass = AnalyticalCompass()
 controller = LocalController(
     on_reset_goal=[controller_rules.TurnToGoal(), vector_step_counter],
-    transform_goal_vector=[controller_rules.ObstacleAvoidance()],
+    transform_goal_vector=[controller_rules.ObstacleAvoidance(ray_length=args.ray_length, tactile_cone=args.tactile_cone, follow_walls=args.follow_walls)],
     hooks=[controller_rules.StuckDetector()],
 )
 tj = TopologicalNavigation(env_model, pc_network, cognitive_map, compass)
@@ -54,6 +54,10 @@ gc_network.set_as_current_state(start_pc.spikings)
 compass.reset_position(start_pc.pos)
 
 with PybulletEnvironment(start=start_pc.pos, visualize=visualize, build_data_set=True) as env:
+    # backwards compatibility: a lot of cognitive maps were saved without angles
+    # TODO: put it into the cognitive_map code?
+    cognitive_map.get_place_cell_network().add_angles_and_lidar(env)
+
     success = tj.navigate(start_pc, goal_pc, gc_network=gc_network, env=env, controller=controller)
     if success:
         print(f"Success! simulation time: {env.t}. Navigation steps: {vector_step_counter.counter}")
