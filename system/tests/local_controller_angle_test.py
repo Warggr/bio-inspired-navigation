@@ -59,9 +59,10 @@ min_fail_angle = np.radians(90)
 max_succ_angle = np.radians(0)
 
 import argparse
-parser = argparse.ArgumentParser()
+from system.parsers import controller_parser
+
+parser = argparse.ArgumentParser(parents=[controller_parser])
 parser.add_argument('precision', nargs='?', type=float, default=5, help='Precision, in degrees')
-parser.add_argument('--ray-length', default=1, type=float)
 parser.add_argument('--visualize', action='store_true')
 args = parser.parse_args()
 

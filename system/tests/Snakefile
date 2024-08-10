@@ -1,0 +1,76 @@
+rule:
+	output: "results/local_controller_angle/length={raylen}.log"
+	shell: """
+		echo -n '{wildcards.raylen}:' > {output}
+		python local_controller_angle_test.py --ray-length {wildcards.raylen} | tail -n 1 >> {output}
+	"""
+
+rule:
+	output: "results/local_controller_width/cone={cone}.log"
+	shell: """
+		echo -n '{wildcards.cone}:' > {output}
+		python local_controller_narrow_test.py --tactile-cone {wildcards.cone} | tail -n 1 >> {output}
+	"""
+
+rule:
+	input: [ f"results/local_controller_width/cone={cone}.log" for cone in [60, 120, 180, 210, 260, 310] ]
+	output:
+		csv = "results/local_controller_width/results.csv",
+		pgf = "results/local_controller_width/results.pgf",
+		png = "results/local_controller_width/results.png",
+	run:
+		results = []
+		for line in shell(f"cat {input}", iterable=True):
+			raylen, line = line.split(':')
+			raylen = float(raylen)
+			LINE_START = 'Minimum handle-able width is '
+			assert line.startswith(LINE_START), line
+			line = line.removeprefix(LINE_START)
+			start, stop = line.split(' ~ ')
+			start, stop = [float(i) for i in (start, stop)]
+			results.append({ 'start': start, 'stop': stop, 'raylen': raylen })
+		import pandas as pd
+		dset = pd.DataFrame(results)
+		dset.to_csv(output.csv)
+		import matplotlib
+		import matplotlib.pyplot as plt
+		matplotlib.use("pgf")
+		plt.scatter(dset['raylen'], dset['start'], label='lower bound')
+		plt.scatter(dset['raylen'], dset['stop'], label='upper bound')
+		plt.xlabel('Cone')
+		plt.ylabel('Maximum handled width')
+		plt.legend()
+		plt.savefig(output.png)
+		plt.savefig(output.pgf)
+
+rule:
+	input: [ f"results/local_controller_angle/length={raylen}.log" for raylen in [0, 0.1, 0.2, 0.5, 0.8, 1, 1.5, 2] ]
+	output:
+		csv = "results/local_controller_angle/results.csv",
+		pgf = "results/local_controller_angle/results.pgf",
+		png = "results/local_controller_angle/results.png",
+		#{format=f"results/local_controller_angle/results.{format}" for format in ['pgf', 'png', 'csv']}
+	run:
+		results = []
+		for line in shell(f"cat {input}", iterable=True):
+			raylen, line = line.split(':')
+			raylen = float(raylen)
+			LINE_START = 'Maximum handle-able angle is '
+			assert line.startswith(LINE_START)
+			line = line.removeprefix(LINE_START)
+			start, stop = line.split(' ~ ')
+			start, stop = [int(i) for i in (start, stop)]
+			results.append( {{ 'start': start, 'stop': stop, 'raylen': raylen }})
+		import pandas as pd
+		dset = pd.DataFrame(results)
+		dset.to_csv('results/local_controller_angle/result.csv')
+		import matplotlib
+		import matplotlib.pyplot as plt
+		matplotlib.use("pgf")
+		plt.scatter(dset['raylen'], dset['start'], label='lower bound')
+		plt.scatter(dset['raylen'], dset['stop'], label='upper bound')
+		plt.xlabel('Ray length')
+		plt.ylabel('Maximum handled angle')
+		plt.legend()
+		plt.savefig(output.png)
+		plt.savefig(output.pgf)

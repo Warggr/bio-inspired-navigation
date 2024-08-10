@@ -2,6 +2,7 @@ import numpy as np
 from system.controller.simulation.pybullet_environment import Robot, RobotStuck
 from system.utils import normalize
 from system.controller.simulation.math_utils import vectors_in_one_direction, intersect, compute_angle
+from system.debug import DEBUG
 
 from abc import ABC
 from system.types import Vector2D, Angle
@@ -33,7 +34,7 @@ class LocalController(ABC):
 
     @staticmethod
     def default(obstacles=True):
-        return LocalController(on_reset_goal=[ TurnToGoal() ], transform_goal_vector=([ObstacleAvoidance()] if obstacles else []), hooks=[StuckDetector()])
+        return LocalController(on_reset_goal=[TurnToGoal()], transform_goal_vector=([ObstacleAvoidance()] if obstacles else []), hooks=[StuckDetector()])
 
     def reset_goal(self, new_goal: Vector2D, robot: Robot):
         for hook in self.on_reset_goal:
@@ -49,7 +50,7 @@ class LocalController(ABC):
                     kwargs = {}
             all_kwargs = { **all_kwargs, **kwargs } # TODO Pierre: this is ugly
 
-        robot.env.add_debug_line(robot.position, np.array(robot.position) + goal_vector, color=(0, 0, 1), width=3)
+        #robot.env.add_debug_line(robot.position, np.array(robot.position) + goal_vector, color=(0, 0, 1), width=3)
         robot.navigation_step(goal_vector, **all_kwargs)
 
 
@@ -91,13 +92,20 @@ class ObstacleAvoidance:
         self.combine = combine
         self.follow_walls = follow_walls
         self.lidar_kwargs = dict(tactile_cone=tactile_cone, num_ray_dir=num_ray_dir, ray_length=ray_length)
+        self.debug = 'obstacles' in DEBUG
 
     def __call__(self, goal_vector: Vector2D, robot: Robot) -> Vector2D:
         lidar = robot.env.lidar(**self.lidar_kwargs, blind_spot_cone=0, agent_pos_orn=robot.lidar_sensor_position)
         point, obstacle_vector = robot.calculate_obstacle_vector(lidar)
         #print(f"{self.position=}, {obstacle_vector=}, {goal_vector=}")
-        robot.env.add_debug_line(robot.position, np.array(robot.position) + obstacle_vector, color=(1, 0, 0), width=3)
-        robot.env.add_debug_line(robot.position, np.array(robot.position) + goal_vector, color=(0, 0, 0), width=3)
+        if self.debug:
+            robot.env.add_debug_line(robot.position, np.array(robot.position) + obstacle_vector, color=(1, 0, 0), width=3)
+            robot.env.add_debug_line(robot.position, np.array(robot.position) + goal_vector, color=(0, 0, 0), width=3)
+
+        goal_vector_norm = np.linalg.norm(goal_vector)
+        if np.dot(goal_vector, np.array(point[:2]) - np.array(robot.position)) / goal_vector_norm >= goal_vector_norm:
+            # the goal is closer than the obstacle
+            return goal_vector
 
         normed_goal_vector = normalize(goal_vector)
 
@@ -109,6 +117,9 @@ class ObstacleAvoidance:
         if self.follow_walls and multiple == 1 and np.linalg.norm(obstacle_vector) > 3: # norm is 1.5 / min(distances), i.e. if norm > 3 <=> distance < 0.5
             combine = 0
         goal_vector = normed_goal_vector * combine + obstacle_vector * multiple
+        if self.debug:
+            robot.env.add_debug_line(robot.position, np.array(robot.position) + goal_vector, color=(0, 0, 1), width=3)
+        #return normalize(goal_vector)
         return goal_vector
 
 

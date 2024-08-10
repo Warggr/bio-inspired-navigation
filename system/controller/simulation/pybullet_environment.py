@@ -534,7 +534,7 @@ class Robot:
             max_speed - determines speed at which agent travels: max_speed = 5.5 -> actual speed of ~0.5 m/s
             build_data_set - when true create camera images
         """
-        base_position = [ base_position[0], base_position[1], PybulletEnvironment.ROBOT_Z_POS ]
+        base_position = [ base_position[0], base_position[1], 0 ]
         base_orientation = p.getQuaternionFromEuler([0, 0, base_orientation])
         filename = os.path.join(DIRNAME,"p3dx","urdf","pioneer3dx.urdf")
         self.ID = p.loadURDF(filename, basePosition=base_position, baseOrientation=base_orientation)

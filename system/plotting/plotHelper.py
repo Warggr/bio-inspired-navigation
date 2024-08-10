@@ -88,16 +88,17 @@ def add_environment(ax, env_model: AllowedMapName, variant: str|None = None):
         ax.add_artist(wall)   
         ax.set_xlim(-4, 2.1)
         ax.set_ylim(-3, 3.1)
+    elif env_model == "plane":
+        pass
+    else:
+        raise ValueError(f"Unrecognized env: `{env_model}`")
+
     if env_model == "obstacle_map_0":
         distance = float(variant)-1 if variant is not None else 0
 
         # TODO: read these values from moveable_wall.urdf?
         box3 = plt.Rectangle((-0.25+distance, -4.25-distance), 3.5, 5, color=TUM_colors['TUMDarkGray'])
         ax.add_artist(box3)
-    elif env_model == "plane":
-        pass
-    else:
-        raise ValueError("Unrecognized env:", env_model)
 
 
 def add_robot(ax, xy: tuple[float, float], angle: float):

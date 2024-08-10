@@ -28,23 +28,29 @@ max_fail_width = 0
 min_succ_width = 2
 
 import argparse
-parser = argparse.ArgumentParser()
+from system.parsers import controller_parser
+
+parser = argparse.ArgumentParser(parents=[controller_parser])
 parser.add_argument('precision', nargs='?', type=float, default=0.1, help='Precision, in meters')
-parser.add_argument('--ray-length', default=1, type=float)
+parser.add_argument('--starting-value', '-s', type=float)
 parser.add_argument('--visualize', action='store_true')
 args = parser.parse_args()
 
 controller = LocalController(
     on_reset_goal=[controller_rules.TurnToGoal()],
     transform_goal_vector=[
-        controller_rules.ObstacleAvoidance(ray_length=args.ray_length),
+        controller_rules.ObstacleAvoidance(ray_length=args.ray_length, follow_walls=args.follow_walls, tactile_cone=np.radians(args.tactile_cone)),
     ],
     hooks=[controller_rules.StuckDetector()],
 )
 
 with PybulletEnvironment(env_model="obstacle_map_0", visualize=args.visualize, contains_robot=False) as env:
     while(min_succ_width - max_fail_width > args.precision):
-        width = (min_succ_width + max_fail_width) / 2
+        if args.starting_value is not None:
+            width = args.starting_value
+            args.starting_value = None
+        else:
+            width = (min_succ_width + max_fail_width) / 2
         print(f"Trying {width=}...", file=sys.stderr)
         success = width_test(width, controller, env)
         print("Success!" if success else "Fail :(", file=sys.stderr)
