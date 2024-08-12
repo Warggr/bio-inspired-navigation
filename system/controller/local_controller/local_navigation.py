@@ -306,6 +306,7 @@ def vector_navigation(
     goal_reached = False
     end_state = ""  # for plotting
     last_pc = None
+    last_observation = None
     while n < step_limit and not goal_reached:
         try:
             goal_vector = compass.calculate_goal_vector()
@@ -324,11 +325,12 @@ def vector_navigation(
         if pc_network is not None and cognitive_map is not None:
             observations = robot.data_collector.get_observations()
             assert len(observations) != 0
+            last_observation = observations[-1]
             firing_values, created_new_pc = pc_network.track_movement(
                 PlaceInfo(
                     *robot.position_and_angle,
                     spikings=gc_network.consolidate_gc_spiking(),
-                    img=observations[-1], lidar=robot.env.lidar()[0],
+                    img=last_observation, lidar=robot.env.lidar()[0],
                 ),
                 creation_allowed=exploration_phase,
             )
@@ -369,7 +371,9 @@ def vector_navigation(
         robot.navigation_hooks.remove(on_nav_step)
 
     if not last_pc and not exploration_phase and pc_network:
-        pc_network.create_new_pc(PlaceInfo(spikings=gc_network.consolidate_gc_spiking(), img=observations[-1], pos=robot.position, angle=NotImplemented, lidar=robot.env.lidar()[0]))
+        if last_observation is None:
+            last_observation = robot.env.camera()
+        pc_network.create_new_pc(PlaceInfo(spikings=gc_network.consolidate_gc_spiking(), img=last_observation, pos=robot.position, angle=NotImplemented, lidar=robot.env.lidar()[0]))
         last_pc = pc_network.place_cells[-1]
     return goal_reached, last_pc
 
