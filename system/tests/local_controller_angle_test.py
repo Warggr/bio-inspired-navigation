@@ -49,7 +49,7 @@ def angle_test(
 ) -> bool:
     goal_direction = np.array([ -np.sin(angle), -np.cos(angle) ])
     start = WALL_CENTER - 2*goal_direction
-    compass = DirectionalCompass(angle, goal_offset=2.5, zero=WALL_CENTER)
+    compass = DirectionalCompass(angle, goal_offset=3, zero=WALL_CENTER)
     compass.reset_position(compass.zvalue(start))
     with Robot(env, base_position=start, base_orientation=-angle-np.radians(90)):
         success, _ = vector_navigation(env, compass, controller=controller)
