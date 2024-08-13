@@ -485,8 +485,9 @@ class LifelongCognitiveMap(CognitiveMapInterface):
                 self.process_add_edge(pc_firing, pc_network)
         if np.max(pc_firing) > self.active_threshold:
             self.prior_idx_pc_firing = np.argmax(pc_firing)
-        if self.prior_idx_pc_firing is not None:
             return pc_network.place_cells[self.prior_idx_pc_firing]
+#        else:
+#            print(f'max. firing[{np.argmax(pc_firing)}] = {np.max(pc_firing)} does not meet threshold {self.active_threshold}')
         return None
 
     def process_add_edge(self, pc_firing: list[float], pc_network: PlaceCellNetwork):
