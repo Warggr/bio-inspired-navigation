@@ -11,7 +11,7 @@ for mapname in maps:
 		output:
 			[ f"system/bio_model/data/cognitive_map/{mapname}.after_exploration.gpickle" ] +
 			[ f"system/bio_model/data/pc_model/{artifact}-{mapname}.npy" for artifact in pc_network_artifacts ]
-		shell: f"python system/controller/topological/exploration_phase.py {mapname}"
+		shell: f"python system/controller/topological/exploration_phase.py npc {mapname}"
 
 for artifact in pc_network_artifacts:
 	rule:

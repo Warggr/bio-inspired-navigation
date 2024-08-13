@@ -98,11 +98,20 @@ if __name__ == "__main__":
     from system.controller.reachability_estimator.ReachabilityDataset import SampleConfig
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("env_model", default="Savinov_val3", choices=["Savinov_val3", "linear_sunburst"])
-    parser.add_argument('-n', dest='desired_nb_of_place_cells', help='desired number of place cells', type=int, default=30)
-    parser.add_argument('-t', '--threshold-same-hint', help='The first value that will be tried as the sameness threshold', type=float)
     parser.add_argument('--re', dest='re_type', default='neural_network', choices=['neural_network', 'view_overlap', 'bvc'])
     parser.add_argument('--visualize', action='store_true')
+    parser.add_argument('--mini', help='Use only a few trajectories', action='store_true')
+    modes = parser.add_subparsers(dest='subcommand')
+    parser.add_argument("env_model", default="Savinov_val3", choices=["Savinov_val3", "linear_sunburst"])
+    parser.add_argument('--output-filename', "-o", help='The file to save the network to', nargs='?', default='after_exploration.gpickle')
+
+    binary_param_search = modes.add_parser('npc', help='Target a number of place cells')
+    binary_param_search.add_argument('-n', dest='desired_nb_of_place_cells', help='desired number of place cells', type=int, default=30)
+    binary_param_search.add_argument('-t', '--threshold-same-hint', help='The first value that will be tried as the sameness threshold', type=float)
+
+    fixed_threshold = modes.add_parser('threshold', help='Set a threshold_same')
+    fixed_threshold.add_argument('threshold_same', type=float)
+
     args = parser.parse_args()
 
     re_weights_file = "re_mse_weights.50"
@@ -113,7 +122,8 @@ if __name__ == "__main__":
             [0.5, 1.5], [2.5, -1.5], [1.5, 0], [5, -1.5], [4.5, -0.5], [-0.5, 0], [-8.5, 3],
             [-8.5, -4], [-7.5, -3.5], [1.5, -3.5], [-6, -2.5]
         ]
-        cognitive_map_filename = "after_exploration.gpickle"
+        if args.mini:
+            goals = goals[7:11]
     elif args.env_model == "linear_sunburst":
         goals = [
              [5.5, 4.5],
@@ -142,41 +152,55 @@ if __name__ == "__main__":
              [8.5, 7.5],
              [9.5, 7.5],
         ]
-        cognitive_map_filename = "linear_sunburst.after_exploration.gpickle"
+        if args.mini:
+            goals = goals[2:8] + [goals[3]]
     else:
         raise ValueError(f"Unsupported map: {args.env_model}")
+
+    if args.env_model != "Savinov_val3" and not args.output_filename.startswith(args.env_model + '.'):
+        args.output_filename = args.env_model + '.' + args.output_filename
 
     gc_network = GridCellNetwork(from_data=False)
     re = reachability_estimator_factory(args.re_type, weights_file=re_weights_file, debug=('plan' in DEBUG), config=SampleConfig(grid_cell_spikings=True))
 
-    too_strict_threshold = 1.4
-    too_lax_threshold = 0.2
-    while True:
-        if args.threshold_same_hint is not None:
-            re.threshold_same = args.threshold_same_hint
-            args.threshold_same_hint = None
-        else:
-            re.threshold_same = (too_lax_threshold + too_strict_threshold) / 2
-        pc_network = PlaceCellNetwork(reach_estimator=re, max_capacity=2*args.desired_nb_of_place_cells)
+    def create_cogmap(threshold, max_capacity=float('inf')):
+        re.threshold_same = threshold
+        pc_network = PlaceCellNetwork(reach_estimator=re, max_capacity=max_capacity)
         cognitive_map = LifelongCognitiveMap(reachability_estimator=re, metadata={'threshold': re.threshold_same})
-
-        print(f"Trying threshold {re.threshold_same}...")
-        try:
-            pc_network, cognitive_map = waypoint_movement(goals, args.env_model, gc_network, pc_network, cognitive_map, visualize=args.visualize)
-        except TooManyPlaceCells as err:
-            too_strict_threshold = re.threshold_same
-            print("Too high!")
-            continue
-        if len(pc_network.place_cells) < args.desired_nb_of_place_cells / 2:
-            too_lax_threshold = re.threshold_same
-            print("Too low!")
-            continue
+        pc_network, cognitive_map = waypoint_movement(goals, args.env_model, gc_network, pc_network, cognitive_map, visualize=args.visualize)
         cognitive_map.postprocess_topological_navigation()
-        assert len(cognitive_map.node_network.nodes) > 1
-        break
+        return cognitive_map, pc_network
+
+    if args.subcommand == 'npc':
+        too_strict_threshold = 1.4
+        too_lax_threshold = 0.2
+        while True:
+            if args.threshold_same_hint is not None:
+                threshold_same = args.threshold_same_hint
+                args.threshold_same_hint = None
+            else:
+                threshold_same = (too_lax_threshold + too_strict_threshold) / 2
+
+            print(f"Trying threshold {threshold_same}...")
+            try:
+                cognitive_map, pc_network = create_cogmap(threshold=threshold_same, max_capacity=2*args.desired_nb_of_place_cells)
+            except TooManyPlaceCells as err:
+                too_strict_threshold = threshold_same
+                print("Too high!")
+                continue
+            if len(pc_network.place_cells) < args.desired_nb_of_place_cells / 2:
+                too_lax_threshold = threshold_same
+                print("Too low!")
+                continue
+            assert len(cognitive_map.node_network.nodes) > 1
+            break
+    elif args.subcommand == 'threshold':
+        cognitive_map, pc_network = create_cogmap(threshold=args.threshold_same)
+    else:
+        raise ValueError('Unrecognized subcommand')
 
     pc_network.save_pc_network(filename=(f'-{args.env_model}' if args.env_model != 'Savinov_val3' else ''))
-    cognitive_map.save(filename=cognitive_map_filename)
+    cognitive_map.save(filename=args.output_filename)
 
     if plotting:
         cognitive_map.draw()
