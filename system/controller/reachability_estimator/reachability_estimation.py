@@ -189,7 +189,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
 
         global_args = state_dict.get('global_args', {})
         if type(global_args) is not dict: # fix for some networks being saved with Hyperparameters
-            global_args = {}
+            global_args = {'backbone': 'convolutional'}
 
         # self.print_debug('global args:')
         # self.print_debug(tabulate.tabulate(global_args.items()))
@@ -256,7 +256,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
 
     def reachability_factor_batch(self, p: PlaceInfo, qs: Iterable[PlaceInfo]) -> list[float]:
         batches: list[Batch['NetworkReachabilityEstimator.dtype']] = [self.to_batch(p, q) for q in qs]
-        if batches == []: return []
+        if batches == []: return np.array([])
         args_batch = np.concatenate(batches, axis=0)
         return self.reachability_factor_of_array(args_batch)
 

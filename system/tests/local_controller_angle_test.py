@@ -33,7 +33,7 @@ class DirectionalCompass(Compass[float]):
         self.position: Optional[float] = None
     def calculate_goal_vector(self) -> Vector2D:
         return self.goal_vector * (self.goal - self.position)
-    def parse(pc: 'PlaceInfo') -> float:
+    def parse(self, pc: 'PlaceInfo') -> float:
         return self.zvalue(pc.pos)
     def update_position(self, robot: 'Robot'):
         self.position = self.zvalue(robot.position)
