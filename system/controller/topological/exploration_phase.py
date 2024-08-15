@@ -160,7 +160,7 @@ if __name__ == "__main__":
     if args.env_model != "Savinov_val3" and not args.output_filename.startswith(args.env_model + '.'):
         args.output_filename = args.env_model + '.' + args.output_filename
 
-    gc_network = GridCellNetwork(from_data=False)
+    gc_network = GridCellNetwork(from_data=True)
     re = reachability_estimator_factory(args.re_type, weights_file=re_weights_file, debug=('plan' in DEBUG), config=SampleConfig(grid_cell_spikings=True))
 
     def create_cogmap(threshold, max_capacity=float('inf')):
