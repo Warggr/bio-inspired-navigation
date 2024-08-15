@@ -444,4 +444,4 @@ class BVCReachabilityEstimator(ReachabilityEstimator):
 
     def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo) -> float:
         spikings_start, spikings_goal = self._allo_bc_spikinigs(start), self._allo_bc_spikinigs(goal)
-        return np.cov(spikings_start, spikings_goal)[0, 1] # np.cov returns a full covariance matrix
+        return -np.mean(np.abs(spikings_start - spikings_goal))
