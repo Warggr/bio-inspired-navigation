@@ -248,6 +248,7 @@ def vector_navigation(
     collect_data_freq=False, collect_data_reachable=False, collect_nr_steps=False, exploration_phase=False,
     pc_network: Optional[PlaceCellNetwork] = None, cognitive_map: Optional[CognitiveMapInterface] = None,
     goal_pos: Optional[Vector2D] = None,
+    add_nodes = True,
 ) -> tuple[bool, Any]:
     """
     Agent navigates towards goal.
@@ -289,6 +290,7 @@ def vector_navigation(
 
     # TODO Pierre: do this before the call
     if gc_network and (target_gc_spiking is not None):
+        print('Warning: deprecated: please set the target_state beforehand')
         gc_network.set_as_target_state(target_gc_spiking)
 
     n = 0  # time steps
@@ -370,7 +372,7 @@ def vector_navigation(
     if gc_network is not None:
         robot.navigation_hooks.remove(on_nav_step)
 
-    if not last_pc and not exploration_phase and pc_network:
+    if not last_pc and not exploration_phase and add_nodes and pc_network:
         if last_observation is None:
             last_observation = robot.env.camera()
         pc_network.create_new_pc(PlaceInfo(spikings=gc_network.consolidate_gc_spiking(), img=last_observation, pos=robot.position, angle=NotImplemented, lidar=robot.env.lidar()[0]))
