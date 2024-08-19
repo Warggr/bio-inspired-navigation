@@ -46,6 +46,26 @@ class SampleConfig:
             + ('+dist' if self.with_dist else '')
         )
 
+    @staticmethod
+    def from_filename(filename: str) -> 'SampleConfig':
+        filename, _extension = filename.split('.')
+        filename, *tags = filename.split('+')
+        config = SampleConfig()
+        for tag in tags:
+            if tag == 'spikings': config.with_grid_cell_spikings = True
+            if tag.startswith('lidar--'):
+                config.lidar = tag.removeprefix('lidar--')
+            if tag.endswith('images'):
+                tag = tag.removesuffix('images')
+                if tag == 'no': config.images = False
+                else: config.images = tag
+            if tag.startswith('crop'):
+                tag = tag.removeprefix('crop')
+                sign, value = {'X': +1, 'N': -1}[tag[0]], int(tag[1:])
+                config.image_crop = sign * value
+            if tag == 'dist': config.with_dist = True
+        return config
+
 DATA_STORAGE_FOLDER = os.path.join(os.path.dirname(__file__), "data", "reachability")
 
 

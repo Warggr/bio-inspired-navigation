@@ -96,13 +96,15 @@ if __name__ == "__main__":
     """
     from system.controller.reachability_estimator.reachability_estimation import reachability_estimator_factory
     from system.controller.reachability_estimator.ReachabilityDataset import SampleConfig
+    import os
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--re', dest='re_type', default='neural_network', choices=['neural_network', 'view_overlap', 'bvc'])
+    parser.add_argument('--re-from')
     parser.add_argument('--visualize', action='store_true')
     parser.add_argument('--mini', help='Use only a few trajectories', action='store_true')
     modes = parser.add_subparsers(dest='subcommand')
-    parser.add_argument("env_model", default="Savinov_val3", choices=["Savinov_val3", "linear_sunburst"])
+    parser.add_argument("--env-model", "-e", default="Savinov_val3", choices=["Savinov_val3", "linear_sunburst"])
     parser.add_argument('--output-filename', "-o", help='The file to save the network to', nargs='?', default='after_exploration.gpickle')
 
     binary_param_search = modes.add_parser('npc', help='Target a number of place cells')
@@ -113,8 +115,6 @@ if __name__ == "__main__":
     fixed_threshold.add_argument('threshold_same', type=float)
 
     args = parser.parse_args()
-
-    re_weights_file = "re_mse_weights.50"
 
     if args.env_model == "Savinov_val3":
         goals = [
@@ -161,7 +161,13 @@ if __name__ == "__main__":
         args.output_filename = args.env_model + '.' + args.output_filename
 
     gc_network = GridCellNetwork(from_data=True)
-    re = reachability_estimator_factory(args.re_type, weights_file=re_weights_file, debug=('plan' in DEBUG), config=SampleConfig(grid_cell_spikings=True))
+    if args.re_from is None:
+        args.re_from = 're_mse_weights.50'
+        config = SampleConfig(grid_cell_spikings=True)
+    else:
+        config = SampleConfig.from_filename(os.path.basename(args.re_from))
+
+    re = reachability_estimator_factory(args.re_type, weights_file=args.re_from, debug=('plan' in DEBUG), config=config)
 
     def create_cogmap(threshold, max_capacity=float('inf')):
         re.threshold_same = threshold
