@@ -99,6 +99,7 @@ if __name__ == "__main__":
     import os
     import argparse
     parser = argparse.ArgumentParser()
+    parser.add_argument('-e', "--env-model", default="Savinov_val3", choices=["Savinov_val3", "linear_sunburst"])
     parser.add_argument('--re', dest='re_type', default='neural_network', choices=['neural_network', 'view_overlap', 'bvc'])
     parser.add_argument('--re-from')
     parser.add_argument('--visualize', action='store_true')
@@ -110,6 +111,8 @@ if __name__ == "__main__":
     binary_param_search = modes.add_parser('npc', help='Target a number of place cells')
     binary_param_search.add_argument('-n', dest='desired_nb_of_place_cells', help='desired number of place cells', type=int, default=30)
     binary_param_search.add_argument('-t', '--threshold-same-hint', help='The first value that will be tried as the sameness threshold', type=float)
+    binary_param_search.add_argument('--lower-bound', '->', type=float, default=0.2)
+    binary_param_search.add_argument('--upper-bound', '-<', type=float, default=1.0)
 
     fixed_threshold = modes.add_parser('threshold', help='Set a threshold_same')
     fixed_threshold.add_argument('threshold_same', type=float)
@@ -167,9 +170,9 @@ if __name__ == "__main__":
     else:
         config = SampleConfig.from_filename(os.path.basename(args.re_from))
 
-    re = reachability_estimator_factory(args.re_type, weights_file=args.re_from, debug=('plan' in DEBUG), config=config)
+    re = reachability_estimator_factory(args.re_type, weights_file=args.re_from, debug=('plan' in DEBUG), config=config, env_model=args.env_model)
 
-    def create_cogmap(threshold, max_capacity=float('inf')):
+    def create_cogmap(threshold, max_capacity=200):
         re.threshold_same = threshold
         pc_network = PlaceCellNetwork(reach_estimator=re, max_capacity=max_capacity)
         cognitive_map = LifelongCognitiveMap(reachability_estimator=re, metadata={'threshold': re.threshold_same})
@@ -178,8 +181,8 @@ if __name__ == "__main__":
         return cognitive_map, pc_network
 
     if args.subcommand == 'npc':
-        too_strict_threshold = 1.4
-        too_lax_threshold = 0.2
+        too_strict_threshold = args.upper_bound
+        too_lax_threshold = args.lower_bound
         while True:
             if args.threshold_same_hint is not None:
                 threshold_same = args.threshold_same_hint
