@@ -105,7 +105,6 @@ if __name__ == "__main__":
     parser.add_argument('--visualize', action='store_true')
     parser.add_argument('--mini', help='Use only a few trajectories', action='store_true')
     modes = parser.add_subparsers(dest='subcommand')
-    parser.add_argument("--env-model", "-e", default="Savinov_val3", choices=["Savinov_val3", "linear_sunburst"])
     parser.add_argument('--output-filename', "-o", help='The file to save the network to', nargs='?', default='after_exploration.gpickle')
 
     binary_param_search = modes.add_parser('npc', help='Target a number of place cells')
@@ -168,7 +167,7 @@ if __name__ == "__main__":
         args.re_from = 're_mse_weights.50'
         config = SampleConfig(grid_cell_spikings=True)
     else:
-        config = SampleConfig.from_filename(os.path.basename(args.re_from))
+        config, kwargs = SampleConfig.from_filename(os.path.basename(args.re_from))
 
     re = reachability_estimator_factory(args.re_type, weights_file=args.re_from, debug=('plan' in DEBUG), config=config, env_model=args.env_model)
 

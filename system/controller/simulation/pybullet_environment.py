@@ -697,6 +697,8 @@ class Robot:
                             controlMode=p.VELOCITY_CONTROL,
                             targetVelocities=gains,
                             forces=[10, 10])
+        if 'gains' in DEBUG:
+            print(f"{gains=}")
         self.env.step()
         self.save_snapshot(current_goal_vector)
 

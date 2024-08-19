@@ -25,7 +25,11 @@ class PlaceInfo:
     lidar: types.LidarReading
 
     def __repr__(self):
-        return f"PlaceInfo(pos={self.pos}, angle={self.angle=}, { 'lidar=...' if hasattr(self, 'lidar') else 'no lidar' })"
+        attrs = [f'{self.pos}=',
+            f'angle={self.angle}' if hasattr(self, 'angle') else 'no angle',
+            'lidar=...' if hasattr(self, 'lidar') else 'no lidar',
+        ]
+        return "PlaceInfo(" + ', '.join(attrs) + ")"
 
 @dataclass
 class Sample:

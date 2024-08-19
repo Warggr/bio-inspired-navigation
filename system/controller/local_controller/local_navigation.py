@@ -377,6 +377,8 @@ def vector_navigation(
             last_observation = robot.env.camera()
         pc_network.create_new_pc(PlaceInfo(spikings=gc_network.consolidate_gc_spiking(), img=last_observation, pos=robot.position, angle=NotImplemented, lidar=robot.env.lidar()[0]))
         last_pc = pc_network.place_cells[-1]
+    if add_nodes:
+        assert last_pc is not None
     return goal_reached, last_pc
 
 

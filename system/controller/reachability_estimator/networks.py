@@ -157,7 +157,7 @@ class CNN(Model):
     def get_args(self) -> dict[str, Any]:
         return {
             'backbone_classname': 'convolutional',
-            'with_conv_layer': self.image_encoder == 'conv',
+            'image_encoder': self.image_encoder,
             # TODO: #'hidden_fc_layers': 
         }
 

@@ -98,7 +98,7 @@ def plotTrajectoryInEnvironment(
         xy_coordinates = env.robot.data_collector.xy_coordinates
     if env_model is None:
         env_model = env.env_model
-    if env_variant is None:
+    if env_variant is None and env is not None:
         env_variant = env.variant
 
     fig, ax = plt.subplots()

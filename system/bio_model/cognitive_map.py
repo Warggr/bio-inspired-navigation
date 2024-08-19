@@ -615,7 +615,7 @@ class LifelongCognitiveMap(CognitiveMapInterface):
         nodelist = list(self.node_network.nodes)
         self.print_debug(
             f"deleting edge [{nodelist.index(node_p)}-{nodelist.index(node_q)}]: " +
-            f"conn {self.node_network[node_q][node_p]['connectivity_probability']}")
+            f"conn {self.node_network[node_q][node_p].get('connectivity_probability', '(no value)')}")
         self.node_network.remove_edge(node_p, node_q)
         self.node_network.remove_edge(node_q, node_p)
 

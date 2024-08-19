@@ -33,7 +33,7 @@ def _printable_path(path: list[int]) -> str:
 class TopologicalNavigation:
     def __init__(
         self, env_model: AllowedMapName,
-        pc_network: PlaceCellNetwork, cognitive_map: CognitiveMapInterface,
+        pc_network: Optional[PlaceCellNetwork], cognitive_map: CognitiveMapInterface,
         compass: Compass,
         log = False,
     ):

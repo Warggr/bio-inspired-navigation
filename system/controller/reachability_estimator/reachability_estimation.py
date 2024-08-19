@@ -196,7 +196,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
 
         if backbone_classname is None:
             backbone_classname = global_args.pop('backbone')
-        global_args = { key: value for key, value in global_args.items() if key in ['with_conv_layer'] }
+        global_args = { key: value for key, value in global_args.items() if key in ['image_encoder'] }
         # TODO: other possible global_args
 
         backbone = networks.Model.create_from_config(backbone_classname=backbone_classname, config=re.config, **global_args)
@@ -229,6 +229,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         ('dst_spikings', (np.float32, (6, 1600))),
         ('src_lidar', (np.float32, types.LidarReading.DEFAULT_NUMBER_OF_ANGLES)),
         ('dst_lidar', (np.float32, types.LidarReading.DEFAULT_NUMBER_OF_ANGLES)),
+        ('transformation', (np.float32, 3))
     ])
 
     @classmethod
@@ -243,6 +244,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
             p.img, q.img,
             p.spikings, q.spikings,
             get_lidar(p), get_lidar(q),
+            np.concat(np.array(q.pos) - np.array(p.pos), [(q.angle - p.angle) % 2*np.pi])
         )
         return np.array([args], dtype=cls.dtype)
 
@@ -283,6 +285,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
             src_batch, goal_batch = data['src_image'], data['dst_image']
             src_spikings, goal_spikings = data['src_spikings'], data['dst_spikings']
             src_lidar, goal_lidar = data['src_lidar'], data['dst_lidar']
+            transform = data['transformation']
 
             """ Helper function, main logic for predicting reachability for multiple location pairs """
             with torch.no_grad():
@@ -293,9 +296,11 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
                 if self.config.with_grid_cell_spikings:
                     additional_info['batch_src_spikings'] = torch.from_numpy(src_spikings).float()
                     additional_info['batch_dst_spikings'] = torch.from_numpy(goal_spikings).float()
-                if self.config.with_dist:
+                if self.config.lidar:
                     additional_info['batch_src_lidar'] = torch.from_numpy(src_lidar).float()
                     additional_info['batch_dst_lidar'] = torch.from_numpy(goal_lidar).float()
+                if self.config.with_dist:
+                    additional_info['batch_transformation'] = torch.from_numpy(transform).float()
 
                 return self.backbone.get_prediction(
                     **additional_info
