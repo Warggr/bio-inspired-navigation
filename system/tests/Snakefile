@@ -1,47 +1,73 @@
 rule:
 	output: "results/local_controller_angle/length={raylen}.log"
 	shell: """
-		echo -n '{wildcards.raylen}:' > {output}
-		python local_controller_angle_test.py --ray-length {wildcards.raylen} | tail -n 1 >> {output}
+		python local_controller_angle_test.py --ray-length {wildcards.raylen} | tail -n 1 > {output}
 	"""
 
 rule:
-	output: "results/local_controller_width/cone={cone}.log"
+	output: "results/local_controller_width/cone={cone},length={raylen}.log"
 	shell: """
-		echo -n '{wildcards.cone}:' > {output}
-		python local_controller_narrow_test.py --tactile-cone {wildcards.cone} | tail -n 1 >> {output}
+		python local_controller_narrow_test.py --tactile-cone {wildcards.cone} --ray-length {wildcards.raylen} | tail -n 1 > {output}
 	"""
 
+import matplotlib
+import matplotlib.pyplot as plt
+import pandas as pd
+
+def create_plot(input, in_params, output, line_start, xlabel, ylabel):
+	results = []
+	for filename, param in zip(input, in_params):
+		with open(filename, 'r') as f:
+			line = f.read().strip()
+		assert line.startswith(line_start), line; line = line.removeprefix(line_start)
+		start, stop = line.split(' ~ ')
+		start, stop = [float(i) for i in (start, stop)]
+		results.append({ 'start': start, 'stop': stop, 'value': param })
+	dset = pd.DataFrame(results)
+	dset.to_csv(output.csv)
+
+	matplotlib.use("pgf")
+	plt.scatter(dset['value'], dset['stop'], label='upper bound')
+	plt.scatter(dset['value'], dset['start'], label='lower bound')
+	plt.xlabel(xlabel); plt.ylabel(ylabel)
+	plt.legend()
+	plt.savefig(output.png)
+	plt.savefig(output.pgf)
+
+cone_values = [60, 120, 180, 210, 260, 310]
+raylen_values = [0, 0.1, 0.2, 0.5, 0.8, 1, 1.5, 2] 
+
 rule:
-	input: [ f"results/local_controller_width/cone={cone}.log" for cone in [60, 120, 180, 210, 260, 310] ]
+	input: [ f"results/local_controller_width/cone={cone},length=1.0.log" for cone in cone_values ]
 	output:
 		csv = "results/local_controller_width/results.csv",
 		pgf = "results/local_controller_width/results.pgf",
 		png = "results/local_controller_width/results.png",
 	run:
-		results = []
-		for line in shell(f"cat {input}", iterable=True):
-			raylen, line = line.split(':')
-			raylen = float(raylen)
-			LINE_START = 'Minimum handle-able width is '
-			assert line.startswith(LINE_START), line
-			line = line.removeprefix(LINE_START)
-			start, stop = line.split(' ~ ')
-			start, stop = [float(i) for i in (start, stop)]
-			results.append({ 'start': start, 'stop': stop, 'raylen': raylen })
-		import pandas as pd
-		dset = pd.DataFrame(results)
-		dset.to_csv(output.csv)
-		import matplotlib
-		import matplotlib.pyplot as plt
-		matplotlib.use("pgf")
-		plt.scatter(dset['raylen'], dset['start'], label='lower bound')
-		plt.scatter(dset['raylen'], dset['stop'], label='upper bound')
-		plt.xlabel('Cone')
-		plt.ylabel('Maximum handled width')
-		plt.legend()
-		plt.savefig(output.png)
-		plt.savefig(output.pgf)
+		create_plot(
+			input,
+			cone_values,
+			output,
+			line_start='Minimum handle-able width is ',
+			xlabel='Cone (°)',
+			ylabel='Minimum handled width (m)',
+		)
+
+rule:
+	input: [ f"results/local_controller_width/cone=120,length={raylen}.log" for raylen in raylen_values ]
+	output:
+		csv = "results/local_controller_width/by_raylen.csv",
+		pgf = "results/local_controller_width/by_raylen.pgf",
+		png = "results/local_controller_width/by_raylen.png",
+	run:
+		create_plot(
+			input,
+			raylen_values,
+			output,
+			line_start='Minimum handle-able width is ',
+			xlabel='Ray length (m)',
+			ylabel='Minimum handled width (m)',
+		)
 
 rule:
 	input: [ f"results/local_controller_angle/length={raylen}.log" for raylen in [0, 0.1, 0.2, 0.5, 0.8, 1, 1.5, 2] ]
@@ -51,26 +77,28 @@ rule:
 		png = "results/local_controller_angle/results.png",
 		#{format=f"results/local_controller_angle/results.{format}" for format in ['pgf', 'png', 'csv']}
 	run:
-		results = []
-		for line in shell(f"cat {input}", iterable=True):
-			raylen, line = line.split(':')
-			raylen = float(raylen)
-			LINE_START = 'Maximum handle-able angle is '
-			assert line.startswith(LINE_START)
-			line = line.removeprefix(LINE_START)
-			start, stop = line.split(' ~ ')
-			start, stop = [int(i) for i in (start, stop)]
-			results.append( {{ 'start': start, 'stop': stop, 'raylen': raylen }})
-		import pandas as pd
-		dset = pd.DataFrame(results)
-		dset.to_csv('results/local_controller_angle/result.csv')
-		import matplotlib
-		import matplotlib.pyplot as plt
-		matplotlib.use("pgf")
-		plt.scatter(dset['raylen'], dset['start'], label='lower bound')
-		plt.scatter(dset['raylen'], dset['stop'], label='upper bound')
-		plt.xlabel('Ray length')
-		plt.ylabel('Maximum handled angle')
-		plt.legend()
-		plt.savefig(output.png)
-		plt.savefig(output.pgf)
+		create_plot(
+			input,
+			[0, 0.1, 0.2, 0.5, 0.8, 1, 1.5, 2],
+			output,
+			line_start='Maximum handle-able angle is ',
+			xlabel='Ray length (m)',
+			ylabel='Maximum handled angle (°)',
+		)
+
+map_metrics = []
+import os
+for root, dirs, files in os.walk('../bio_model/data/cognitive_map/'):
+	for file in files:
+		if not file.endswith('.gpickle'):
+			continue
+		for metric in ['mean-distance', 'coverage', 'edges']:
+			output = os.path.join(root, file.replace('.gpickle', '-' + metric + '.v'))
+			map_metrics.append(output)
+			rule:
+				input: os.path.join(root, file)
+				output: os.path.join(root, file.replace('.gpickle', '-' + metric + '.v'))
+				shell: f"python map/main.py {metric} {{input}} > {{output}}"
+
+rule map_metrics:
+	input: map_metrics
