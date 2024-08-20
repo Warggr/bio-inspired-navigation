@@ -86,6 +86,12 @@ rule:
 			ylabel='Maximum handled angle (°)',
 		)
 
+def create_map_metric_rule(infile, outfile, metric):
+	rule:
+		input: infile
+		output: outfile
+		shell: f"python map/main.py {metric} {{input}} > {{output}}"
+
 map_metrics = []
 import os
 for root, dirs, files in os.walk('../bio_model/data/cognitive_map/'):
@@ -95,10 +101,7 @@ for root, dirs, files in os.walk('../bio_model/data/cognitive_map/'):
 		for metric in ['mean-distance', 'coverage', 'edges']:
 			output = os.path.join(root, file.replace('.gpickle', '-' + metric + '.v'))
 			map_metrics.append(output)
-			rule:
-				input: os.path.join(root, file)
-				output: os.path.join(root, file.replace('.gpickle', '-' + metric + '.v'))
-				shell: f"python map/main.py {metric} {{input}} > {{output}}"
+			create_map_metric_rule(os.path.join(root, file), output, metric)
 
 rule map_metrics:
 	input: map_metrics
