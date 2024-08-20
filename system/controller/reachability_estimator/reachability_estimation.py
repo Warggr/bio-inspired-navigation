@@ -15,6 +15,9 @@ import os
 from abc import ABC, abstractmethod
 from typing import Iterable, Literal
 from system.bio_model.place_cell_model import PlaceCell
+from system.bio_model.bc_network.bc_encoding import BoundaryCellNetwork, HDCActivity
+from system.bio_model.bc_network.parameters import HeadingCellActivity, BoundaryCellActivity
+from system.bio_model.bc_network.bc_activity import bcActivityForLidar
 import system.controller.reachability_estimator.networks as networks
 from system.controller.simulation.environment.map_occupancy import MapLayout
 import system.types as types
@@ -143,6 +146,14 @@ NNResult = (float, float, float)
 
 from .ReachabilityDataset import SampleConfig
 
+def allo_bc_spikings(boundaryCellEncoder: BoundaryCellNetwork, p: PlaceInfo) -> 'HDCActivity':
+    heading = HDCActivity.headingCellsActivityTraining(p.angle)
+    ego = bcActivityForLidar(p.lidar)
+    _, allo = boundaryCellEncoder.calculateActivities(ego, heading)
+    assert not np.all(allo == 0)
+    return allo
+
+
 class NetworkReachabilityEstimator(ReachabilityEstimator):
     """ Creates a network-based reachability estimator that judges reachability
         between two locations based on observations and grid cell spikings """
@@ -167,9 +178,29 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         super().__init__(threshold_same=0.933, threshold_reachable=0.4, debug=debug)
 
         self.config = config
+        if self.config.lidar == 'allo_bc':
+            self.boundaryCellEncoder = BoundaryCellNetwork.load()
 
         self.backbone = backbone
         self.batch_size = batch_size
+
+        LIDAR_LENGTHS = {
+            'raw_lidar': types.LidarReading.DEFAULT_NUMBER_OF_ANGLES,
+            'ego_bc': BoundaryCellActivity.size,
+            'allo_bc': BoundaryCellActivity.size,
+            None: 0,
+        }
+        lidar_length = LIDAR_LENGTHS[self.config.lidar]
+
+        self.dtype = np.dtype([
+            ('src_image', (np.int32, (64, 64, 4))),
+            ('dst_image', (np.int32, (64, 64, 4))),
+            ('src_spikings', (np.float32, (6, 1600))),
+            ('dst_spikings', (np.float32, (6, 1600))),
+            ('src_lidar', (np.float32, lidar_length)),
+            ('dst_lidar', (np.float32, lidar_length)),
+            ('transformation', (np.float32, 3))
+        ])
 
     @staticmethod
     def from_file(weights_file: str, weights_folder: str = WEIGHTS_FOLDER, backbone_classname=None, **kwargs):
@@ -222,23 +253,17 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         re.backbone = backbone
         return re
 
-    dtype = np.dtype([
-        ('src_image', (np.int32, (64, 64, 4))),
-        ('dst_image', (np.int32, (64, 64, 4))),
-        ('src_spikings', (np.float32, (6, 1600))),
-        ('dst_spikings', (np.float32, (6, 1600))),
-        ('src_lidar', (np.float32, types.LidarReading.DEFAULT_NUMBER_OF_ANGLES)),
-        ('dst_lidar', (np.float32, types.LidarReading.DEFAULT_NUMBER_OF_ANGLES)),
-        ('transformation', (np.float32, 3))
-    ])
-
-    @classmethod
-    def to_batch(cls, p: PlaceInfo, q: PlaceInfo):
+    def to_batch(self, p: PlaceInfo, q: PlaceInfo):
         def get_lidar(p: PlaceInfo):
             if hasattr(p, 'lidar') and p.lidar is not None:
-                return p.lidar.distances
+                if self.config.lidar == 'raw_lidar':
+                    return p.lidar.distances
+                elif self.config.lidar == 'ego_bc':
+                    return bcActivityForLidar(p.lidar)
+                elif self.config.lidar == 'allo_bc':
+                    return allo_bc_spikings(self.boundaryCellEncoder, p)
             else:
-                return -1 * np.ones(types.LidarReading.DEFAULT_NUMBER_OF_ANGLES)
+                return -1 * np.ones(shape=(), dtype=self.dtype['dst_lidar'])
 
         args = (
             p.img, q.img,
@@ -246,7 +271,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
             get_lidar(p), get_lidar(q),
             np.concat(np.array(q.pos) - np.array(p.pos), [(q.angle - p.angle) % 2*np.pi])
         )
-        return np.array([args], dtype=cls.dtype)
+        return np.array([args], dtype=self.dtype)
 
     def is_same_batch(self, p: PlaceInfo, qs: Iterable[PlaceInfo]) -> Batch[bool]:
         return self.reachability_factor_batch(p, qs) >= self.threshold_same
@@ -263,7 +288,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         return self.reachability_factor_of_array(args_batch)
 
     def reachability_factor_of_array(self,
-        data: np.ndarray['NetworkReachabilityEstimator.dtype']
+        data: np.ndarray['self.dtype']
     ) -> networks.Batch[float]:
         """ Predicts reachability for multiple location pairs
 
@@ -280,7 +305,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         """
 
         def get_prediction(
-            data: Batch['NetworkReachabilityEstimator.dtype']
+            data: Batch['self.dtype']
         ) -> networks.Batch[Prediction]:
             src_batch, goal_batch = data['src_image'], data['dst_image']
             src_spikings, goal_spikings = data['src_spikings'], data['dst_spikings']
@@ -437,15 +462,6 @@ class BVCReachabilityEstimator(ReachabilityEstimator):
         super().__init__(threshold_reachable=0.4, threshold_same=0.9)
         from system.bio_model.bc_network.bc_encoding import BoundaryCellNetwork
         self.boundaryCellEncoder = BoundaryCellNetwork.load()
-
-    def _allo_bc_spikinigs(self, p: PlaceInfo) -> 'HDCActivity':
-        from system.bio_model.bc_network.bc_encoding import HDCActivity
-        from system.bio_model.bc_network.bc_activity import bcActivityForLidar
-
-        heading = HDCActivity.headingCellsActivityTraining(p.angle)
-        ego = bcActivityForLidar(p.lidar)
-        _, allo = self.boundaryCellEncoder.calculateActivities(ego, heading)
-        return allo
 
     def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo) -> float:
         spikings_start, spikings_goal = self._allo_bc_spikinigs(start), self._allo_bc_spikinigs(goal)
