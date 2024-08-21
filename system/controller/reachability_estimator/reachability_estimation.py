@@ -227,7 +227,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
 
         if backbone_classname is None:
             backbone_classname = global_args.pop('backbone')
-        global_args = { key: value for key, value in global_args.items() if key in ['image_encoder'] }
+        global_args = { key: value for key, value in global_args.items() if key in ['image_encoder', 'hidden_fc_layers'] }
         # TODO: other possible global_args
 
         backbone = networks.Model.create_from_config(backbone_classname=backbone_classname, config=re.config, **global_args)

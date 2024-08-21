@@ -53,6 +53,7 @@ from system.controller.simulation.math_utils import compute_angle
 from system.types import AllowedMapName, types, LidarReading, Vector2D
 from system.controller.simulation.environment_config import environment_dimensions
 from system.debug import DEBUG
+import pickle
 
 try:
     itertools.batched
@@ -222,21 +223,45 @@ class PybulletEnvironment:
     def switch_visualization(self, visualize) -> Self:
         if visualize == self.visualize:
             return self
-        if self.robot is not None:
-            pos = self.robot.position_and_angle
-            robot_kwargs = { 'contains_robot': True, 'start': pos[0], 'orientation': pos[1], 'build_data_set': self.robot.buildDataSet }
-        else:
-            robot_kwargs = { 'contains_robot': False }
+        state = self._dumps_state()
         self.__exit__(None, None, None)
-        new_env = PybulletEnvironment(
-            env_model=self.env_model, dt=self.dt, visualize=visualize,
-            realtime=False, **robot_kwargs
+        if os.getenv('BULLET_SHMEM_SERVER', None) is not None:
+            _ = input('Restart the server, then enter anything...')
+        new_env = PybulletEnvironment._loads_state(state,
+            visualize=visualize, realtime=False,
         )
         if self.robot is not None:
             new_robot = new_env.robot
             self.robot.env = new_env
             self.robot.ID = new_robot.ID
         return new_env
+
+    def _dumps_state(self) -> Any:
+        if self.robot is not None:
+            pos = self.robot.position_and_angle
+            robot_kwargs = { 'contains_robot': True, 'start': pos[0], 'orientation': pos[1], 'build_data_set': self.robot.buildDataSet }
+        else:
+            robot_kwargs = { 'contains_robot': False }
+        return {
+            'env_model': self.env_model,
+            'variant': self.variant,
+            'dt': self.dt,
+            **robot_kwargs,
+        }
+
+    @staticmethod
+    def _loads_state(data: Any, **kwargs):
+        return PybulletEnvironment(**kwargs, **data)
+
+    def dump(self, filename: str):
+        with open(filename, 'wb') as file:
+            pickle.dump(self._dumps_state, file)
+
+    @staticmethod
+    def load(filename: str):
+        with open(filename, 'rb') as file:
+            state = pickle.load(file)
+        return PybulletEnvironment._loads_state(state)
 
     def switch_variant(self, new_variant):
         self.variant = new_variant
@@ -686,7 +711,7 @@ class Robot:
 
             v_left = (forward - turn) * self.max_speed
             v_right = (forward + turn) * self.max_speed
-            gains = [v_left, v_right]
+            gains = (v_left, v_right)
             self._step(gains, None)
             self.env.camera()
 

@@ -20,7 +20,7 @@ from system.plotting.plotThesis import plot_grid_cell
 from system.bio_model.place_cell_model import PlaceCell, PlaceCellNetwork
 ReachabilityEstimator = 'ReachabilityEstimator'
 
-from typing import Optional
+from typing import Optional, Literal
 
 def get_path_top() -> str:
     """ returns path to the folder of the current file """
@@ -296,10 +296,16 @@ class CognitiveMapInterface(ABC):
 
 
 class CognitiveMap(CognitiveMapInterface):
-    def __init__(self, reachability_estimator=None, mode="exploration", connection=("all", "delayed"),
-                 load_data_from=None, debug=False):
+    def __init__(
+        self,
+        reachability_estimator=None,
+        mode: Literal['exploration', 'navigation']="exploration",
+        connection: tuple[Literal['all', 'radius'], Literal['delayed', 'instant']]=("all", "delayed"),
+        load_data_from=None,
+        debug=False
+    ):
         """ Baseline cognitive map representation of the environment.
-        
+
         arguments:
         reachability_estimator: ReachabilityEstimator -- reachability estimator that should be used for
                                                          defining the proximity of nodes
@@ -458,7 +464,7 @@ class LifelongCognitiveMap(CognitiveMapInterface):
         self.min_node_degree_for_deletion = 4
         self.max_number_unique_neighbors_for_deletion = 2
 
-    def track_vector_movement(self, pc_firing: list[float], created_new_pc: bool, pc: PlaceCell, **kwargs) -> Optional[PlaceCell]:
+    def track_vector_movement(self, pc_firing: list[float], created_new_pc: bool, pc: PlaceCell, *, exploration_phase=True, **kwargs) -> Optional[PlaceCell]:
         """ Incorporate changes to the map after each vector navigation tryout. Adds nodes during exploration phase and
             edges during navigation.
 
@@ -468,12 +474,13 @@ class LifelongCognitiveMap(CognitiveMapInterface):
         pc: PlaceCell                     -- current location of the agent
         kwargs:
              exploration_phase: bool      -- indicates exploration or navigation phase
+                                             exploration: do not add edges
+                                             navigation: ignore place cell creation
              pc_network: PlaceCellNetwork -- place cell network
 
         returns:
         pc: PlaceCell                 -- current active node if it exists
         """
-        exploration_phase = kwargs.get('exploration_phase', True)
         pc_network: PlaceCellNetwork = kwargs.get('pc_network', None)
         if exploration_phase and created_new_pc:
             is_mergeable, mergeable_values = self.is_mergeable(pc)

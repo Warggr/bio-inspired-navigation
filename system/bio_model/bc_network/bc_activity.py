@@ -8,7 +8,7 @@
 ***************************************************************************************
 '''
 
-from system.controller.simulation.pybullet_environment import types
+import system.types as types
 from . import parameters as p
 import math
 import numpy as np

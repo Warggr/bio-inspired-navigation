@@ -2,6 +2,7 @@ import math
 import numpy as np
 from . import parameters as p
 from system.types import Angle
+from system.utils import angle_abs_difference
 
 def headingCellsActivityTraining(heading: Angle) -> p.HeadingCellActivity:
     '''
@@ -18,6 +19,6 @@ def headingCellsActivityTraining(heading: Angle) -> p.HeadingCellActivity:
     tuning_vector = np.linspace(0, 2 * math.pi, p.nrHDC)     # nrHdc = 100  np.arange(0, 2 * math.pi, hdRes)
     # normal gaussian for hdc activity profile
     # activity_vector = np.exp( -((heading_vector - tuning_vector) / 2 * (math.pow(sig, 2)) ** 2) ) * amp
-    activity_vector = amp * np.exp(-np.power((heading_vector - tuning_vector) / 2 * sig**2, 2))
+    activity_vector = amp * np.exp(-np.power(angle_abs_difference(heading_vector, tuning_vector) / 2 * sig**2, 2))
 
     return np.around(activity_vector, 5)

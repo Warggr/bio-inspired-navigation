@@ -9,7 +9,7 @@
 """
 import numpy as np
 
-from typing import Optional
+from typing import Callable, Optional, Protocol
 
 from system.bio_model.grid_cell_model import GridCellNetwork
 from system.controller.local_controller.decoder.phase_offset_detector import PhaseOffsetDetectorNetwork
@@ -29,6 +29,10 @@ plotting = 'topo' in PLOTTING # if True plot results
 def _printable_path(path: list[int]) -> str:
     """ Helper function to print a path of node indices"""
     return ','.join((str(i) for i in path))
+
+class TopoNavStepHook(Protocol):
+    def __call__(self, i: int, *, endpoints: tuple[PlaceCell, PlaceCell], endpoint_indices: tuple[int, int], success: bool):
+        ...
 
 class TopologicalNavigation:
     def __init__(
@@ -50,16 +54,18 @@ class TopologicalNavigation:
         self.pc_network = pc_network
         self.cognitive_map = cognitive_map
         self.env_model = env_model
-        self.path_length_limit = 30  # max number of topological navigation steps
         self.step_limit = 2000  # max number of vector navigation steps
         self.compass = compass
         self.log = log
+        self.step_hooks: list[TopoNavStepHook] = []
 
     def navigate(self, start: PlaceCell, goal: PlaceCell, gc_network: GridCellNetwork,
         controller: Optional[LocalController] = None,
         cognitive_map_filename: Optional[str] = None,
         env: Optional[PybulletEnvironment] = None,
         robot: Optional[Robot] = None,
+        head: Optional[int] = None,
+        path_length_limit = 30,
         *nav_args, **nav_kwargs,
     ):
         """ Navigates the agent through the environment with topological navigation.
@@ -68,6 +74,7 @@ class TopologicalNavigation:
         start_ind: int              -- start node in the cognitive map
         goal_ind: int               -- goal node in the cognitive map
         cognitive_map_filename: str -- name of file to save the cognitive map to
+        head: int                   -- only perform the first n steps
 
         returns:
         bool -- whether the goal was reached
@@ -128,7 +135,7 @@ class TopologicalNavigation:
         last_pc = path[0]
         i = 0
         curr_path_length = 0
-        while i + 1 < len(path) and curr_path_length < self.path_length_limit:
+        while i + 1 < len(path) and curr_path_length < path_length_limit:
             self.compass.reset_goal(new_goal=self.compass.parse(path[i+1]))
             goal_spiking = path[i+1].gc_connections
             if gc_network:
@@ -139,6 +146,10 @@ class TopologicalNavigation:
                                          step_limit=self.step_limit, goal_pos=path[i+1].pos, *nav_args, **nav_kwargs)
             self.cognitive_map.postprocess_vector_navigation(node_p=path[i], node_q=path[i + 1],
                                                              observation_p=last_pc, observation_q=pc, success=success)
+
+            for hook in self.step_hooks:
+                hook(curr_path_length, success=success, endpoints=(path[i], path[i+1]), endpoint_indices=(path_indices[i], path_indices[i+1]))
+
             if self.log:
                 print(f'Vector navigation: goal={path_indices[i+1]}, {success=}')
             curr_path_length += 1
@@ -181,9 +192,8 @@ class TopologicalNavigation:
                 i += 1
             if i == len(path) - 1:
                 break
-
-        if curr_path_length >= self.path_length_limit:
-            print("LIMIT WAS REACHED STOPPING HERE")
+            elif i == head:
+                break
 
         if plotting:
             plot.plotTrajectoryInEnvironment(env, goal=False, start=start.env_coordinates, end=goal.env_coordinates)
@@ -193,7 +203,10 @@ class TopologicalNavigation:
         self.cognitive_map.postprocess_topological_navigation()
         if cognitive_map_filename is not None:
             self.cognitive_map.save(filename=cognitive_map_filename)
-        return curr_path_length < self.path_length_limit
+        if curr_path_length >= path_length_limit:
+            print("LIMIT WAS REACHED STOPPING HERE")
+            return False
+        return True
 
     def locate_node(self, compass: Compass, pc: PlaceCell, goal: PlaceCell):
         """

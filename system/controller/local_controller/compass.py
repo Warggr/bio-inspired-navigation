@@ -30,6 +30,7 @@ class Compass(ABC, Generic[PositionRepresentation]):
         """ Updates the stored position """
         ...
 
+    # TODO Pierre: an overload reset_position(pc: PlaceCell) would be very convenient
     @abstractmethod
     def reset_position(self, new_position: PositionRepresentation):
         ...

@@ -137,7 +137,7 @@ class CNN(Model):
                 input_dim += 512
                 nets["img_encoder"] = NNModuleWithOptimizer(ImagePairEncoderV2(init_scale=1.0), opt=opt)
                 if self.image_encoder == 'conv':
-                    nets["conv_encoder"] = NNModuleWithOptimizer( ConvEncoder(init_scale=1.0, input_dim=512, no_weight_init=False), opt=opt)
+                    nets["conv_encoder"] = NNModuleWithOptimizer(ConvEncoder(init_scale=1.0, input_dim=512, no_weight_init=False), opt=opt)
 
         if self.sample_config.with_dist:
             input_dim += 3

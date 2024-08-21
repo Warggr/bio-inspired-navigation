@@ -17,7 +17,7 @@ if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 from system.bio_model.cognitive_map import CognitiveMapInterface
-from system.bio_model.place_cell_model import PlaceCellNetwork
+from system.bio_model.place_cell_model import PlaceCell, PlaceCellNetwork
 
 from system.controller.local_controller.decoder.linear_lookahead_no_rewards import *
 from system.controller.local_controller.decoder.phase_offset_detector import PhaseOffsetDetectorNetwork
@@ -249,7 +249,7 @@ def vector_navigation(
     pc_network: Optional[PlaceCellNetwork] = None, cognitive_map: Optional[CognitiveMapInterface] = None,
     goal_pos: Optional[Vector2D] = None,
     add_nodes = True,
-) -> tuple[bool, Any]:
+) -> tuple[bool, list[WaypointInfo]|tuple|int|PlaceCell|None]:
     """
     Agent navigates towards goal.
 

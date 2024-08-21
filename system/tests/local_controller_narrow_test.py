@@ -14,11 +14,14 @@ def width_test(
     width: float,
     controller: LocalController,
     env: PybulletEnvironment,
+    start_distance,
+    goal_distance,
 ) -> bool:
     env.switch_variant(width)
 
-    start = (-1.0, -1.33)
-    goal = (1.0, 1.4)
+    angle = (-0.75, 1.25)
+    start = (angle[0], angle[1] - start_distance)
+    goal = (angle[0] + goal_distance, angle[0])
     compass = AnalyticalCompass(start, goal)
     with Robot(env, base_position=start):
         success, _ = vector_navigation(env, compass, controller=controller, goal_pos=goal)
@@ -32,6 +35,8 @@ from system.parsers import controller_parser
 
 parser = argparse.ArgumentParser(parents=[controller_parser])
 parser.add_argument('precision', nargs='?', type=float, default=0.1, help='Precision, in meters')
+parser.add_argument('--start-distance', '--start', type=float, default=2.5)
+parser.add_argument('--goal-distance', '--goal', type=float, default=1.75)
 parser.add_argument('--starting-value', '-s', type=float)
 parser.add_argument('--visualize', action='store_true')
 args = parser.parse_args()
@@ -51,8 +56,9 @@ with PybulletEnvironment(env_model="obstacle_map_0", visualize=args.visualize, c
             args.starting_value = None
         else:
             width = (min_succ_width + max_fail_width) / 2
+
         print(f"Trying {width=}...", file=sys.stderr)
-        success = width_test(width, controller, env)
+        success = width_test(width, controller, env, start_distance=args.start_distance, goal_distance=args.goal_distance)
         print("Success!" if success else "Fail :(", file=sys.stderr)
         if success:
             min_succ_width = width

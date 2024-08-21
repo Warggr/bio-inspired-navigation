@@ -59,12 +59,23 @@ class PositionEstimation:
     def __init__(
         self,
         pc_network: PlaceCellNetwork, gc_network: GridCellNetwork, re: ReachabilityEstimator, compass: Compass,
-        true_compass: Optional[Compass] = None,
+        true_compass: Optional[Compass] = None, current_position: Optional[PlaceCell] = None,
     ):
+        """
+        PositionEstimation constructor
+        
+        arguments:
+        pc_network: the place cells
+        gc_network: a GridCellNetwork that tracks the agent's position
+        re: used to determine at which place we are most likely, based on current observations
+        compass: used for plotting
+        true_compass: also used for plotting
+        current_position: the current position of the robot (warning: this is not automatically updated)
+        """
         self.gc_network = gc_network
         self.pc_network = pc_network
         self.re = re
-        self.current_position: PlaceCell = None # TODO: set this somewhere (i.e. don't rely on client code to set it)
+        self.current_position: PlaceCell = current_position # TODO: set this somewhere (i.e. don't rely on client code to set it)
         # and set it regularly when a new place cell is passed
         self.confidence_threshold = 0.8
         self.compass = compass

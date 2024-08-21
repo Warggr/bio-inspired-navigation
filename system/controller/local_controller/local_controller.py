@@ -51,7 +51,10 @@ class LocalController(ABC):
             all_kwargs = { **all_kwargs, **kwargs } # TODO Pierre: this is ugly
 
         #robot.env.add_debug_line(robot.position, np.array(robot.position) + goal_vector, color=(0, 0, 1), width=3)
-        robot.navigation_step(goal_vector, **all_kwargs)
+        if np.linalg.norm(goal_vector) != 0:
+            robot.navigation_step(goal_vector, **all_kwargs)
+        else:
+            print('Warning: <0, 0> goal vector -> hope this doesn\'t happen too often')
 
 
 class FajenObstacleAvoidance:
