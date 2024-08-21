@@ -273,6 +273,7 @@ def vector_navigation(
     goal_reached : bool, data : List[WaypointInfo] if collect_data_freq
     goal_reached : bool, ???  if collect_data_reachable
     goal_reached : bool, nr_steps : int if collect_nr_steps
+    goal_reached : bool, last_pc : PlaceCell|None if not add_nodes
     goal_reached : bool, last_pc : PlaceCell else
     """
 
@@ -372,13 +373,12 @@ def vector_navigation(
     if gc_network is not None:
         robot.navigation_hooks.remove(on_nav_step)
 
-    if not last_pc and not exploration_phase and add_nodes and pc_network:
+    if not last_pc and add_nodes and pc_network:
         if last_observation is None:
             last_observation = robot.env.camera()
-        pc_network.create_new_pc(PlaceInfo(spikings=gc_network.consolidate_gc_spiking(), img=last_observation, pos=robot.position, angle=NotImplemented, lidar=robot.env.lidar()[0]))
+        position, angle = robot.position_and_angle
+        pc_network.create_new_pc(PlaceInfo(spikings=gc_network.consolidate_gc_spiking(), img=last_observation, pos=position, angle=angle, lidar=robot.env.lidar()[0]))
         last_pc = pc_network.place_cells[-1]
-    if add_nodes:
-        assert last_pc is not None
     return goal_reached, last_pc
 
 
