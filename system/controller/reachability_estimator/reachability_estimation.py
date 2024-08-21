@@ -91,6 +91,10 @@ class ReachabilityEstimator(ReachabilityController):
         """ Batch version of reachability_factor. Implementations that can do this efficiently (e.g. NetworkRE) override this """
         return [self.reachability_factor(p, q) for q in qs]
 
+    def reachability_factor_batch_2(self, ps: Iterable[PlaceInfo], q: PlaceInfo) -> list[float]:
+        """ Similar to reachability_factor_batch, but the list comes first """
+        return [self.reachability_factor(p, q) for p in ps]
+
     @override
     def reachable(self, src: PlaceInfo, dst: PlaceInfo, path_l=None) -> bool:
         reachability_factor = self.reachability_factor(src, dst)
@@ -283,6 +287,12 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
 
     def reachability_factor_batch(self, p: PlaceInfo, qs: Iterable[PlaceInfo]) -> list[float]:
         batches: list[Batch['NetworkReachabilityEstimator.dtype']] = [self.to_batch(p, q) for q in qs]
+        if batches == []: return np.array([])
+        args_batch = np.concatenate(batches, axis=0)
+        return self.reachability_factor_of_array(args_batch)
+
+    def reachability_factor_batch_2(self, ps: Iterable[PlaceInfo], q: PlaceInfo) -> list[float]:
+        batches: list[Batch['NetworkReachabilityEstimator.dtype']] = [self.to_batch(p, q) for p in ps]
         if batches == []: return np.array([])
         args_batch = np.concatenate(batches, axis=0)
         return self.reachability_factor_of_array(args_batch)
