@@ -80,7 +80,7 @@ def waypoint_movement(
             except AssertionError:
                 print(f"At {','.join(map(str, env.robot.position))} -> {','.join(map(str, goals[i]))}")
                 raise
-            except PlaceCellNetwork.TooManyPlaceCells:
+            except CognitiveMapInterface.TooManyPlaceCells:
                 raise TooManyPlaceCells(progress=i/len(goals))
             if plotting and (i + 1) % 100 == 0:
                 cognitive_map.draw()
@@ -173,8 +173,8 @@ if __name__ == "__main__":
 
     def create_cogmap(threshold, max_capacity=200):
         re.threshold_same = threshold
-        pc_network = PlaceCellNetwork(reach_estimator=re, max_capacity=max_capacity)
-        cognitive_map = LifelongCognitiveMap(reachability_estimator=re, metadata={'threshold': re.threshold_same})
+        pc_network = PlaceCellNetwork(reach_estimator=re)
+        cognitive_map = LifelongCognitiveMap(reachability_estimator=re, max_capacity=max_capacity, metadata={'threshold': re.threshold_same})
         pc_network, cognitive_map = waypoint_movement(goals, args.env_model, gc_network, pc_network, cognitive_map, visualize=args.visualize)
         cognitive_map.postprocess_topological_navigation()
         return cognitive_map, pc_network

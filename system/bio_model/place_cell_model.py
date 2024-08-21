@@ -130,10 +130,8 @@ class PlaceCell(PlaceInfo):
 class PlaceCellNetwork:
     """A PlaceCellNetwork holds information about all Place Cells"""
 
-    class TooManyPlaceCells(Exception):
-        pass
 
-    def __init__(self, reach_estimator: Optional['ReachabilityEstimator'] = None, from_data=False, max_capacity=float('inf'), map_name=None):
+    def __init__(self, reach_estimator: Optional['ReachabilityEstimator'] = None, from_data=False, map_name=None):
         """ Place Cell Network  of the environment.
 
         arguments:
@@ -150,7 +148,6 @@ class PlaceCellNetwork:
             self.reach_estimator = reach_estimator
 
         self.place_cells: list[PlaceCell] = []
-        self.max_capacity = max_capacity
 
         if from_data:
             # Load place cells if wanted
@@ -165,8 +162,6 @@ class PlaceCellNetwork:
                 self.place_cells.append(pc)
 
     def create_new_pc(self, data: PlaceInfo):
-        if len(self.place_cells) == self.max_capacity:
-            raise PlaceCellNetwork.TooManyPlaceCells()
         # Consolidate grid cell spiking vectors to matrix of size n^2 x M
         pc = PlaceCell.from_data(data)
         self.place_cells.append(pc)

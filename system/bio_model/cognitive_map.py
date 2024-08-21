@@ -46,6 +46,7 @@ class CognitiveMapInterface(ABC):
         load_data_from: Optional[str] = None,
         debug = True,
         metadata: dict = {},
+        max_capacity: int|None = None,
     ):
         """ Abstract base class defining the interface for cognitive map implementations.
 
@@ -67,6 +68,10 @@ class CognitiveMapInterface(ABC):
         self.active_threshold = 0.9
         # last active node
         self.prior_idx_pc_firing = None
+        self.max_capacity = max_capacity
+
+    class TooManyPlaceCells(Exception):
+        pass
 
     @abstractmethod
     def track_vector_movement(self, pc_firing: list[float], created_new_pc: bool, pc: PlaceCell, **kwargs) -> Optional[PlaceCell]:
@@ -95,6 +100,8 @@ class CognitiveMapInterface(ABC):
     def add_node_to_map(self, p: PlaceCell):
         """ Adds a new node to the cognitive map """
         self.print_debug(f'Adding node: #={len(self.node_network.nodes)}, position={p.env_coordinates}')
+        if self.max_capacity is not None and len(self.node_network.nodes) > self.max_capacity:
+            raise self.TooManyPlaceCells()
         self.node_network.add_node(p, pos=tuple(p.env_coordinates))
 
     @report

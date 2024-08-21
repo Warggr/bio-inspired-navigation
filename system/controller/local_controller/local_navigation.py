@@ -377,6 +377,7 @@ def vector_navigation(
         if last_observation is None:
             last_observation = robot.env.camera()
         position, angle = robot.position_and_angle
+        # TODO: Pierre: this PC is not introduced into the cognitive map, is that intentional?
         pc_network.create_new_pc(PlaceInfo(spikings=gc_network.consolidate_gc_spiking(), img=last_observation, pos=position, angle=angle, lidar=robot.env.lidar()[0]))
         last_pc = pc_network.place_cells[-1]
     return goal_reached, last_pc
