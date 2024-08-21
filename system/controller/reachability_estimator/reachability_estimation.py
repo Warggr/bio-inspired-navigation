@@ -307,6 +307,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         def get_prediction(
             data: Batch['self.dtype']
         ) -> networks.Batch[Prediction]:
+            batch_size = len(data)
             src_batch, goal_batch = data['src_image'], data['dst_image']
             src_spikings, goal_spikings = data['src_spikings'], data['dst_spikings']
             src_lidar, goal_lidar = data['src_lidar'], data['dst_lidar']
@@ -328,7 +329,8 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
                     additional_info['batch_transformation'] = torch.from_numpy(transform).float()
 
                 return self.backbone.get_prediction(
-                    **additional_info
+                    **additional_info,
+                    batch_size=batch_size,
                 )
 
         n = len(data)

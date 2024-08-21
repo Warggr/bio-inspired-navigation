@@ -58,6 +58,7 @@ class Model(ABC):
         batch_transformation=None,
         batch_src_spikings=None, batch_dst_spikings=None,
         batch_src_lidar=None, batch_dst_lidar=None,
+        batch_size: int|None = None,
     ) -> Batch[Prediction]:
         ...
 
@@ -105,7 +106,8 @@ class Siamese(Model):
         batch_src_images=None, batch_dst_images=None,
         batch_transformation=None,
         batch_src_spikings=None, batch_dst_spikings=None,
-        batch_src_lidar=None, batch_dst_lidar=None
+        batch_src_lidar=None, batch_dst_lidar=None,
+        batch_size: int|None = None,
     ) -> Batch[Prediction]:
         return get_grid_cell(batch_src_spikings, batch_dst_spikings), None, None
 
@@ -175,12 +177,13 @@ class CNN(Model):
         batch_transformation=None,
         batch_src_spikings=None, batch_dst_spikings=None,
         batch_src_lidar=None, batch_dst_lidar=None,
+        batch_size: int|None=None,
     ) -> Batch[Prediction]:
         # Extract features
         all_x = []
 
-        batch_size = batch_dst_images.size()[0]
         if self.sample_config.images:
+            assert batch_src_images is not None
             if self.image_encoder == 'pretrained':
                 x1 = self.nets['img_encoder'](batch_src_images)
                 x2 = self.nets['img_encoder'](batch_dst_images)
@@ -189,6 +192,7 @@ class CNN(Model):
                 x = self.nets['img_encoder'](batch_src_images, batch_dst_images)
 
                 if self.image_encoder == 'conv':
+                    batch_size = batch_src_images.shape[0]
                     # Convolutional Layer
                     x = self.nets['conv_encoder'](x.view(batch_size, -1, 1))
                     assert not torch.any(x.isnan())
@@ -213,6 +217,7 @@ class CNN(Model):
         if all_x:
             x = torch.cat(all_x, 1)
         else:
+            assert batch_size is not None, "no inputs and no batch size provided"
             x = torch.Tensor(np.zeros((batch_size, 0)))
         assert not torch.any(x.isnan())
 
@@ -264,6 +269,7 @@ class ResNet(Model):
         batch_transformation=None,
         batch_src_spikings=None, batch_dst_spikings=None,
         batch_src_lidar=None, batch_dst_lidar=None,
+        batch_size: int|None = None,
     ) -> Batch[Prediction]:
         # Extract features
         src_features = self.nets['res_net'](src_batch.view(batch_size, c, h, w))
