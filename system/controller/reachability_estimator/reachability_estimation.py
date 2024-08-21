@@ -269,7 +269,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
             p.img, q.img,
             p.spikings, q.spikings,
             get_lidar(p), get_lidar(q),
-            np.concat(np.array(q.pos) - np.array(p.pos), [(q.angle - p.angle) % 2*np.pi])
+            np.concatenate([np.array(q.pos) - np.array(p.pos), [(q.angle - p.angle) % 2*np.pi]])
         )
         return np.array([args], dtype=self.dtype)
 

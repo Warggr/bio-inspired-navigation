@@ -65,8 +65,8 @@ class SampleConfig:
                 sign, value = {'X': +1, 'N': -1}[tag[0]], int(tag[1:])
                 config.image_crop = sign * value
             elif tag == 'dist': config.with_dist = True
-            elif tag == 'conv':
-                other_attrs['with_conv'] = True
+            elif tag in ('conv', 'fc'):
+                other_attrs['image_encoder'] = tag
             else:
                 raise ValueError('Unrecognized tag: ', tag)
         return config, other_attrs

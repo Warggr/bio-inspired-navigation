@@ -107,7 +107,7 @@ with PybulletEnvironment(env_model, visualize=False, start=start.pos, build_data
     robot = env.robot
     pc_network.add_angles_and_lidar(env)
 
-    compass.reset_position(robot.position)
+    compass.reset_position(compass.parse(start))
 
     double_compass = DoubleCompass()
     double_compass.reset_position(double_compass.parse(start))

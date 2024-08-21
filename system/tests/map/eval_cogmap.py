@@ -8,6 +8,7 @@ from system.controller.simulation.pybullet_environment import PybulletEnvironmen
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.types import AllowedMapName, Vector2D
 import numpy as np
+from tqdm import tqdm
 
 def grid_for_map(map_name: AllowedMapName, total_points=100) -> list[Vector2D]:
     x1, x2, y1, y2 = environment_dimensions(map_name)
@@ -38,7 +39,7 @@ def cognitive_map_coverage(
     gc_network = setup_gc_network(dt=env.dt)
 
     last_pos = (0, 0)
-    for i, pos in enumerate(points):
+    for i, pos in enumerate(tqdm(points)):
         angle = 0
         spiking = create_gc_spiking(start=last_pos, goal=pos, gc_network_at_start=gc_network, plotting=False)
         place = place_info((pos, angle, spiking), env)

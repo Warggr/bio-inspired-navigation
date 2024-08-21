@@ -177,7 +177,7 @@ class PlaceCellNetwork:
 
     def track_movement(self, current_position: PlaceInfo, creation_allowed):
         """Keeps track of current grid cell firing"""
-        firing_values = [ self.reach_estimator.reachability_factor(current_position, node) for node in self.place_cells ]
+        firing_values = list(self.reach_estimator.reachability_factor_batch(current_position, self.place_cells))
 
         if not creation_allowed:
             return [firing_values, False]
