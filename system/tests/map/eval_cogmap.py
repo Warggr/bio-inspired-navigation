@@ -36,18 +36,19 @@ def cognitive_map_coverage(
     covered = np.zeros((len(points), len(place_cells)), dtype=bool)
 
     env = PybulletEnvironment(map_name, visualize=False, contains_robot=False)
-    gc_network = setup_gc_network(dt=env.dt)
+    #gc_network = setup_gc_network(dt=env.dt)
 
     last_pos = (0, 0)
     for i, pos in enumerate(tqdm(points)):
         angle = 0
-        spiking = create_gc_spiking(start=last_pos, goal=pos, gc_network_at_start=gc_network, plotting=False)
+        #spiking = create_gc_spiking(start=last_pos, goal=pos, gc_network_at_start=gc_network, plotting=False)
+        spiking = np.zeros((40, 40, 6)) # see types.Spikings
         place = place_info((pos, angle, spiking), env)
 
         covered[i, :] = reachability_estimator.is_same_batch(place, place_cells)
 
         last_pos = pos
-        gc_network.set_as_current_state(spiking)
+        #gc_network.set_as_current_state(spiking)
     return points, covered
 
 def scalar_coverage(
