@@ -49,7 +49,7 @@ class Sample:
         )
 
     @staticmethod
-    def from_tuple(tup: tuple) -> tuple[Self, bool]:
+    def from_tuple(tup: tuple) -> tuple['Sample', bool]:
         (
             src_img, dst_img,
             reachable,
@@ -98,11 +98,11 @@ class ReachabilityController(ABC):
         ...
 
     @staticmethod
-    def factory(controller_type) -> Self:
+    def factory(controller_type) -> 'ReachabilityController':
         if controller_type == "view_overlap":
             from .reachability_utils import ViewOverlapReachabilityController
             return ViewOverlapReachabilityController()
-        
+
         from .reachability_estimation import reachability_estimator_factory
         try:
             return reachability_estimator_factory(controller_type)

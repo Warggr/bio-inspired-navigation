@@ -4,18 +4,19 @@ if __name__ == "__main__":
     import sys
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 from system.controller.reachability_estimator.types import ReachabilityController
+from system.controller.reachability_estimator.reachability_estimation import ReachabilityEstimator, reachability_estimator_factory
 from dataset import SampleGenerator, get_path, TrajectoriesDataset
 from system.controller.simulation.environment_cache import EnvironmentCache
+from tqdm import tqdm
+import numpy as np
 
 
-def crosscheck_re(
+def crosscheck_rc(
     res: tuple[ReachabilityController, ReachabilityController], samples: SampleGenerator,
-    env_cache: EnvironmentCache,
+    env_model: str,
     num_samples: int,
     flush_freq: int = 10,
-):
-    from tqdm import tqdm
-
+) -> dict[tuple[bool, bool], int]:
     results = { (True, True): 0, (True, False): 0, (False, True): 0, (False, False): 0 }
 
     for i in (bar := tqdm(range(num_samples))):
@@ -23,10 +24,9 @@ def crosscheck_re(
         while sample is None:
             try:
                 sample, path_l, map_name = next(samples)
+                assert map_name == env_model
 
-                env = env_cache[map_name]
-
-                reachable = tuple( reachability_controller.reachable(env, sample.src, sample.dst, path_l) for reachability_controller in res )
+                reachable = tuple(reachability_controller.reachable(sample.src, sample.dst, path_l) for reachability_controller in res)
             except (ValueError, AssertionError):
                 tqdm.write(f"Error at sample {i}")
                 continue
@@ -34,22 +34,21 @@ def crosscheck_re(
 
         if i % flush_freq == (flush_freq - 1):
             bar.set_description('/'.join(map(str, results.values())))
+    return results
 
-    print('\t2>True\t2>False\t|')
-    for i, re1pred in enumerate([True, False]):
-        print(f'1>{re1pred}', end='\t')
-        for j, re2pred in enumerate([True, False]):
-            percentage = results[re1pred, re2pred] / num_samples
-            print(f'{results[re1pred, re2pred]} ({percentage:2.1f}%)', end='\t')
-        print('|')
 
-    print(f'Assuming the first RE ({repr(res[0])}) to be the ground truth:')
-    precision = results[True, True] / (results[True, True] + results[False, True])
-    recall = results[True, True] / (results[True, True] + results[True, False])
-    print('Accuracy:', (results[True, True] + results[False, False]) / num_samples)
-    print('Precision:', precision)
-    print('Recall:', recall)
-    print('F1Score:', 2*precision*recall/(precision+recall))
+def crosscheck_re(
+    res: tuple[ReachabilityEstimator, ReachabilityEstimator], samples: SampleGenerator,
+    num_samples: int,
+):
+    results = np.zeros((num_samples, 2), dtype=float)
+
+    for i in tqdm(range(num_samples)):
+        sample, path_l, map_name = next(samples)
+        factors = tuple(re.reachability_factor(sample.src, sample.dst) for re in res)
+        results[i] = factors
+    return results
+
 
 if __name__ == "__main__":
     """
@@ -60,9 +59,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('re_types',
         nargs=2,
-        choices=['view_overlap', 'network', 'distance', 'simulation'],
+        choices=['view_overlap', 'neural_network', 'distance', 'simulation'],
         help='RE algorithms to compare',
     )
+    parser.add_argument('mode', choices=['binary', 'distribution'])
+    parser.add_argument('--re-from', help='File from which to take the reachability estimator', default='re_mse_weights.50')
     parser.add_argument('-n', '--num-samples', type=int, default=400, help='Number of samples on which to test')
     parser.add_argument('-w', '--wall-colors', help='how to color the walls', choices=['1color', '3colors', 'patterns'], default='1color')
     parser.add_argument('--gen', '--generate-point-pairs',
@@ -71,8 +72,6 @@ if __name__ == "__main__":
     )
     parser.add_argument('--traj_file', help='Dataset of trajectories used for the _traj point-pair generators', nargs='?', default='trajectories.hd5')
     args = parser.parse_args()
-
-    res = [ ReachabilityController.factory(controller_type=retype) for retype in args.re_types ]
 
     if args.wall_colors == '1color':
         textures = [ os.path.join( 'yellow_wall.png') ]
@@ -84,6 +83,10 @@ if __name__ == "__main__":
     env_kwargs={ 'wall_kwargs': { 'textures': textures } }
 
     with EnvironmentCache(override_env_kwargs=env_kwargs) as env_cache:
+        env_model = 'Savinov_val3'
+        env = env_cache[env_model]
+        res = [reachability_estimator_factory(retype, weights_file=args.re_from, env_model=env_model, env=env) for retype in args.re_types]
+
         if args.gen.endswith('_traj'):
             filename = os.path.join(get_path(), "data", "trajectories", args.traj_file)
             filename = os.path.realpath(filename)
@@ -92,15 +95,42 @@ if __name__ == "__main__":
         else:
             if args.gen == 'random':
                 from system.controller.reachability_estimator.data_generation.dataset import RandomSamples
-                samples = RandomSamples(env_cache["Savinov_val3"])
+                samples = RandomSamples(env)
             elif args.gen == 'random_circle':
                 from system.controller.reachability_estimator.data_generation.dataset import RandomSamplesWithLimitedDistance
-                samples = RandomSamplesWithLimitedDistance(env_cache["Savinov_val3"])
+                samples = RandomSamplesWithLimitedDistance(env)
             else: raise ValueError(args.gen)
 
-        crosscheck_re(
-            res, samples,
-            env_cache=env_cache,
-            num_samples=args.num_samples,
-        )
- 
+        if args.mode == 'binary':
+            results = crosscheck_rc(
+                res, samples,
+                env_model=env_model,
+                num_samples=args.num_samples,
+            )
+            print('\t2>True\t2>False\t|')
+            for i, re1pred in enumerate([True, False]):
+                print(f'1>{re1pred}', end='\t')
+                for j, re2pred in enumerate([True, False]):
+                    percentage = results[re1pred, re2pred] / args.num_samples
+                    print(f'{results[re1pred, re2pred]} ({percentage:2.1f}%)', end='\t')
+                print('|')
+
+            print(f'Assuming the first RE ({repr(res[0])}) to be the ground truth:')
+            precision = results[True, True] / (results[True, True] + results[False, True])
+            recall = results[True, True] / (results[True, True] + results[True, False])
+            print('Accuracy:', (results[True, True] + results[False, False]) / args.num_samples)
+            print('Precision:', precision)
+            print('Recall:', recall)
+            print('F1Score:', 2*precision*recall/(precision+recall))
+
+        elif args.mode == 'distribution':
+            results = crosscheck_re(
+                res, samples, num_samples=args.num_samples
+            )
+            import matplotlib.pyplot as plt
+            plt.scatter(results[:, 0], results[:, 1])
+            plt.xlabel(args.re_types[0])
+            plt.ylabel(args.re_types[1])
+            plt.show()
+        else:
+            raise ValueError(args.mode)

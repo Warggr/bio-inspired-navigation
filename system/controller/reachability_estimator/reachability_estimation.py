@@ -49,7 +49,7 @@ def reachability_estimator_factory(
     elif type == 'neural_network':
         return NetworkReachabilityEstimator.from_file(debug=debug, **kwargs)
     elif type == 'simulation':
-        return SimulationReachabilityEstimator(debug=debug)
+        return SimulationReachabilityEstimator(debug=debug, env=kwargs['env'])
     elif type == 'view_overlap':
         return ViewOverlapReachabilityEstimator(debug=debug, env_model=kwargs['env_model'])
     elif type == 'spikings':
@@ -216,7 +216,12 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
 
         other arguments are passed to the NetworkReachabilityEstimator constructor
         """
-        re = NetworkReachabilityEstimator(backbone=None, **kwargs)
+        if weights_file == 're_mse_weights.50':
+            config, new_kwargs = SampleConfig(grid_cell_spikings=True), {'with_conv': True}
+        else:
+            config, new_kwargs = SampleConfig.from_filename(os.path.basename(weights_file))
+
+        re = NetworkReachabilityEstimator(backbone=None, config=config, **kwargs, **new_kwargs)
 
         weights_filepath = os.path.join(weights_folder, weights_file)
         state_dict = torch.load(weights_filepath, map_location='cpu')
@@ -383,16 +388,14 @@ class SimulationReachabilityEstimator(ReachabilityEstimator):
 
         # initialize grid cell network and create target spiking
         gc_network = GridCellNetwork(self.dt, from_data=True)
-        gc_network.set_as_current_state(start.spikings)
-        target_spiking = goal.spikings
 
         compass = GcCompass.factory(mode="combo", gc_network=gc_network)
+        compass.reset_position(compass.parse(start))
         compass.reset_goal(compass.parse(goal))
         angle = start.angle
         angle = 0.0 if angle is NotImplemented else angle
         with Robot(env=self.env, base_position=start.pos, base_orientation=angle) as robot:
-            goal_reached, _ = vector_navigation(self.env, compass, gc_network, target_gc_spiking=target_spiking,
-                                        step_limit=750, plot_it=False)
+            goal_reached, _ = vector_navigation(self.env, compass, gc_network, step_limit=750, plot_it=False)
             final_position, final_angle = robot.position_and_angle
 
         if goal_reached:
