@@ -2,7 +2,7 @@ import pickle
 from system.bio_model.grid_cell_model import GridCellNetwork
 from system.bio_model.cognitive_map import LifelongCognitiveMap
 from system.bio_model.place_cell_model import PlaceCellNetwork
-from system.controller.local_controller.compass import AnalyticalCompass
+from system.controller.local_controller.compass import Compass
 from system.controller.local_controller.local_controller import LocalController, controller_rules
 from system.controller.local_controller.local_navigation import PhaseOffsetDetectorNetwork, setup_gc_network
 from system.controller.reachability_estimator.reachability_estimation import reachability_estimator_factory, SpikingsReachabilityEstimator
@@ -15,10 +15,11 @@ import numpy as np
 import argparse
 from system.parsers import controller_parser, controller_creator
 
-parser = argparse.ArgumentParser(parents=[controller_parser])
+parser = argparse.ArgumentParser(parents=[controller_parser], formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('env_model', nargs='?', default='Savinov_val3')
 parser.add_argument('map_file', nargs='?', default="after_exploration.gpickle")
 parser.add_argument('start_stop', nargs='?', type=lambda ab: map(int, ab.split(',')), default=(73, 21))
+parser.add_argument('--compass', choices=['analytical', 'combo', 'pod', 'linear_lookahead'], default='analytical')
 parser.add_argument('--env-variant', '--variant')
 parser.add_argument('--visualize', action='store_true')
 parser.add_argument('--dump-all-steps', action='store_true')
@@ -38,10 +39,10 @@ re = reachability_estimator_factory(re_type, weights_file=re_weights_file, confi
 cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from=args.map_file, debug=False)
 pc_network = cognitive_map.get_place_cell_network()
 gc_network = GridCellNetwork(dt=1e-2, from_data=True)
-pod = PhaseOffsetDetectorNetwork(16, 9, 40)
 #compass = ComboGcCompass(gc_network, pod)
 #compass = LinearLookaheadGcCompass(arena_size=15, gc_network=gc_network)
 #compass = GoalVectorCache(compass)
+compass = Compass.factory(args.compass, gc_network=gc_network)
 
 class Counter:
     def __init__(self):
@@ -50,7 +51,6 @@ class Counter:
         self.counter += 1
 
 vector_step_counter = Counter()
-compass = AnalyticalCompass()
 controller = controller_creator(args)
 controller.on_reset_goal.append(vector_step_counter)
 
@@ -88,7 +88,7 @@ else:
     env = PybulletEnvironment(args.env_model, variant=args.env_variant, start=start_pc.pos, visualize=args.visualize, build_data_set=True)
     start_position = start_pc
 
-compass.reset_position(start_position.pos)
+compass.reset_position(compass.parse(start_position))
 gc_network.set_as_current_state(start_position.spikings)
 
 if args.position_estimation:
