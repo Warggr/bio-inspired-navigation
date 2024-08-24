@@ -421,8 +421,8 @@ class Map:
 
         return result
 
-    def view_overlap(self, pos1, heading1, pos2, heading2, fov,
-                     n_test_rays=100, offset=0.06, mode='plane', vis=None):
+    def view_overlap(self, pos1, heading1: Angle, pos2, heading2: Angle, fov,
+                     n_test_rays=100, offset=0.06, mode='plane', vis=None) -> tuple[float, float]:
         """
         Estimate the overlapping area between two camera poses
         :param offset: the amount to offset laser points to make them outside obstacles. The default

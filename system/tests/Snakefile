@@ -5,9 +5,17 @@ rule:
 	"""
 
 rule:
-	output: "results/local_controller_width/cone={cone},length={raylen}.log"
+	output: "results/local_controller_width/cone={cone},length={raylen},adist={adist},zdist={zdist}.log"
 	shell: """
-		python local_controller_narrow_test.py --tactile-cone {wildcards.cone} --ray-length {wildcards.raylen} | tail -n 1 > {output}
+		python local_controller_narrow_test.py \
+			--tactile-cone {wildcards.cone} --ray-length {wildcards.raylen} --start {wildcards.adist} --goal {wildcards.zdist} \
+		| tail -n 1 > {output}
+	"""
+
+rule:
+	output: "results/local_controller_width/adist={adist}.log"
+	shell: """
+		python local_controller_narrow_test.py goal_distance --start-distance {wildcards.adist} | tail -n 1 > {output}
 	"""
 
 import matplotlib
@@ -27,10 +35,9 @@ def create_plot(input, in_params, output, line_start, xlabel, ylabel):
 	dset.to_csv(output.csv)
 
 	matplotlib.use("pgf")
-	plt.scatter(dset['value'], dset['stop'], label='upper bound')
-	plt.scatter(dset['value'], dset['start'], label='lower bound')
+	plt.errorbar(dset['value'], (dset['stop'] + dset['start']) / 2, yerr=(dset['stop'] - dset['start']) / 2)
 	plt.xlabel(xlabel); plt.ylabel(ylabel)
-	plt.legend()
+	#plt.legend()
 	plt.savefig(output.png)
 	plt.savefig(output.pgf)
 
@@ -38,7 +45,7 @@ cone_values = [60, 120, 180, 210, 260, 310]
 raylen_values = [0, 0.1, 0.2, 0.5, 0.8, 1, 1.5, 2] 
 
 rule:
-	input: [ f"results/local_controller_width/cone={cone},length=1.0.log" for cone in cone_values ]
+	input: [ f"results/local_controller_width/cone={cone},length=1.0,adist=2.5,zdist=1.75.log" for cone in cone_values ]
 	output:
 		csv = "results/local_controller_width/results.csv",
 		pgf = "results/local_controller_width/results.pgf",
@@ -54,7 +61,7 @@ rule:
 		)
 
 rule:
-	input: [ f"results/local_controller_width/cone=120,length={raylen}.log" for raylen in raylen_values ]
+	input: [ f"results/local_controller_width/cone=120,length={raylen},adist=2.5,zdist=1.75.log" for raylen in raylen_values ]
 	output:
 		csv = "results/local_controller_width/by_raylen.csv",
 		pgf = "results/local_controller_width/by_raylen.pgf",
@@ -69,8 +76,25 @@ rule:
 			ylabel='Minimum handled width (m)',
 		)
 
+distance_values = [i / 4 for i in range(4*2 + 1)]
 rule:
-	input: [ f"results/local_controller_angle/length={raylen}.log" for raylen in [0, 0.1, 0.2, 0.5, 0.8, 1, 1.5, 2] ]
+	input: [ f"results/local_controller_width/cone=120,length=1.0,adist={distance},zdist={distance}.log" for distance in distance_values ]
+	output:
+		csv = "results/local_controller_width/by_distance.csv",
+		pgf = "results/local_controller_width/by_distance.pgf",
+		png = "results/local_controller_width/by_distance.png",
+	run:
+		create_plot(
+			input,
+			distance_values,
+			output,
+			line_start='Minimum handle-able width is ',
+			xlabel='Distance from start and goal to the corner',
+			ylabel='Minimum handled width (m)',
+		)
+
+rule:
+	input: [ f"results/local_controller_angle/length={raylen}.log" for raylen in raylen_values ]
 	output:
 		csv = "results/local_controller_angle/results.csv",
 		pgf = "results/local_controller_angle/results.pgf",
@@ -79,11 +103,27 @@ rule:
 	run:
 		create_plot(
 			input,
-			[0, 0.1, 0.2, 0.5, 0.8, 1, 1.5, 2],
+			raylen_values,
 			output,
 			line_start='Maximum handle-able angle is ',
 			xlabel='Ray length (m)',
 			ylabel='Maximum handled angle (°)',
+		)
+
+rule:
+	input: [ f"results/local_controller_width/adist={adist}.log" for adist in distance_values ]
+	output:
+		csv = "results/local_controller_width/adist_by_zdist.csv",
+		pgf = "results/local_controller_width/adist_by_zdist.pgf",
+		png = "results/local_controller_width/adist_by_zdist.png",
+	run:
+		create_plot(
+			input,
+			distance_values,
+			output,
+			line_start='Maximum handle-able goal_distance is ',
+			xlabel='Distance between start and corner',
+			ylabel='Maximum distance between goal and corner',
 		)
 
 def create_map_metric_rule(infile, outfile, metric):

@@ -60,6 +60,7 @@ class PositionEstimation:
         self,
         pc_network: PlaceCellNetwork, gc_network: GridCellNetwork, re: ReachabilityEstimator, compass: Compass,
         true_compass: Optional[Compass] = None, current_position: Optional[PlaceCell] = None,
+        env_model: Optional[str] = None,
     ):
         """
         PositionEstimation constructor
@@ -71,6 +72,7 @@ class PositionEstimation:
         compass: used for plotting
         true_compass: also used for plotting
         current_position: the current position of the robot (warning: this is not automatically updated)
+        env_model: the env model, used only for plotting
         """
         self.gc_network = gc_network
         self.pc_network = pc_network
@@ -88,7 +90,8 @@ class PositionEstimation:
         self.starting_position = np.sum(positions, axis=0) / len(positions)
         if plotting:
             _fig, axis = plt.subplots()
-            add_environment(axis, env_model)
+            if env_model is not None:
+                add_environment(axis, env_model)
             plt.scatter(positions[:, 0], positions[:, 1])
             plt.plot(*self.starting_position, 'gx')
             plt.show()
@@ -103,6 +106,27 @@ class PositionEstimation:
         norm_error = np.linalg.norm(true_position - estimated_position)
         angle_error = np.arccos(np.dot(true_position, estimated_position) / np.linalg.norm(true_position) / np.linalg.norm(estimated_position))
         print(f"  Error norm={norm_error}, error angle={np.degrees(angle_error)}°")
+        return norm_error, angle_error
+
+    def draw_correction(self, priors, likelihoods, posteriors, robot):
+        for probs, name in zip((priors, likelihoods, posteriors), ('priors', 'likelihoods', 'posteriors')):
+            fig, ax = plt.subplots()
+            add_environment(ax, robot.env.env_model)
+            ax.scatter(x=[pc.pos[0] for pc in pc_network.place_cells], y=[pc.pos[1] for pc in pc_network.place_cells], c=probs, label=name)
+            ax.plot(*(robot.position), 'gx', label='Current position')
+            estimated_position = self.starting_position + np.array(self.compass.calculate_goal_vector())
+            ax.plot(*estimated_position, 'yx', label='Estimated position')
+            fig.legend()
+            ax.set_title(name)
+            plt.show()
+
+    def on_reset_goal(self, new_goal: Vector2D, robot: 'Robot'):
+        current_observed_position = place_info((*robot.position_and_angle, self.gc_network.consolidate_gc_spiking().flatten()), robot.env)
+        priors = self.pc_network.compute_firing_values(self.gc_network)
+        likelihoods = self.re.reachability_factor_batch(current_observed_position, self.pc_network.place_cells)
+        posteriors = np.array(priors) * np.array(likelihoods)
+        self.draw_correction(priors, likelihoods, posteriors, robot)
+
     def __call__(self, goal_vector: Vector2D, robot: 'Robot') -> Vector2D:
         if self.counter > 0:
             self.counter -= 1
@@ -111,27 +135,21 @@ class PositionEstimation:
         current_observed_position = place_info((*robot.position_and_angle, self.gc_network.consolidate_gc_spiking().flatten()), robot.env)
         confidence = self.re.reachability_factor(self.current_position, current_observed_position)
         if confidence < self.confidence_threshold:
-            print("Correcting place cell")
             self.print_error()
             priors = self.pc_network.compute_firing_values(self.gc_network)
             likelihoods = self.re.reachability_factor_batch(current_observed_position, self.pc_network.place_cells)
             posteriors = np.array(priors) * np.array(likelihoods)
-            if plotting:
-                for probs, name in zip((priors, likelihoods, posteriors), ('priors', 'likelihoods', 'posteriors')):
-                    _fig, ax = plt.subplots()
-                    add_environment(ax, env_model)
-                    plt.scatter(x=[pc.pos[0] for pc in pc_network.place_cells], y=[pc.pos[1] for pc in pc_network.place_cells], c=probs, label=name)
-                    plt.plot(*(robot.position), 'gx', label='Current position')
-                    estimated_position = self.starting_position + np.array(self.compass.calculate_goal_vector())
-                    plt.plot(*estimated_position, 'yx', label='Estimated position')
-                    plt.show()
 
             max_likelihood_estimate = np.argmax(posteriors)
             if max_likelihood_estimate != np.argmax(priors):
-                actual_position = self.pc_network.place_cells[max_likelihood_estimate]
-                self.compass.reset_position(self.compass.parse(actual_position))
-                goal_vector = self.compass.calculate_goal_vector()
-                self.print_error()
+                if np.max(posteriors) >= 0.1:
+                    if plotting:
+                        self.draw_correction(priors, likelihoods, posteriors, robot)
+
+                    actual_position = self.pc_network.place_cells[max_likelihood_estimate]
+                    self.compass.reset_position(self.compass.parse(actual_position))
+                    goal_vector = self.compass.calculate_goal_vector()
+                    self.print_error()
                 self.counter = 20
         return goal_vector
 
@@ -142,34 +160,33 @@ if __name__ == "__main__":
     from system.controller.local_controller.local_navigation import setup_gc_network, PhaseOffsetDetectorNetwork
     from system.controller.reachability_estimator.ReachabilityDataset import SampleConfig
     from system.controller.local_controller.local_controller import LocalController
+    from system.parsers import fullstack_parser
     import numpy as np
 
     import argparse
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(parents=[fullstack_parser])
     parser.add_argument('map_file', default='after_lifelong_learning.gpickle')
-    parser.add_argument('--visualize', action='store_true')
     parser.add_argument('--seed', type=int, default=None)
     args = parser.parse_args()
 
-    re_type = 'view_overlap' #"neural_network"
     re_weights_file = "re_mse_weights.50"
-    map_file_after_lifelong_learning = "after_lifelong_learning.gpickle"
-    env_model = "Savinov_val3"
     model = "combo"
-    input_config = SampleConfig(grid_cell_spikings=True)
 
-    re = reachability_estimator_factory(re_type, backbone_classname='convolutional', weights_file=re_weights_file, config=input_config, env_model=env_model)
+    re = reachability_estimator_factory(args.re_type, backbone_classname='convolutional', weights_file=re_weights_file, env_model=args.env_model)
     cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from=args.map_file, debug=False)
     pc_network = cognitive_map.get_place_cell_network()
     gc_network = GridCellNetwork(from_data=True)
     #pod = PhaseOffsetDetectorNetwork(16, 9, 40)
     compass = GcCompass.factory(model, gc_network=gc_network)#, pod=pod)
-    tj = TopologicalNavigation(env_model, pc_network, cognitive_map, compass)
+    tj = TopologicalNavigation(args.env_model, pc_network, cognitive_map, compass)
+
+    [pc.angle for pc in cognitive_map.node_network.nodes]
 
     true_compass = AnalyticalCompass()
-    corrector = PositionEstimation(pc_network, gc_network, re, tj.compass, true_compass)
+    corrector = PositionEstimation(pc_network, gc_network, re, tj.compass, true_compass, env_model=args.env_model)
     controller = LocalController.default()
     controller.transform_goal_vector.append(corrector)
+    controller.on_reset_goal.append(corrector.on_reset_goal)
 
     if not args.seed:
         args.seed = np.random.default_rng().integers(low=0, high=0b100000000)
@@ -180,10 +197,10 @@ if __name__ == "__main__":
     start = list(pc_network.place_cells)[start_index]
     corrector.current_position = start
 
-    compass.reset_position(compass.parse(start))
+    compass.reset_position_pc(start)
     true_compass.reset_position(start.pos)
 
-    with PybulletEnvironment(start=start.pos, visualize=args.visualize, build_data_set=True) as env:
+    with PybulletEnvironment(args.env_model, start=start.pos, visualize=args.visualize, build_data_set=True) as env:
         env.robot.navigation_hooks.append(true_compass.update_position)
         for i in range(10):
             goal_index = None
@@ -192,6 +209,7 @@ if __name__ == "__main__":
             goal = list(cognitive_map.node_network.nodes)[goal_index]
 
             true_compass.reset_goal(goal.pos)
+            compass.reset_goal_pc(goal)
             success = tj.navigate(start, goal, gc_network=gc_network, controller=controller, env=env)
             if not success:
                 break

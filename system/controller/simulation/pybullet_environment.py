@@ -263,7 +263,7 @@ class PybulletEnvironment:
             state = pickle.load(file)
         return PybulletEnvironment._loads_state(state)
 
-    def switch_variant(self, new_variant):
+    def switch_variant(self, new_variant: str|None):
         self.variant = new_variant
         if self.env_model == 'obstacle_map_0':
             if self.mazeID:

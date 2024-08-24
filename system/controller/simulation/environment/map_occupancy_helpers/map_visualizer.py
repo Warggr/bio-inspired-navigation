@@ -7,7 +7,7 @@ from system.controller.simulation.environment.map_occupancy_helpers.cached_drawi
 
 
 class OccupancyMapVisualizer:
-    def __init__(self, occupancy_map, ax):
+    def __init__(self, occupancy_map: 'Map', ax):
         self.occupancy_map = occupancy_map
         self.ax = ax
         self.plotter = CachedPlotter(self.ax)

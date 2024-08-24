@@ -72,7 +72,8 @@ class GoalVectorCache(Compass):
         return self.goal_vector
 
     def reset_position(self, new_position: Spikings):
-        return self.impl.reset_position(new_position)
+        self.impl.reset_position(new_position)
+        self.goal_vector = None
 
     def update_position(self, robot: Robot):
         distance_to_goal = np.linalg.norm(self.goal_vector)  # current length of goal vector
@@ -159,6 +160,12 @@ class ComboGcCompass(GcCompass):
         self.pod_network = compass.pod_network
         compass = GoalVectorCache(compass)
         self.impl = compass
+
+    def reset_position(self, new_position: Spikings):
+        if type(self.impl) == LinearLookaheadGcCompass:
+            self.impl = PodGcCompass(pod_network=self.pod_network, gc_network=self.gc_network)
+            self.impl = GoalVectorCache(self.impl)
+        self.impl.reset_position(new_position)
 
     def reset_goal(self, new_goal: Spikings):
         super().reset_goal(new_goal)

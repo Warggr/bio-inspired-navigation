@@ -35,10 +35,16 @@ class Compass(ABC, Generic[PositionRepresentation]):
     def reset_position(self, new_position: PositionRepresentation):
         ...
 
+    def reset_position_pc(self, pc: 'PlaceInfo'):
+        self.reset_position(self.parse(pc))
+
     @abstractmethod
     def reset_goal(self, new_goal: PositionRepresentation):
         """ Sets a new goal position """
         self.goal_pos = new_goal
+
+    def reset_goal_pc(self, pc: 'PlaceInfo'):
+        self.reset_goal(self.parse(pc))
 
     def reached_goal(self) -> bool:
         '''

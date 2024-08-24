@@ -53,7 +53,7 @@ def reachability_estimator_factory(
     elif type == 'view_overlap':
         return ViewOverlapReachabilityEstimator(debug=debug, env_model=kwargs['env_model'])
     elif type == 'spikings':
-        return SpikingsReachabilityEstimator(**kwargs)
+        return SpikingsReachabilityEstimator(debug=debug, axis=kwargs.get('axis', None))
     elif type == 'bvc':
         return BVCReachabilityEstimator()
     else:
@@ -94,6 +94,10 @@ class ReachabilityEstimator(ReachabilityController):
     def reachability_factor_batch_2(self, ps: Iterable[PlaceInfo], q: PlaceInfo) -> list[float]:
         """ Similar to reachability_factor_batch, but the list comes first """
         return [self.reachability_factor(p, q) for p in ps]
+
+    def reachability_factor_batch_mm(self, ps: Iterable[PlaceInfo], qs: Iterable[PlaceInfo]) -> list[float]:
+        """ Similar to reachability_factor_batch, but both inputs are lists (which should have the same size) """
+        return [self.reachability_factor(p, q) for p, q in zip(ps, qs)]
 
     @override
     def reachable(self, src: PlaceInfo, dst: PlaceInfo, path_l=None) -> bool:
@@ -277,11 +281,12 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
             else:
                 return -1 * np.ones(shape=(), dtype=self.dtype['dst_lidar'])
 
+        p_angle, q_angle = getattr(p, 'angle', 0), getattr(q, 'angle', 0)
         args = (
             p.img, q.img,
             p.spikings, q.spikings,
             get_lidar(p), get_lidar(q),
-            np.concatenate([np.array(q.pos) - np.array(p.pos), [(q.angle - p.angle) % 2*np.pi]])
+            np.concatenate([np.array(q.pos) - np.array(p.pos), [(q_angle - p_angle) % 2*np.pi]])
         )
         return np.array([args], dtype=self.dtype)
 
@@ -301,6 +306,12 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
 
     def reachability_factor_batch_2(self, ps: Iterable[PlaceInfo], q: PlaceInfo) -> list[float]:
         batches: list[Batch['NetworkReachabilityEstimator.dtype']] = [self.to_batch(p, q) for p in ps]
+        if batches == []: return np.array([])
+        args_batch = np.concatenate(batches, axis=0)
+        return self.reachability_factor_of_array(args_batch)
+
+    def reachability_factor_batch_mm(self, ps: Iterable[PlaceInfo], qs: Iterable[PlaceInfo]) -> list[float]:
+        batches: list[Batch['NetworkReachabilityEstimator.dtype']] = [self.to_batch(p, q) for p, q in zip(ps, qs)]
         if batches == []: return np.array([])
         args_batch = np.concatenate(batches, axis=0)
         return self.reachability_factor_of_array(args_batch)
@@ -423,7 +434,7 @@ class SimulationReachabilityEstimator(ReachabilityEstimator):
 
     @override
     def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo) -> float:
-        if self.reachable(start, goal): # TODO provide the env somewhere
+        if self.reachable(start, goal):
             return 1.0
         else:
             return 0.0
@@ -433,7 +444,7 @@ class SimulationReachabilityEstimator(ReachabilityEstimator):
 
 
 class ViewOverlapReachabilityEstimator(ReachabilityEstimator):
-    def __init__(self, env_model: types.AllowedMapName, debug=False):
+    def __init__(self, env_model: types.AllowedMapName, env_variant=None, debug=False):
         """ Creates a reachability estimator that judges reachability
             between two locations based the overlap of their fields of view
 
@@ -444,6 +455,7 @@ class ViewOverlapReachabilityEstimator(ReachabilityEstimator):
         """
         super().__init__(threshold_same=0.4, threshold_reachable=0.3, debug=debug)
         self.env_model = env_model
+        assert env_model != 'plane', 'View overlap does not really make sense in an empty space'
         self.fov = 120 * np.pi / 180
         self.distance_threshold = 0.7
         self.map_layout = MapLayout(self.env_model)
@@ -454,7 +466,7 @@ class ViewOverlapReachabilityEstimator(ReachabilityEstimator):
         start_pos = start.pos
         goal_pos = goal.pos
 
-        heading1 = np.degrees(np.arctan2(goal_pos[0] - start_pos[0], goal_pos[1] - start_pos[1]))
+        heading1 = np.arctan2(goal_pos[0] - start_pos[0], goal_pos[1] - start_pos[1])
 
         overlap_ratios = self.map_layout.view_overlap(start_pos, heading1, goal_pos, heading1, self.fov, mode='plane')
 
@@ -470,6 +482,8 @@ class SpikingsReachabilityEstimator(ReachabilityEstimator):
         self.axis = axis
 
     def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo) -> float:
+        if not isinstance(goal, PlaceCell):
+            start, goal = goal, start
         assert isinstance(goal, PlaceCell)
         if self.axis is None:
             return goal.compute_firing(start.spikings)
@@ -493,8 +507,11 @@ class BVCReachabilityEstimator(ReachabilityEstimator):
         from system.bio_model.bc_network.bc_encoding import BoundaryCellNetwork
         self.boundaryCellEncoder = BoundaryCellNetwork.load()
 
+    def _allo_bc_spikings(self, pc: PlaceInfo):
+        return allo_bc_spikings(self.boundaryCellEncoder, pc)
+
     def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo) -> float:
-        spikings_start, spikings_goal = self._allo_bc_spikinigs(start), self._allo_bc_spikinigs(goal)
+        spikings_start, spikings_goal = self._allo_bc_spikings(start), self._allo_bc_spikings(goal)
         return -np.mean(np.abs(spikings_start - spikings_goal))
 
     def __str__(self) -> str:

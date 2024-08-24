@@ -59,7 +59,7 @@ min_fail_angle = np.radians(90)
 max_succ_angle = np.radians(0)
 
 import argparse
-from system.parsers import controller_parser
+from system.parsers import controller_parser, controller_creator
 
 parser = argparse.ArgumentParser(parents=[controller_parser])
 parser.add_argument('precision', nargs='?', type=float, default=5, help='Precision, in degrees')
@@ -67,13 +67,8 @@ parser.add_argument('--visualize', action='store_true')
 args = parser.parse_args()
 
 precision = np.radians(args.precision)
-controller = LocalController(
-    on_reset_goal=[],
-    transform_goal_vector=[
-        controller_rules.ObstacleAvoidance(ray_length=args.ray_length),
-    ],
-    hooks=[controller_rules.StuckDetector()],
-)
+controller = controller_creator(args)
+controller.on_reset_goal = [hook for hook in controller.on_reset_goal if type(hook) != controller_rules.TurnToGoal]
 
 with PybulletEnvironment(env_model="obstacle_map_2", visualize=args.visualize, contains_robot=False) as env:
     while(min_fail_angle - max_succ_angle > precision):

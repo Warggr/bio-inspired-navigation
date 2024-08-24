@@ -95,12 +95,13 @@ if __name__ == "__main__":
     Agent follows a hard-coded path to explore the environment and build the cognitive map. 
     """
     from system.controller.reachability_estimator.reachability_estimation import reachability_estimator_factory
+    from system.controller.reachability_estimator.training.train_multiframe_dst import Hyperparameters
     from system.controller.reachability_estimator.ReachabilityDataset import SampleConfig
     import os
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('-e', "--env-model", default="Savinov_val3", choices=["Savinov_val3", "linear_sunburst"])
-    parser.add_argument('--re', dest='re_type', default='neural_network', choices=['neural_network', 'view_overlap', 'bvc'])
+    parser.add_argument('-e', "--env-model", default="Savinov_val3", choices=["Savinov_val3", "linear_sunburst", 'plane'])
+    parser.add_argument('--re', dest='re_type', default='neural_network', choices=['neural_network', 'view_overlap', 'bvc', 'distance'])
     parser.add_argument('--re-from')
     parser.add_argument('--visualize', action='store_true')
     parser.add_argument('--mini', help='Use only a few trajectories', action='store_true')
@@ -156,6 +157,10 @@ if __name__ == "__main__":
         ]
         if args.mini:
             goals = goals[2:8] + [goals[3]]
+    elif args.env_model == 'plane':
+        from numpy import random
+        rng = random.RandomState(1)
+        goals = rng.normal(size=(20, 2))
     else:
         raise ValueError(f"Unsupported map: {args.env_model}")
 
