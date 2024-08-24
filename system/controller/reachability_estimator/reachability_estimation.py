@@ -143,6 +143,9 @@ class DistanceReachabilityEstimator(ReachabilityEstimator):
         # Since a bigger factor means better reachability, we use negative distance
         return -np.linalg.norm(np.array(start.pos) - np.array(goal.pos))
 
+    def __str__(self):
+        return f"DistanceRE({self.threshold_same},{self.threshold_reachable})"
+
 
 WEIGHTS_FOLDER = os.path.join(os.path.dirname(__file__), "data/models")
 
@@ -364,6 +367,9 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         # TODO Pierre: I don't understand this, I thought the value was already a probability?
         return min(1.0, max((self.threshold_reachable - reachability_factor * 0.3) / self.threshold_reachable, 0.1))
 
+    def __str__(self) -> str:
+        return f"NetworkRE({self.config.suffix()},{self.threshold_same},{self.threshold_reachable})"
+
 
 class SimulationReachabilityEstimator(ReachabilityEstimator):
     def __init__(self, env: 'PybulletEnvironment', debug=False):
@@ -422,6 +428,9 @@ class SimulationReachabilityEstimator(ReachabilityEstimator):
         else:
             return 0.0
 
+    def __str__(self) -> str:
+        return f'SimulationRE'
+
 
 class ViewOverlapReachabilityEstimator(ReachabilityEstimator):
     def __init__(self, env_model: types.AllowedMapName, debug=False):
@@ -451,6 +460,9 @@ class ViewOverlapReachabilityEstimator(ReachabilityEstimator):
 
         return (overlap_ratios[0] + overlap_ratios[1]) / 2
 
+    def __str__(self) -> str:
+        return f'ViewOverlapRE({self.threshold_same},{self.threshold_reachable})'
+
 
 class SpikingsReachabilityEstimator(ReachabilityEstimator):
     def __init__(self, axis=None, debug=False):
@@ -463,6 +475,9 @@ class SpikingsReachabilityEstimator(ReachabilityEstimator):
             return goal.compute_firing(start.spikings)
         else:
             return goal.compute_firing_2x(start.spikings, axis=self.axis)
+
+    def __str__(self) -> str:
+        return f'SpikingsRE({self.threshold_same},{self.threshold_reachable})'
 
 
 def spikings_reshape(img_array):
@@ -481,3 +496,6 @@ class BVCReachabilityEstimator(ReachabilityEstimator):
     def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo) -> float:
         spikings_start, spikings_goal = self._allo_bc_spikinigs(start), self._allo_bc_spikinigs(goal)
         return -np.mean(np.abs(spikings_start - spikings_goal))
+
+    def __str__(self) -> str:
+        return f'BVCRE({self.threshold_same},{self.threshold_reachable})'
