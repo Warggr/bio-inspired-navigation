@@ -31,7 +31,7 @@ except ImportError:
 Batch = networks.Batch
 
 def reachability_estimator_factory(
-    type: Literal['distance', 'neural_network', 'simulation', 'view_overlap', 'spikings', 'bvc'],
+    type: str,
     *, debug: bool = False, **kwargs
 ) -> 'ReachabilityEstimator':
     """
@@ -46,8 +46,12 @@ def reachability_estimator_factory(
     """
     if type == 'distance':
         return DistanceReachabilityEstimator(debug=debug)
-    elif type == 'neural_network':
-        return NetworkReachabilityEstimator.from_file(debug=debug, **kwargs)
+    elif type.startswith('neural_network'):
+        if type == 'neural_network':
+            return NetworkReachabilityEstimator.from_file(debug=debug, **kwargs)
+        else:
+            assert type.startswith('(') and type.endswith(')'); filename = type.strip('(').strip(')')
+            return NetworkReachabilityEstimator.from_file(filename, debug=debug, **kwargs)
     elif type == 'simulation':
         return SimulationReachabilityEstimator(debug=debug, env=kwargs['env'])
     elif type == 'view_overlap':
@@ -56,6 +60,10 @@ def reachability_estimator_factory(
         return SpikingsReachabilityEstimator(debug=debug, axis=kwargs.get('axis', None))
     elif type == 'bvc':
         return BVCReachabilityEstimator()
+    elif type.startswith('combine:'):
+        type = type.removeprefix('combine:')
+        res = map(lambda t: reachability_estimator_factory(t, debug, **kwargs), type.split('x'))
+        return CombineReachabilityEstimator(res, kwargs['threshold_same'], kwargs['threshold_reachable'])
     else:
         raise ValueError("Reachability estimator type not defined: " + type)
 
@@ -516,3 +524,15 @@ class BVCReachabilityEstimator(ReachabilityEstimator):
 
     def __str__(self) -> str:
         return f'BVCRE({self.threshold_same},{self.threshold_reachable})'
+
+class CombineReachabilityEstimator(ReachabilityEstimator):
+    def __init__(self, components: Iterable[ReachabilityEstimator], debug, threshold_same, threshold_reachable):
+        super().__init__(threshold_same, threshold_reachable, debug)
+        self.components = list(components)
+
+    def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo) -> float:
+        factors = map(lambda c: c.reachability_factor(start, goal), self.components)
+        return np.mean(factors)
+
+    def __str__(self):
+        return 'CombineRE:' + 'x'.join(map(str, self.components))

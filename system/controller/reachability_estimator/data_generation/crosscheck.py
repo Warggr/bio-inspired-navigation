@@ -59,7 +59,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('re_types',
         nargs=2,
-        choices=['view_overlap', 'neural_network', 'distance', 'simulation'],
         help='RE algorithms to compare',
     )
     parser.add_argument('mode', choices=['binary', 'distribution'])
