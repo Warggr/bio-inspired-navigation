@@ -18,6 +18,12 @@ rule:
 		python local_controller_narrow_test.py goal_distance --start-distance {wildcards.adist} | tail -n 1 > {output}
 	"""
 
+rule:
+	output: "results/local_controller_width/zdist={zdist}.log"
+	shell: """
+		python local_controller_narrow_test.py start_distance --goal-distance {wildcards.zdist} | tail -n 1 > {output}
+	"""
+
 import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -76,7 +82,7 @@ rule:
 			ylabel='Minimum handled width (m)',
 		)
 
-distance_values = [i / 4 for i in range(4*2 + 1)]
+distance_values = [i / 8 for i in range(8*2 + 1)]
 rule:
 	input: [ f"results/local_controller_width/cone=120,length=1.0,adist={distance},zdist={distance}.log" for distance in distance_values ]
 	output:
@@ -124,6 +130,22 @@ rule:
 			line_start='Maximum handle-able goal_distance is ',
 			xlabel='Distance between start and corner',
 			ylabel='Maximum distance between goal and corner',
+		)
+
+rule:
+	input: [ f"results/local_controller_width/zdist={zdist}.log" for zdist in distance_values ]
+	output:
+		csv = "results/local_controller_width/zdist_by_adist.csv",
+		pgf = "results/local_controller_width/zdist_by_adist.pgf",
+		png = "results/local_controller_width/zdist_by_adist.png",
+	run:
+		create_plot(
+			input,
+			distance_values,
+			output,
+			line_start='Maximum handle-able start_distance is ',
+			xlabel='Distance between goal and corner',
+			ylabel='Maximum distance between start and corner',
 		)
 
 def create_map_metric_rule(infile, outfile, metric):
