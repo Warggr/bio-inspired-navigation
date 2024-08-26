@@ -1,5 +1,5 @@
 import system.types as types
-from system.types import LidarReading
+from system.types import LidarReading, AllowedMapName
 import numpy as np
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
@@ -86,7 +86,7 @@ class ReachabilityController(ABC):
     """ Any algorithm that decides whether one place is reachable from another. """
 
     @abstractmethod
-    def reachable(self, src: PlaceInfo, dst: PlaceInfo, path_l: Optional[float]=None) -> bool:
+    def reachable(self, map_name: AllowedMapName, src: PlaceInfo, dst: PlaceInfo, path_l: Optional[float]=None) -> bool:
         """
         Decides whether dst is reachable from dst.
 
@@ -98,17 +98,25 @@ class ReachabilityController(ABC):
         ...
 
     @staticmethod
-    def factory(controller_type) -> 'ReachabilityController':
+    def factory(controller_type, **kwargs) -> 'ReachabilityController':
+        from .reachability_utils import RCCache
         if controller_type == "view_overlap":
             from .reachability_utils import ViewOverlapReachabilityController
-            return ViewOverlapReachabilityController()
+            return RCCache(ViewOverlapReachabilityController)
 
         from .reachability_estimation import reachability_estimator_factory
+        import functools
         try:
-            return reachability_estimator_factory(controller_type)
-        except KeyError:
-            pass
-        raise ValueError("Controller type not found: " + controller_type)
+            return RCCache(lambda map_name: reachability_estimator_factory(controller_type, env_model=map_name, **kwargs))
+        except KeyError as err:
+            raise ValueError("Controller type not found: " + controller_type) from err
+
+
+class SpecificReachabilityController(ABC):
+    @abstractmethod
+    def reachable(self, src: PlaceInfo, dst: PlaceInfo, path_l: Optional[float] = None) -> bool:
+        ...
+
 
 ModelInput = list['torch.Tensor']
 Prediction = tuple[float, types.Vector2D, types.Angle]

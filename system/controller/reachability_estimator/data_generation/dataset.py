@@ -22,7 +22,7 @@ import os
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
-from system.controller.reachability_estimator.reachability_utils import ViewOverlapReachabilityController
+from system.controller.reachability_estimator.reachability_utils import ViewOverlapReachabilityController, RCCache
 
 from system.controller.simulation.pybullet_environment import PybulletEnvironment, all_possible_textures
 from system.controller.simulation.environment_config import environment_dimensions
@@ -32,6 +32,7 @@ from system.controller.simulation.environment.map_occupancy_helpers.map_utils im
 from system.plotting.plotResults import plotStartGoalDataset
 from system.types import PositionAndOrientation, types, FlatSpikings, WaypointInfo, Vector2D, AllowedMapName
 from system.controller.reachability_estimator.types import Sample, PlaceInfo, ReachabilityController
+from system.debug import PLOTTING, DEBUG
 
 def get_path():
     """ returns path to data storage folder """
@@ -39,8 +40,8 @@ def get_path():
     return dirname
 
 
-plotting = os.getenv('PLOTTING', False)  # if True: plot every reachability rollout
-debug = os.getenv('DEBUG', False)  # if True: print debug output
+plotting = 'reachability' in PLOTTING  # if True: plot every reachability rollout
+debug = 'dataset_generation' in DEBUG  # if True: print debug output
 
 
 def print_debug(*params):
@@ -459,7 +460,7 @@ class RandomSamplesWithLimitedDistance(RandomSamples):
 def create_and_save_reachability_samples(
     samples: SampleGenerator, f: h5py.File,
     envs: EnvironmentCache,
-    reachability_controller: ReachabilityController = ViewOverlapReachabilityController(),
+    reachability_controller: ReachabilityController = RCCache(ViewOverlapReachabilityController),
     nr_samples=1000,
     flush_freq=50,
 ) -> h5py.File:
@@ -616,20 +617,22 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    re = CompositeReachabilityEstimator([
-        ReachabilityController.factory(controller_type=controller_type)
-        for controller_type in args.re.split('|')
-    ])
-
     if args.wall_colors == '1color':
         textures = [ os.path.join( 'yellow_wall.png') ]
     elif args.wall_colors == '3colors':
         textures = all_possible_textures[:args.wall_colors]
     elif args.wall_colors == 'patterns':
         textures = lambda i : f'pattern-{i+1}.png'
-    env_kwargs={ 'wall_kwargs': { 'textures': textures } }
+    else:
+        raise ValueError(f"Unrecognized textures: '{args.wall_colors}'")
+    env_kwargs={'wall_kwargs': {'textures': textures}}
 
     with EnvironmentCache(override_env_kwargs=env_kwargs) as env_cache:
+        re = CompositeReachabilityEstimator([
+            ReachabilityController.factory(controller_type=controller_type, env_cache=env_cache)
+            for controller_type in args.re.split('|')
+        ])
+
         if args.gen.endswith('_traj'):
             filename = os.path.join(get_path(), "data", "trajectories", args.traj_file)
             filename = os.path.realpath(filename)

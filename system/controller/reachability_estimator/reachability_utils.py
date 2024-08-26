@@ -14,9 +14,11 @@ from matplotlib import pyplot as plt
 
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.plotting.plotResults import plotStartGoalPair
-from system.controller.reachability_estimator.types import PlaceInfo, ReachabilityController
+from system.controller.reachability_estimator.types import PlaceInfo, SpecificReachabilityController, ReachabilityController
 
-from typing import Optional
+from typing import Optional, Callable
+
+from system.types import AllowedMapName
 try:
     from typing import override
 except ImportError: # Python <3.12
@@ -34,26 +36,24 @@ def in_fov(src_position, src_heading, src_fov, dst_position):
     return abs(angle_to_target) <= src_fov / 2
 
 
-class ViewOverlapReachabilityController(ReachabilityController):
-    def __init__(self):
+class ViewOverlapReachabilityController(SpecificReachabilityController):
+    def __init__(self, env_model: AllowedMapName):
         self.fov = 120 * np.pi / 180
         self.L_min = 0.5
         self.R_max = 1
         self.E_max_squared = 0.8
         self.theta_max = self.fov / 2
+        self.map_layout = MapLayout(env_model)
 
-    def compute_overlap(self, map_name, pos1, heading1, pos2, heading2):
-        map_layout = MapLayout(map_name)
-
-        overlap_ratios = map_layout.view_overlap(pos1, heading1,
+    def compute_overlap(self, pos1, heading1, pos2, heading2):
+        overlap_ratios = self.map_layout.view_overlap(pos1, heading1,
                                                  pos2, heading2,
                                                  self.fov, mode='plane')
         return overlap_ratios
 
     @override
-    def reachable(self, env: 'PybulletEnvironment', src: PlaceInfo, dst: PlaceInfo, path_l: Optional[float] = None) -> bool:
-        visual_overlap = min(self.compute_overlap(env.env_model,
-                                                  src.pos, src.angle,
+    def reachable(self, src: PlaceInfo, dst: PlaceInfo, path_l: Optional[float] = None) -> bool:
+        visual_overlap = min(self.compute_overlap(src.pos, src.angle,
                                                   dst.pos, dst.angle))
         dst_in_fov = in_fov(src.pos, src.angle, self.fov, dst.pos)
         distance_squared = (src.pos[0] - dst.pos[0]) ** 2 + (src.pos[1] - dst.pos[1]) ** 2
@@ -84,3 +84,16 @@ def display_sample(env_model, src_sample, dst_sample, src_image, dst_image):
         plt.show()
 
     plotStartGoalPair(env_model, src_sample[0], src_sample[1], dst_sample[0], dst_sample[1])
+
+
+class RCCache(ReachabilityController):
+    def __init__(self, rc_class: Callable[[AllowedMapName], SpecificReachabilityController]):
+        self.rc_class = rc_class
+        self.rcs = {}
+    def reachable(self, map_name: AllowedMapName, src: PlaceInfo, dst: PlaceInfo, path_l: Optional[float] = None) -> bool:
+        if map_name not in self.rcs:
+            rc = self.rc_class(map_name)
+            self.rcs[map_name] = rc
+        else:
+            rc = self.rcs[map_name]
+        return rc.reachable(src, dst, path_l)

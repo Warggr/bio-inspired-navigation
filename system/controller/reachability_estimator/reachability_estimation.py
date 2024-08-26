@@ -13,7 +13,7 @@ import numpy as np
 
 import os
 from abc import ABC, abstractmethod
-from typing import Iterable, Literal
+from typing import Iterable, Literal, Optional
 from system.bio_model.place_cell_model import PlaceCell
 from system.bio_model.bc_network.bc_encoding import BoundaryCellNetwork, HDCActivity
 from system.bio_model.bc_network.parameters import HeadingCellActivity, BoundaryCellActivity
@@ -21,7 +21,7 @@ from system.bio_model.bc_network.bc_activity import bcActivityForLidar
 import system.controller.reachability_estimator.networks as networks
 from system.controller.simulation.environment.map_occupancy import MapLayout
 import system.types as types
-from system.controller.reachability_estimator.types import Prediction, ReachabilityController, PlaceInfo
+from system.controller.reachability_estimator.types import Prediction, SpecificReachabilityController, PlaceInfo
 
 try:
     from typing import override
@@ -53,7 +53,7 @@ def reachability_estimator_factory(
             assert type.startswith('(') and type.endswith(')'); filename = type.strip('(').strip(')')
             return NetworkReachabilityEstimator.from_file(filename, debug=debug, **kwargs)
     elif type == 'simulation':
-        return SimulationReachabilityEstimator(debug=debug, env=kwargs['env'])
+        return SimulationReachabilityEstimator(debug=debug, env=kwargs.get('env', None), env_cache=kwargs.get('env_cache', None), env_model=kwargs.get('env_model', None))
     elif type == 'view_overlap':
         return ViewOverlapReachabilityEstimator(debug=debug, env_model=kwargs['env_model'])
     elif type == 'spikings':
@@ -62,13 +62,13 @@ def reachability_estimator_factory(
         return BVCReachabilityEstimator()
     elif type.startswith('combine:'):
         type = type.removeprefix('combine:')
-        res = map(lambda t: reachability_estimator_factory(t, debug, **kwargs), type.split('x'))
-        return CombineReachabilityEstimator(res, kwargs['threshold_same'], kwargs['threshold_reachable'])
+        res = map(lambda t: reachability_estimator_factory(t, debug=debug, **kwargs), type.split('x'))
+        return CombineReachabilityEstimator(res, debug=debug)
     else:
         raise ValueError("Reachability estimator type not defined: " + type)
 
 
-class ReachabilityEstimator(ReachabilityController):
+class ReachabilityEstimator(SpecificReachabilityController):
     def __init__(self, threshold_same: float, threshold_reachable: float, debug: bool = False):
         """ Abstract base class defining the interface for reachability estimator implementations.
 
@@ -391,13 +391,15 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
 
 
 class SimulationReachabilityEstimator(ReachabilityEstimator):
-    def __init__(self, env: 'PybulletEnvironment', debug=False):
+    def __init__(self, env: Optional['PybulletEnvironment']=None, env_cache=None, env_model=None, debug=False):
         """ Creates a reachability estimator that judges reachability
             between two locations based success of navigation simulation
         """
         super().__init__(threshold_same=None, threshold_reachable=1.0, debug=debug) # we can't decide whether two points are the same, only whether they are reachable
         self.fov = 120 * np.pi / 180
         self.dt = 1e-2
+        if env is None:
+            env = env_cache[env_model]
         self.env = env
 
     @override
