@@ -5,7 +5,7 @@ from system.controller.simulation.math_utils import vectors_in_one_direction, in
 from system.debug import DEBUG
 
 from abc import ABC
-from system.types import Vector2D, Angle
+from system.types import Vector2D, Angle, AllowedMapName
 from typing import Callable
 
 ResetGoalHook = Callable[[Vector2D, Robot], None]
@@ -230,6 +230,35 @@ class TurnToGoal:
             pass
         raise RobotStuck()
 
+
+class OptimalController(Hook):
+    def __init__(self, env_model: AllowedMapName, allowed_angle = np.radians(60)):
+        from system.controller.simulation.environment.map_occupancy import MapLayout
+        self.map = MapLayout(env_model)
+        self.allowed_angle = allowed_angle
+
+    def transform_goal_vector(self, goal_vector: Vector2D, robot: Robot) -> Vector2D:
+        start = np.array(robot.position)
+        i = 1.0
+        for i in range(10, 0, -1):
+            goal = start + (i/10) * np.array(goal_vector)
+            if self.map.suitable_position_for_robot(goal):
+                break
+        else: #not suitable position found
+            return goal_vector
+
+        current_pos, next_waypoint, *_ignored = self.map.find_path(start, goal)
+        # assert current_pos == start
+
+        new_goal_vector = np.array(next_waypoint) - start
+        new_goal_vector /= np.linalg.norm(new_goal_vector)
+        angle_to_goal = np.arccos(np.dot(new_goal_vector, goal_vector) / np.linalg.norm(goal_vector) / np.linalg.norm(new_goal_vector))
+        if angle_to_goal <= self.allowed_angle:
+            return new_goal_vector
+        else:
+            return goal_vector
+
+
 class controller_rules: # namespace
     ObstacleAvoidance = ObstacleAvoidance
     FajenObstacleAvoidance = FajenObstacleAvoidance
@@ -237,3 +266,4 @@ class controller_rules: # namespace
     StuckDetector = StuckDetector
     TurnToGoal = TurnToGoal
     TurnWhenNecessary = TurnWhenNecessary
+    OptimalController = OptimalController

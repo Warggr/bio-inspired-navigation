@@ -50,8 +50,9 @@ class Counter:
     def __call__(self, *args, **kwargs):
         self.counter += 1
 
+
 vector_step_counter = Counter()
-controller = controller_creator(args)
+controller = controller_creator(args, env_model=args.env_model)
 controller.on_reset_goal.append(vector_step_counter)
 
 tj = TopologicalNavigation(args.env_model, pc_network=pc_network, cognitive_map=cognitive_map, compass=compass, log=log)
