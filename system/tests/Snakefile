@@ -82,7 +82,7 @@ rule:
 			ylabel='Minimum handled width (m)',
 		)
 
-distance_values = [i / 8 for i in range(8*2 + 1)]
+distance_values = [i / 8 for i in range(8*3 + 1)]
 rule:
 	input: [ f"results/local_controller_width/cone=120,length=1.0,adist={distance},zdist={distance}.log" for distance in distance_values ]
 	output:
@@ -148,6 +148,13 @@ rule:
 			ylabel='Maximum distance between start and corner',
 		)
 
+rule:
+	input: "results/local_controller_width/adist_by_zdist.csv", "results/local_controller_width/adist_by_zdist.csv"
+	output:
+		pgf = 'results/local_controller_width/view_overlap.pgf',
+		png = 'results/local_controller_width/view_overlap.png',
+	shell: 'python scripts/overlap_plot.py'
+
 def create_map_metric_rule(infile, outfile, metric):
 	rule:
 		input: infile
@@ -164,6 +171,11 @@ for root, dirs, files in os.walk('../bio_model/data/cognitive_map/'):
 			output = os.path.join(root, file.replace('.gpickle', '-' + metric + '.v'))
 			map_metrics.append(output)
 			create_map_metric_rule(os.path.join(root, file), output, metric)
+
+		rule:
+			input: os.path.join(root, file)
+			output: os.path.join(root, file.replace('.gpickle', '-edge_agreement' + '.csv'))
+			shell: 'python map/edges.py {input} > {output}'
 
 rule map_metrics:
 	input: map_metrics
