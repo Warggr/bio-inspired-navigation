@@ -62,7 +62,6 @@ if __name__ == "__main__":
         help='RE algorithms to compare',
     )
     parser.add_argument('mode', choices=['binary', 'distribution'])
-    parser.add_argument('--re-from', help='File from which to take the reachability estimator', default='re_mse_weights.50')
     parser.add_argument('-n', '--num-samples', type=int, default=400, help='Number of samples on which to test')
     parser.add_argument('-w', '--wall-colors', help='how to color the walls', choices=['1color', '3colors', 'patterns'], default='1color')
     parser.add_argument('--gen', '--generate-point-pairs',
@@ -85,7 +84,7 @@ if __name__ == "__main__":
     with EnvironmentCache(override_env_kwargs=env_kwargs) as env_cache:
         env_model = 'Savinov_val3'
         env = env_cache[env_model]
-        res = [reachability_estimator_factory(retype, weights_file=args.re_from, env_model=env_model, env=env) for retype in args.re_types]
+        res = [reachability_estimator_factory(retype, env_model=env_model, env=env) for retype in args.re_types]
 
         if args.gen.endswith('_traj'):
             filename = os.path.join(get_path(), "data", "trajectories", args.traj_file)

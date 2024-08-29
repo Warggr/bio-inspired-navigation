@@ -35,3 +35,22 @@ for dataset_flags in ['', '3colors']:
 		shell:
 			f"python data_generation/dataset.py -n 200000 --flush-freq 1000 --extension '.hd5.part' {cmdline_flags} && "
 			"ln -s $(basename {output}).part {output}"
+
+rule:
+	input: "data/models/{model}"
+	output: "logs/SimulationRExNetworkRE({model}).log"
+	shell: """
+		python data_generation/crosscheck.py simulation 'neural_network({wildcards.model})' binary > '{output}'
+	"""
+
+models = ['reachability_network+noimages+conv.25', 'reachability_network+spikings+lidar--raw_lidar.25', 'reachability_network-3colors+lidar--ego_bc.25']
+
+rule:
+	input: ["data/models/" + model for model in models]
+	output: "logs/SimulationRExCombine(" + ",".join(map(lambda filename: f"Network({filename})", models)) + ").log"
+	shell: f"""
+		python data_generation/crosscheck.py simulation 'combine:{'x'.join(map(lambda filename: 'neural_network(' + filename + ')', models))}' binary > '{{output}}'
+	"""
+
+rule combine_test:
+	input: ["logs/SimulationRExCombine(" + ",".join(map(lambda filename: f"Network({filename})", models)) + ").log"] + [ f"logs/SimulationRExNetworkRE({model}).log" for model in models ]
