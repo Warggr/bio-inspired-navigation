@@ -20,6 +20,9 @@ rule:
 	output: "data/reachability/{map}.trajectories.hd5"
 	shell: "ln -sf ../trajectories/{map}.trajectories.hd5 {output}"
 
+FEATURES = '--spikings --lidar=allo_bc'
+FEATURES_FILE_FLAGS = '+spikings+lidar'
+
 for dataset_flags in ['', '3colors']:
 	cmdline_flags = f'--wall-colors {dataset_flags}' if dataset_flags else ''
 	filename_flags = f'-{dataset_flags}' if dataset_flags else ''
@@ -35,6 +38,11 @@ for dataset_flags in ['', '3colors']:
 		shell:
 			f"python data_generation/dataset.py -n 200000 --flush-freq 1000 --extension '.hd5.part' {cmdline_flags} && "
 			"ln -s $(basename {output}).part {output}"
+	rule:
+		output: f"data/models/reachability_network{FEATURES_FILE_FLAGS}.25"
+		input: f"data/reachability/dataset{filename_flags}.hd5"
+		shell:
+			f"""python training/train_multiframe_dst.py train {FEATURES} --resume """ + cmdline_flags
 
 rule:
 	input: "data/models/{model}"
@@ -54,3 +62,51 @@ rule:
 
 rule combine_test:
 	input: ["logs/SimulationRExCombine(" + ",".join(map(lambda filename: f"Network({filename})", models)) + ").log"] + [ f"logs/SimulationRExNetworkRE({model}).log" for model in models ]
+
+code_sizes = [0, 1, 4, 16, 20, 50, 80, 100]
+AUTOENCODER_EPOCHS = 25
+
+rule:
+	output: f"data/models/autoencoder{{i}}.{AUTOENCODER_EPOCHS}"
+	input: 'data/reachability/dataset.hd5'
+	shell: f'python training/train_autoencoder.py train {{wildcards.i}} -e {AUTOENCODER_EPOCHS}'
+
+rule:
+	output: f"data/results/autoencoder{{i}}.${AUTOENCODER_EPOCHS}.log"
+	input: f"data/models/autoencoder{{i}}.{AUTOENCODER_EPOCHS}"
+	shell: 'python training/train_autoencoder.py validate {wildcards.i} > {output}'
+
+rule:
+	input: [f"data/results/autoencoder{i}.25.log" for i in code_sizes]
+	output: "data/results/autoencoder_performance.csv"
+	run:
+		with open(str(output), 'w') as outfile:
+			print('Dimension of the encoding','MSE loss', sep=',', file=outfile)
+			for i in code_sizes:
+				with open(f'data/results/autoencoder{code_size}.{AUTOENCODER_EPOCHS}.log') as result_file:
+					value = result_file.read().strip()
+				value = value.split(' ')[1]
+				print(i, value, sep=',', file=outfile)
+
+
+for format in ('png', 'pgf'):
+	rule:
+		input: "data/results/autoencoder_performance.csv"
+		output: f"data/results/autoencoder_performance.{format}"
+		run:
+			import matplotlib
+			matplotlib.use("Agg")
+			import matplotlib.pyplot as plt
+			import pandas as pd
+
+			data = pd.read_csv(str(input))
+			x, y = data.keys()
+			plt.scatter(data[x], data[y])
+			plt.title("Autoencoder performance")
+			plt.xlabel(x); plt.ylabel(y)
+			plt.savefig(str(output))
+
+rule:
+	output: f"data/models/reachability_network{FEATURES_FILE_FLAGS}+pretrained.25"
+	input: "data/reachability/trajectories.hd5", "data/models/autoencoder20.25"
+	shell: f"""python training/train_multiframe_dst.py train {FEATURES} --image-encoder pretrained --resume """ + cmdline_flags
