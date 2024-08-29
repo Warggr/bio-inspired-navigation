@@ -19,6 +19,18 @@ def random_edges(rng: np.random.Generator, cogmap: CognitiveMap, n=100):
         nodei, nodej = pcs[i], pcs[j]
         yield (i, nodei), (j, nodej)
 
+def random_edges_in_map(rng: np.random.Generator, cogmap: CognitiveMap, n=100):
+    pcs = list(cogmap.node_network.nodes)
+    for k in range(n):
+        while True:
+            i = rng.integers(len(cogmap.node_network.nodes)).item()
+            nodei = pcs[i]
+            if cogmap.node_network.adj[nodei]:
+                nodej = rng.choice(cogmap.node_network.adj[nodei])
+                break
+        j = pcs.index(nodej)
+        yield (i, nodei), (j, nodej)
+
 def agreement_values(
     cogmap: CognitiveMap, env: PybulletEnvironment,
     edges: Iterable[tuple[tuple[int, PlaceCell], tuple[int, PlaceCell]]]
@@ -50,6 +62,21 @@ def agreement_values(
             for key, batch in batches.items():
                 values[key + '_success'] = batch[k]
             yield values
+
+def agreement(
+    cogmap: CognitiveMap,
+    env_model: AllowedMapName,
+):
+    from tqdm import tqdm
+    rng = np.random.default_rng(seed=1)
+    total = 40
+    edges = random_edges_in_map(rng, cogmap, n=total)
+    successes = 0
+    with PybulletEnvironment(env_model, contains_robot=False) as env:
+        for line in tqdm(agreement_values(cogmap, env, edges)):
+            if (line['net_2_success'] >= 0.8) == (line['view_success'] >= 0.4):
+                successes += 1
+    return successes / total
 
 if __name__ == "__main__":
     map_file = sys.argv[1]
