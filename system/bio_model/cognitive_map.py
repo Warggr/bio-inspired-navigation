@@ -94,8 +94,11 @@ class CognitiveMapInterface(ABC):
 
         return path
 
-    def _place_cell_number(self, p: PlaceCell) -> int:
-        return list(self.node_network.nodes).index(p)
+    def _place_cell_number(self, p: PlaceCell) -> int|Literal['not in map']:
+        try:
+            return list(self.node_network.nodes).index(p)
+        except ValueError:
+            return 'not in map'
 
     def add_node_to_map(self, p: PlaceCell):
         """ Adds a new node to the cognitive map """

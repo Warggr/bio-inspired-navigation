@@ -459,7 +459,6 @@ class RandomSamplesWithLimitedDistance(RandomSamples):
 
 def create_and_save_reachability_samples(
     samples: SampleGenerator, f: h5py.File,
-    envs: EnvironmentCache,
     reachability_controller: ReachabilityController = RCCache(ViewOverlapReachabilityController),
     nr_samples=1000,
     flush_freq=50,
@@ -503,10 +502,9 @@ def create_and_save_reachability_samples(
 
             if map_name not in map_names:
                 map_names.add(map_name)
-            env = envs[map_name]
 
             if True: #try:
-                reachable = reachability_controller.reachable(env, sample.src, sample.dst, path_l)
+                reachable = reachability_controller.reachable(map_name, sample.src, sample.dst, path_l)
             #except AssertionError:
             #    continue
 
@@ -662,7 +660,6 @@ if __name__ == "__main__":
 
         create_and_save_reachability_samples(
             samples, f,
-            envs=env_cache,
             reachability_controller=re,
             nr_samples=args.num_samples,
             flush_freq=args.flush_freq,

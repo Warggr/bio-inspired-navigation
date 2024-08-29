@@ -35,6 +35,14 @@ for file in weights_files:
 
     if 'fully_connected' in state_dict['nets']:
         fc = state_dict['nets']['fully_connected']
+        if 'fc1.weight' in fc:
+            for i in range(3):
+                for value_type in ['bias', 'weight']:
+                    fc[f'fc.{2*i}.{value_type}'] = fc[f'fc{i+1}.{value_type}']
+                    del fc[f'fc{i+1}.{value_type}']
+            dirty = True
+            print('Fix fc1 -> fc.0')
+
         sizes = [fc[key].shape[0] for key in fc if 'bias' in key]
         assert sizes[-1] == 4; sizes = sizes[:-1]
         if sizes != [256, 256] and ('hidden_fc_layers' not in state_dict['global_args'] or sizes != state_dict['global_args']['hidden_fc_layers']):

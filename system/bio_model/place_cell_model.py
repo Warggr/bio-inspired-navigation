@@ -57,7 +57,7 @@ class PlaceCell(PlaceInfo):
 
     def compute_firing(self, s_vectors):
         """Computes firing value based on current grid cell spiking"""
-        gc_connections = np.where(self.gc_connections > 0.1, 1, 0)  # determine where connection exist to grid cells
+        gc_connections = np.where(self.spikings > 0.1, 1, 0)  # determine where connection exist to grid cells
         filtered = np.multiply(gc_connections, s_vectors)  # filter current grid cell spiking, by connections
         modules_firing = np.sum(filtered, axis=1) / np.sum(s_vectors, axis=1)  # for each module determine pc firing
         firing = np.average(modules_firing)  # compute overall pc firing by summing averaging over modules
@@ -68,7 +68,7 @@ class PlaceCell(PlaceInfo):
         new_dim = int(np.sqrt(len(s_vectors[0])))  # n
 
         s_vectors = np.where(s_vectors > 0.1, 1, 0)  # mute weak grid cell spiking, transform to binary vector
-        gc_connections = np.where(self.gc_connections > 0.1, 1, 0)  # mute weak connections, transform to binary vector
+        gc_connections = np.where(self.spikings > 0.1, 1, 0)  # mute weak connections, transform to binary vector
 
         proj_s_vectors = np.empty((len(s_vectors[:, 0]), new_dim))
         for i, s in enumerate(s_vectors):

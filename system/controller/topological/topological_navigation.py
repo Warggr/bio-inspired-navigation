@@ -265,9 +265,8 @@ if __name__ == "__main__":
         if not map_file_after_lifelong_learning.startswith(args.env_model + '.'):
             map_file_after_lifelong_learning = args.env_model + '.' + map_file_after_lifelong_learning
     model = "combo"
-    input_config = SampleConfig(grid_cell_spikings=True)
 
-    re = reachability_estimator_factory(args.re_type, env_model=args.env_model, weights_file=re_weights_file, config=input_config)
+    re = reachability_estimator_factory(args.re_type, env_model=args.env_model, weights_file=re_weights_file)
     pc_network = PlaceCellNetwork(from_data=True, map_name=args.env_model)
     cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from=map_file, debug=('cogmap' in DEBUG or args.log))
     assert len(cognitive_map.node_network.nodes) > 1

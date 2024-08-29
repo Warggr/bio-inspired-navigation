@@ -14,4 +14,6 @@ def to_mst(graph):
 
 def mean_distance_between_nodes(cogmap, env_model):
     mst = to_mst(cogmap.node_network)
+    if len(mst.edges) == 0:
+        return float('nan')
     return average([edge['distance'] for edge in mst.edges.values()])

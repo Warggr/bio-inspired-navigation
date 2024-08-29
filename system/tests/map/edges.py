@@ -22,7 +22,7 @@ def random_edges(rng: np.random.Generator, cogmap: CognitiveMap, n=100):
 def agreement_values(
     cogmap: CognitiveMap, env: PybulletEnvironment,
     edges: Iterable[tuple[tuple[int, PlaceCell], tuple[int, PlaceCell]]]
-) -> Generator[dict[str, Any]]:
+) -> Generator[dict[str, Any], None, None]:
     res = dict(
     #    sim = SimulationReachabilityEstimator(env),
         view = ViewOverlapReachabilityEstimator(env_model=env.env_model),
@@ -75,4 +75,4 @@ if __name__ == "__main__":
                 print(','.join(keys))
             else:
                 assert list(line.keys()) == keys
-            print(','.join(line.values()))
+            print(','.join(map(str, line.values())))

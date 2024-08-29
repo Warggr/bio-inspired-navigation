@@ -70,6 +70,7 @@ if __name__ == "__main__":
         help='How to generate pairs of points',
     )
     parser.add_argument('--traj_file', help='Dataset of trajectories used for the _traj point-pair generators', nargs='?', default='trajectories.hd5')
+    parser.add_argument('--headless', help='Save plots instead of showing them', action='store_true')
     args = parser.parse_args()
 
     if args.wall_colors == '1color':
@@ -111,7 +112,7 @@ if __name__ == "__main__":
                 print(f'1>{re1pred}', end='\t')
                 for j, re2pred in enumerate([True, False]):
                     percentage = results[re1pred, re2pred] / args.num_samples
-                    print(f'{results[re1pred, re2pred]} ({percentage:2.1f}%)', end='\t')
+                    print(f'{results[re1pred, re2pred]} ({percentage:2.1%})', end='\t')
                 print('|')
 
             print(f'Assuming the first RE ({repr(res[0])}) to be the ground truth:')
@@ -130,6 +131,10 @@ if __name__ == "__main__":
             plt.scatter(results[:, 0], results[:, 1])
             plt.xlabel(args.re_types[0])
             plt.ylabel(args.re_types[1])
-            plt.show()
+            if args.headless:
+                plt.savefig(f'distro_{res[0]}x{res[1]}.png')
+                plt.close()
+            else:
+                plt.show()
         else:
             raise ValueError(args.mode)

@@ -50,6 +50,7 @@ def reachability_estimator_factory(
         if type == 'neural_network':
             return NetworkReachabilityEstimator.from_file(debug=debug, **kwargs)
         else:
+            type = type.removeprefix('neural_network')
             assert type.startswith('(') and type.endswith(')'); filename = type.strip('(').strip(')')
             return NetworkReachabilityEstimator.from_file(filename, debug=debug, **kwargs)
     elif type == 'simulation':
@@ -492,13 +493,13 @@ class SpikingsReachabilityEstimator(ReachabilityEstimator):
         self.axis = axis
 
     def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo) -> float:
-        if not isinstance(goal, PlaceCell):
-            start, goal = goal, start
-        assert isinstance(goal, PlaceCell)
+        if not isinstance(start, PlaceCell):
+            start, goal = goal, start # TODO Pierre: check if that actually works, i.e. if this RE is sufficiently non-directional
+        assert isinstance(start, PlaceCell)
         if self.axis is None:
-            return goal.compute_firing(start.spikings)
+            return PlaceCell.compute_firing(goal, start.spikings)
         else:
-            return goal.compute_firing_2x(start.spikings, axis=self.axis)
+            return PlaceCell.compute_firing_2x(goal, start.spikings, axis=self.axis)
 
     def __str__(self) -> str:
         return f'SpikingsRE({self.threshold_same},{self.threshold_reachable})'
@@ -528,13 +529,18 @@ class BVCReachabilityEstimator(ReachabilityEstimator):
         return f'BVCRE({self.threshold_same},{self.threshold_reachable})'
 
 class CombineReachabilityEstimator(ReachabilityEstimator):
-    def __init__(self, components: Iterable[ReachabilityEstimator], debug, threshold_same, threshold_reachable):
-        super().__init__(threshold_same, threshold_reachable, debug)
-        self.components = list(components)
+    def __init__(self, components: Iterable[ReachabilityEstimator], debug):
+        components = list(components)
+        super().__init__(
+            threshold_same=sum(re.threshold_same for re in components) / len(components),
+            threshold_reachable=sum(re.threshold_reachable for re in components) / len(components),
+            debug=debug
+        )
+        self.components = components
 
     def reachability_factor(self, start: PlaceInfo, goal: PlaceInfo) -> float:
-        factors = map(lambda c: c.reachability_factor(start, goal), self.components)
-        return np.mean(factors)
+        factors = list(map(lambda c: c.reachability_factor(start, goal), self.components))
+        return sum(factors) / len(factors)
 
     def __str__(self):
         return 'CombineRE:' + 'x'.join(map(str, self.components))

@@ -28,17 +28,15 @@ print('Using device', TRAIN_DEVICE, file=sys.stderr)
 def _load_weights(model_file, nets: Model, **kwargs) -> int:
     state, epoch = load_model(model_file, load_to_cpu=True, **kwargs)
 
-    for name, net in nets.nets.items():
+    for name in nets.nets:
         if name == "img_encoder" and 'conv1.weight' in state['nets'][name].keys(): # Backwards compatibility
             for i in range(4):
                 for value_type in ['bias', 'weight']:
                     state['nets'][name][f'layers.{2*i}.{value_type}'] = state['nets'][name][f'conv{i+1}.{value_type}']
                     del state['nets'][name][f'conv{i+1}.{value_type}']
+        net = nets.nets[name]
         net.load_state_dict(state['nets'][name])
-        for net_state in net.state.values():
-            for k, v in net_state.items():
-                if torch.is_tensor(v):
-                    net_state[k] = v.to(TRAIN_DEVICE)
+        nets.nets[name] = net.to(TRAIN_DEVICE)
 
     for name, opt in nets.optimizers.items():
         opt.load_state_dict(state['optims'][name])
