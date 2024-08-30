@@ -255,6 +255,7 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=None, help='Seed for random index generation.') # for reproducibility / debugging purposes
     parser.add_argument('--num-topo-nav', '-n', help='number of topological navigations', type=int, default=100)
     parser.add_argument('--re-type', help='Type of the reachability estimator', choices=['neural_network', 'view_overlap'], default='neural_network')
+    parser.add_argument('--log-metrics', action='store_true')
     args = parser.parse_args()
 
     re_weights_file = "re_mse_weights.50"
@@ -275,6 +276,14 @@ if __name__ == "__main__":
     compass = Compass.factory(model, gc_network=gc_network, pod_network=pod)
 
     tj = TopologicalNavigation(args.env_model, pc_network, cognitive_map, compass, log=args.log)
+
+    if args.store_metrics:
+        from system.tests.map import unobstructed_lines, mean_distance_between_nodes, scalar_coverage, agreement
+        def log_metrics(i, endpoints, endpoint_indices, success):
+            print('Metrics:')
+            for fun in (unobstructed_lines, mean_distance_between_nodes, scalar_coverage, agreement):
+                print(fun.__name__, ':', fun(cognitive_map, args.env_model))
+        tj.step_hooks.append(log_metrics)
 
     with PybulletEnvironment(args.env_model, variant=args.env_variant, build_data_set=True, visualize=args.visualize, contains_robot=False) as env:
         # TODO Pierre figure out how to remove unnecessary xy_coordinates
