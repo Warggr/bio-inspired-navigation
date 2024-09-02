@@ -1,7 +1,7 @@
 import system.types as types
 from system.types import LidarReading, AllowedMapName
 import numpy as np
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from abc import ABC, abstractmethod
 from typing import Optional
 from system.polyfill import Self
@@ -30,6 +30,10 @@ class PlaceInfo:
             'lidar=...' if hasattr(self, 'lidar') else 'no lidar',
         ]
         return "PlaceInfo(" + ', '.join(attrs) + ")"
+
+    def dump(self, file):
+        np.savez(file, **asdict(self))
+
 
 @dataclass
 class Sample:

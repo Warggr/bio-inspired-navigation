@@ -70,6 +70,10 @@ class CognitiveMapInterface(ABC):
         self.prior_idx_pc_firing = None
         self.max_capacity = max_capacity
 
+        if self.debug:
+            import tempfile
+            self.tmpdir = tempfile.TemporaryDirectory()
+
     class TooManyPlaceCells(Exception):
         pass
 
@@ -102,7 +106,12 @@ class CognitiveMapInterface(ABC):
 
     def add_node_to_map(self, p: PlaceCell):
         """ Adds a new node to the cognitive map """
-        self.print_debug(f'Adding node: #={len(self.node_network.nodes)}, position={p.env_coordinates}')
+        if self.debug:
+            pc_id = len(self.node_network.nodes)
+            filename = os.path.join(self.tmpdir, str(pc_id) + '.npz')
+            with open(filename, 'x') as file:
+                p.dump(file)
+            self.print_debug(f'Adding node: #={pc_id}, position={p.env_coordinates}, angle={p.angle}, dump_file={filename}')
         if self.max_capacity is not None and len(self.node_network.nodes) > self.max_capacity:
             raise self.TooManyPlaceCells()
         self.node_network.add_node(p, pos=tuple(p.env_coordinates))
