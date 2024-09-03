@@ -51,7 +51,7 @@ class SampleConfig:
         filename, _extension = filename.split('.')
         filename, *tags = filename.split('+')
         config = SampleConfig()
-        other_attrs = {}
+        other_attrs = {'basename': filename}
         for tag in tags:
             if tag == 'spikings': config.with_grid_cell_spikings = True
             elif tag.startswith('lidar--'):
@@ -67,6 +67,10 @@ class SampleConfig:
             elif tag == 'dist': config.with_dist = True
             elif tag in ('conv', 'fc'):
                 other_attrs['image_encoder'] = tag
+            elif tag.startswith('fc'):
+                other_attrs['fc_layers'] = list(map(int, tag[2:].split(',')))
+            elif tag == '+dropout':
+                other_attrs['dropout'] = True
             else:
                 raise ValueError('Unrecognized tag: ', tag)
         return config, other_attrs
@@ -132,13 +136,13 @@ class ReachabilityDataset(torch.utils.data.Dataset):
         None_tensor = torch.tensor(torch.nan) # we can't use None because it has to be a tensor to be collated into batches by the dataloader
         model_args = []
 
-        if self.config.images == 'zeros':
-            model_args += [torch.zeros((64, 64, 4), dtype=torch.float32), torch.zeros((64, 64, 4), dtype=torch.float32)]
-        elif self.config.images == 'fixed':
-            model_args += [torch.tensor(self.fixed_image).float(), torch.tensor(self.fixed_image).float()]
-        elif self.config.images:
-            for pos in (sample.src, sample.dst):
-                image = pos.img
+        if self.config.images:
+            if self.config.images == 'zeros':
+                img_src, img_dst = np.zeros((64, 64, 4), dtype=float), np.zeros((64, 64, 4), dtype=float)
+            elif self.config.images == 'fixed':
+                img_src, img_dst = self.fixed_image, self.fixed_image
+            else:
+                img_src, img_dst = sample.src.img, sample.dst.img
                 if self.config.image_crop is not None and self.config.image_crop > 0:
                     image = image.copy()
                     lowbound, upbound = self.config.image_crop, 64-self.config.image_crop

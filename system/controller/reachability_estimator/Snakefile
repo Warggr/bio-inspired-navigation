@@ -60,8 +60,13 @@ rule:
 		python data_generation/crosscheck.py simulation 'combine:{'x'.join(map(lambda filename: 'neural_network(' + filename + ')', models))}' binary > '{{output}}'
 	"""
 
-rule combine_test:
-	input: ["logs/SimulationRExCombine(" + ",".join(map(lambda filename: f"Network({filename})", models)) + ").log"] + [ f"logs/SimulationRExNetworkRE({model}).log" for model in models ]
+rule:
+	output: f"data/results/{{model}}-val_perf.log"
+	input: f"data/models/{{model}}", "data/reachability/dataset-boolor.hd5"
+	shell: """
+		flags=$(python scripts/network_name.py cmdline {wildcards.model})
+		python training/train_multiframe_dst.py validate --dataset-basename "dataset-boolor" $flags > {output}
+	"""
 
 code_sizes = [0, 1, 4, 16, 20, 50, 80, 100]
 AUTOENCODER_EPOCHS = 25

@@ -85,7 +85,75 @@ def suffix_for(cmdline: list[str]):
 
     return suffix
 
-import sys
+def flags_for(netname: str):
+    config, attrs = SampleConfig.from_filename(netname)
 
-for line in sys.stdin:
-    print(suffix_for(line.strip().split(' ')))
+    flags = []
+
+    if config.images is False:
+        flags.append('--images off')
+    elif config.images in ['zeros', 'fixed']:
+        flags.append('--images ' + config.images)
+    if config.with_grid_cell_spikings:
+        flags.append('--spikings')
+    if config.lidar is not None:
+        flags.append('--lidar=' + config.lidar)
+    if config.with_dist:
+        flags.append('--dist')
+    if config.image_crop is not None:
+        flags.append(f'--image-crop={config.image_crop}')
+
+    if 'image_encoder' in attrs:
+        flags.append('--image-encoder=' + attrs['image_encoder'])
+    if 'fc_layers' in attrs:
+        flags.append('--hidden-fc-layers ' + ','.join(map(str, attrs['fc_layers'])))
+    if 'dropout' in attrs:
+        assert attrs['dropout'] == True
+        flags.append('--dropout')
+
+    dataset_features, tag = None, None
+    match attrs['basename'].split('-'):
+        # TODO: this assumes there is only one dataset_feature (in practice, this is always true)
+        case (basename, tag, dataset_features):
+            pass
+        case (basename, tag_or_datasetfeatures):
+            if tag_or_datasetfeatures in ('3colors', 'patterns'):
+                dataset_features = tag_or_datasetfeatures
+            else:
+                tag = tag_or_datasetfeatures
+        case (basename,):
+            pass
+    if basename != 'reachability_network':
+        raise ValueError('' + basename)
+    if dataset_features is not None:
+        flags.append(f'--dataset-features "{dataset_features}"')
+    if tag is not None:
+        flags.append(f'--tag "{tag}"')
+
+    return ' '.join(flags)
+
+
+if __name__ == "__main__":
+    import sys
+
+    reverse = False
+
+    match sys.argv:
+        case _, 'cmdline':
+            reverse = True
+        case _, 'tags':
+            reverse = False
+        case _, _:
+            raise ValueError('Too many arguments')
+        case _:
+            reverse = False
+
+    if reverse:
+        for line in sys.stdin:
+            try:
+                print(flags_for(line.strip()))
+            except ValueError:
+                print(f'"{line.strip()}": couldn\'t parse')
+    else:
+        for line in sys.stdin:
+            print(suffix_for(line.strip().split(' ')))
