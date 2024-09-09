@@ -204,7 +204,7 @@ class TopologicalNavigation:
         if cognitive_map_filename is not None:
             self.cognitive_map.save(filename=cognitive_map_filename)
         if curr_path_length >= path_length_limit:
-            print("LIMIT WAS REACHED STOPPING HERE")
+            print(f"LIMIT WAS REACHED STOPPING HERE: remaining_path={path}")
             return False
         return True
 
@@ -298,10 +298,12 @@ if __name__ == "__main__":
         place_cells = list(tj.cognitive_map.node_network.nodes)
 
         successful = 0
+        nb_correct_place_cells = len(place_cells) # if a large number of useless place cells are added to the cognitive map,
+        # we want to navigate only between the original place cells. Else we would "dilute" places that are difficult to reach
         for navigation_i in range(args.num_topo_nav):
             start_index, goal_index = None, None
             while start_index == goal_index:
-                start_index, goal_index = random.integers(0, len(place_cells), size=2)
+                start_index, goal_index = random.integers(0, nb_correct_place_cells, size=2)
                 assert len(tj.cognitive_map.node_network.nodes) > 1
 
             start, goal = place_cells[start_index], place_cells[goal_index]
