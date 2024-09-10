@@ -80,11 +80,12 @@ rule:
 	"""
 
 rule:
-	output: f"data/results/{{model}}-val_perf.log"
-	input: f"data/models/{{model}}", "data/reachability/dataset-boolor.hd5"
+	output: f"data/results/{{model}}-val{{tag}}.log"
+	input: f"data/models/{{model}}", "data/reachability/dataset{tag}.hd5"
 	shell: """
 		flags=$(python scripts/network_name.py cmdline {wildcards.model})
-		python training/train_multiframe_dst.py validate --dataset-basename "dataset-boolor" $flags > {output}
+		# we need the eval because of some shell quoting issue
+		eval python training/train_multiframe_dst.py validate --dataset-basename "dataset{wildcards.tag}" $flags > {output}
 	"""
 
 code_sizes = [0, 1, 4, 16, 20, 50, 80, 100]
