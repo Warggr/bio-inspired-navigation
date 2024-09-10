@@ -20,29 +20,48 @@ rule:
 	output: "data/reachability/{map}.trajectories.hd5"
 	shell: "ln -sf ../trajectories/{map}.trajectories.hd5 {output}"
 
-FEATURES = '--spikings --lidar=allo_bc'
-FEATURES_FILE_FLAGS = '+spikings+lidar'
+rule:
+    output: f"data/reachability/dataset.hd5"
+    input: "data/reachability/trajectories.hd5"
+    shell:
+        f"python data_generation/dataset.py -n 200000 --flush-freq 1000 --extension '.hd5.part' && "
+        "ln -s $(basename {output}).part {output}"
+rule:
+    output: "data/reachability/dataset-map{map}.hd5"
+    input: "data/reachability/{map}.trajectories.hd5"
+    shell:
+        "python data_generation/dataset.py {output}.part {input} -n 200000 --flush-freq 1000 --extension '.hd5.part' && "
+        "ln -s $(basename {output}).part {output}"
 
-for dataset_flags in ['', '3colors']:
-	cmdline_flags = f'--wall-colors {dataset_flags}' if dataset_flags else ''
-	filename_flags = f'-{dataset_flags}' if dataset_flags else ''
-	rule:
-		output: f"data/reachability/dataset{filename_flags}.hd5"
-		input: "data/reachability/trajectories.hd5"
-		shell:
-			f"python data_generation/dataset.py -n 200000 --flush-freq 1000 --extension '.hd5.part' {cmdline_flags} && "
-			"ln -s $(basename {output}).part {output}"
-	rule:
-		output: f"data/reachability/dataset-map{{map}}{filename_flags}.hd5"
-		input: "data/reachability/{map}.trajectories.hd5"
-		shell:
-			f"python data_generation/dataset.py -n 200000 --flush-freq 1000 --extension '.hd5.part' {cmdline_flags} && "
-			"ln -s $(basename {output}).part {output}"
-	rule:
-		output: f"data/models/reachability_network{FEATURES_FILE_FLAGS}.25"
-		input: f"data/reachability/dataset{filename_flags}.hd5"
-		shell:
-			f"""python training/train_multiframe_dst.py train {FEATURES} --resume """ + cmdline_flags
+for wall_colors in ('3colors', 'patterns'):
+    rule:
+        input: "data/reachability/{basename}.hd5"
+        output: f"data/reachability/{{basename}}-{wall_colors}.hd5"
+        shell: f"python data_generation/clone_dataset.py {{input}} {{output}} --wall-colors {wall_colors}"
+
+def dataset_for(wildcards):
+    if wildcards.flags.startswith('-3colors'):
+        return 'data/reachability/dataset-3colors.hd5'
+    elif wildcards.flags.startswith('-patterns'):
+        return 'data/reachability/dataset-patterns.hd5'
+    else:
+        return 'data/reachability/dataset.hd5'
+
+rule:
+    output: "data/models/reachability_network{flags}.25"
+    input: dataset_for
+    shell: """
+        flags=$(python scripts/network_name.py cmdline {wildcards.model})
+		python training/train_multiframe_dst.py train $flags --resume
+    """
+
+rule:
+	output: "data/models/reachability_network{flags}+pretrained.25"
+	input: dataset_for, "data/models/autoencoder20.25"
+	shell: """
+		flags=$(python scripts/network_name.py cmdline {wildcards.model})
+		python training/train_multiframe_dst.py train $flags --resume
+	"""
 
 rule:
 	input: "data/models/{model}"
@@ -110,8 +129,3 @@ for format in ('png', 'pgf'):
 			plt.title("Autoencoder performance")
 			plt.xlabel(x); plt.ylabel(y)
 			plt.savefig(str(output))
-
-rule:
-	output: f"data/models/reachability_network{FEATURES_FILE_FLAGS}+pretrained.25"
-	input: "data/reachability/trajectories.hd5", "data/models/autoencoder20.25"
-	shell: f"""python training/train_multiframe_dst.py train {FEATURES} --image-encoder pretrained --resume """ + cmdline_flags
