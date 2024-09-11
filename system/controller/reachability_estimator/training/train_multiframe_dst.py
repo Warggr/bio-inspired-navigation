@@ -225,44 +225,25 @@ class Hyperparameters:
 
 def train_multiframedst(
     nets: Model, dataset: ReachabilityDataset,
-    resume: bool = False,
     hyperparams: Hyperparameters = Hyperparameters(),
     n_dataset_worker = 0,
     log_interval = 20,
     save_interval = 5,
     model_suffix: str = '',
-    model_filename = "reachability_network",
-    model_dir = DATA_STORAGE_FOLDER,
     loss_function: LossFunction = make_loss_function(),
+    start_epoch: int = 0,
 ):
     """ Train the model on a multiframe dataset. """
 
     # For Tensorboard: log the runs
     writer = SummaryWriter(comment=model_suffix)
 
-    epoch = 0
-
-    model_filename = model_filename + model_suffix
-    model_file = os.path.join(model_dir, model_filename)
-    # Resume: load weights and continue training
-    if resume:
-        try:
-            epoch = _load_weights(model_file, nets)
-            torch.manual_seed(231239 + epoch)
-            print('loaded saved state. epoch: %d' % epoch)
-        except FileNotFoundError:
-            epoch = 0
-            print('No saved state found. Starting from the beginning. epoch: 0')
-
-    if epoch == 0 and nets.image_encoder == 'pretrained': # TODO Pierre: this is ugly
-        nets.load_pretrained_model()
-
     # This is a direct copy of rmp_nav
     # FIXME: hack to mitigate the bug in torch 1.1.0's schedulers
-    if epoch <= 1:
-        last_epoch = epoch - 1
+    if start_epoch <= 1:
+        last_epoch = start_epoch - 1
     else:
-        last_epoch = epoch - 2
+        last_epoch = start_epoch - 2
 
     # Scheduler: takes care of learning rate decay
     net_scheds = {
@@ -285,7 +266,7 @@ def train_multiframedst(
 
     latest_metrics = None
 
-    for epoch in range(epoch + 1, hyperparams.max_epochs + 1):
+    for epoch in range(start_epoch + 1, hyperparams.max_epochs + 1):
         print('===== epoch %d =====' % epoch)
 
         sampler = RandomSampler(train_dataset, True, n_samples)
@@ -356,13 +337,8 @@ def train_multiframedst(
 def validate_func(net: Model, dataset: ReachabilityDataset, batch_size,
     loss_function: LossFunction,
     model_suffix: str,
-    model_filename = "reachability_network",
-    model_dir = DATA_STORAGE_FOLDER,
+    loaded_epoch: int,
 ):
-    model_filename = model_filename + model_suffix
-    model_file = os.path.join(model_dir, model_filename)
-    epoch = _load_weights(model_file, nets)
-    print('loaded saved state. epoch: %d' % epoch)
     train_size = int(0.8 * len(dataset))
     valid_size = len(dataset) - train_size
     train_dataset, valid_dataset = torch.utils.data.random_split(dataset, [train_size, valid_size])
@@ -374,7 +350,7 @@ def validate_func(net: Model, dataset: ReachabilityDataset, batch_size,
                               num_workers=0)
 
     # log performance on the validation set
-    tensor_log(valid_loader, writer, epoch, net, loss_function, print_confusion_matrix=True)
+    tensor_log(valid_loader, writer, loaded_epoch, net, loss_function, print_confusion_matrix=True)
     writer.flush()
     print("Run info written to", writer.log_dir)
 
@@ -419,6 +395,7 @@ if __name__ == '__main__':
     parser.add_argument('--hidden-fc-layers', help='Hidden FC layer dimensions as a comma-separated list', type=lambda s: [int(i) for i in s.split(',')])
     parser.add_argument('--dropout', help='Use dropout in the hidden FC layers', action='store_true')
 
+    parser.add_argument('--load', help='Load network from file')
     parser.add_argument('--resume', action='store_true', help='Continue training from last saved model')
     parser.add_argument('--save-interval', type=optional(int))
 
@@ -458,11 +435,34 @@ if __name__ == '__main__':
 
     nets = Model.create_from_config(backbone, config, image_encoder=args.image_encoder, **{key: getattr(args, key) for key in ['hidden_fc_layers', 'dropout'] if getattr(args, key) is not None})
 
+    epoch = 0
+    if args.load is not None:
+        name, epoch = args.load.split('.')
+        epoch = int(epoch)
+        _load_weights(args.load, nets, step=epoch)
+        assert args.resume == False, "resume with "
+        # warning: if this assertion is removed, the if resume: block below will be ran and overwrite the loaded network
+
+    model_filename = model_basename + suffix
+    model_file = os.path.join(DATA_STORAGE_FOLDER, model_filename)
+
+    if args.resume or args.mode == "validate":
+        try:
+            epoch = _load_weights(model_file, nets)
+            torch.manual_seed(231239 + epoch)
+            print('loaded saved state. epoch: %d' % epoch)
+        except FileNotFoundError:
+            epoch = 0
+            print('No saved state found. Starting from the beginning. epoch: 0')
+
+    if epoch == 0 and nets.image_encoder == 'pretrained': # TODO Pierre: this is ugly
+        nets.load_pretrained_model()
+
     loss_function = make_loss_function(position_loss_weight=0.6, angle_loss_weight=0.3)
     global_args = {
         'loss_function': loss_function,
-        'model_filename': model_basename,
         'model_suffix': suffix,
+        'loaded_epoch': epoch,
     }
 
     if args.mode == "validate":
@@ -471,4 +471,4 @@ if __name__ == '__main__':
         run_test_model(dataset)
     elif args.mode == "train":
         print("Training with dataset of length", len(dataset))
-        train_multiframedst(nets, dataset, save_interval=args.save_interval, resume=args.resume, hyperparams=Hyperparameters(batch_size=64), **global_args)
+        train_multiframedst(nets, dataset, save_interval=args.save_interval, hyperparams=Hyperparameters(batch_size=64), **global_args)
