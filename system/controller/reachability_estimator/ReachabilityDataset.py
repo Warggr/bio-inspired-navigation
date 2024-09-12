@@ -143,6 +143,7 @@ class ReachabilityDataset(torch.utils.data.Dataset):
                 img_src, img_dst = self.fixed_image, self.fixed_image
             else:
                 img_src, img_dst = sample.src.img, sample.dst.img
+            for image in (img_src, img_dst):
                 if self.config.image_crop is not None and self.config.image_crop > 0:
                     image = image.copy()
                     lowbound, upbound = self.config.image_crop, 64-self.config.image_crop

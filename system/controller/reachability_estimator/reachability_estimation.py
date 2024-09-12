@@ -18,7 +18,6 @@ from system.bio_model.place_cell_model import PlaceCell
 from system.bio_model.bc_network.bc_encoding import BoundaryCellNetwork, HDCActivity
 from system.bio_model.bc_network.parameters import HeadingCellActivity, BoundaryCellActivity
 from system.bio_model.bc_network.bc_activity import bcActivityForLidar
-import system.controller.reachability_estimator.networks as networks
 from system.controller.simulation.environment.map_occupancy import MapLayout
 import system.types as types
 from system.controller.reachability_estimator.types import Prediction, SpecificReachabilityController, PlaceInfo
@@ -28,7 +27,7 @@ try:
 except ImportError:
     from system.polyfill import override
 
-Batch = networks.Batch
+Batch = list # just used as type hint for readability
 
 def reachability_estimator_factory(
     type: str,
@@ -180,7 +179,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
 
     def __init__(
         self,
-        backbone: networks.Model,
+        backbone: 'Model',
         device: str = 'cpu',
         debug: bool = True,
         batch_size: int = 64,
@@ -251,11 +250,15 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         # self.print_debug(tabulate.tabulate(global_args.items()))
 
         if backbone_classname is None:
-            backbone_classname = global_args.pop('backbone')
+            if 'backbone_classname' in global_args:
+                backbone_classname = global_args.pop('backbone_classname')
+            else: # backwards compatibility
+                backbone_classname = global_args.pop('backbone')
         global_args = { key: value for key, value in global_args.items() if key in ['image_encoder', 'hidden_fc_layers'] }
         # TODO: other possible global_args
 
-        backbone = networks.Model.create_from_config(backbone_classname=backbone_classname, config=re.config, **global_args)
+        from system.controller.reachability_estimator.networks import Model
+        backbone = Model.create_from_config(backbone_classname=backbone_classname, config=re.config, **global_args)
 
         # self.print_debug(backbone.nets)
 
@@ -327,7 +330,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
 
     def reachability_factor_of_array(self,
         data: np.ndarray['self.dtype']
-    ) -> networks.Batch[float]:
+    ) -> Batch[float]:
         """ Predicts reachability for multiple location pairs
 
         arguments:
@@ -344,7 +347,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
 
         def get_prediction(
             data: Batch['self.dtype']
-        ) -> networks.Batch[Prediction]:
+        ) -> Batch[Prediction]:
             batch_size = len(data)
             src_batch, goal_batch = data['src_image'], data['dst_image']
             src_spikings, goal_spikings = data['src_spikings'], data['dst_spikings']
@@ -528,6 +531,7 @@ class BVCReachabilityEstimator(ReachabilityEstimator):
     def __str__(self) -> str:
         return f'BVCRE({self.threshold_same},{self.threshold_reachable})'
 
+
 class CombineReachabilityEstimator(ReachabilityEstimator):
     def __init__(self, components: Iterable[ReachabilityEstimator], debug):
         components = list(components)
@@ -544,3 +548,28 @@ class CombineReachabilityEstimator(ReachabilityEstimator):
 
     def __str__(self):
         return 'CombineRE:' + 'x'.join(map(str, self.components))
+        #covariance = np.cov(spikings_start, spikings_goal) # np.cov returns a full covariance matrix
+        #assert covariance[0, 1] == covariance[1, 0]
+        #return covariance[0, 1] / np.sqrt(covariance[1, 1]) / np.sqrt(covariance[0, 0])
+
+class Combine(ReachabilityEstimator):
+    def __new__(cls, estimators: list[ReachabilityEstimator]):
+        if len(estimators) == 1:
+            return estimators[0]
+        else:
+            return super().__new__(cls)
+    def __init__(self, op: Literal['&', '|'], estimators: list[ReachabilityEstimator]):
+        # Improvement suggestions if this were a large library:
+        # - add a NOT operation (I don't know why it would be useful in our case)
+        # - make this the & and | operator for the ReachabilityEstimator class
+        self.op = op
+        self.estimators = estimators
+    #override
+    def reachable(self, *args, **kwargs) -> bool:
+        reachable = (estimator.reachable(*args, **kwargs) for estimator in self.estimators) # this is a lazily evaluated generator
+        if self.op == '|':
+            return any(reachable)
+        elif self.op == '&':
+            return all(reachable)
+        else:
+            raise AssertionError(f'Unrecognized op {self.op}')

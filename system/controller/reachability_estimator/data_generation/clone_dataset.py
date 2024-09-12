@@ -5,12 +5,13 @@ from system.controller.simulation.pybullet_environment import PybulletEnvironmen
 from system.controller.reachability_estimator.data_generation.dataset import DATASET_KEY, display_samples
 from system.controller.reachability_estimator.types import Sample
 import sys
+from typing import Literal
 
 
 def clone_dataset(
     infile: h5py.File, out_filename: str,
     env: PybulletEnvironment,
-    nr_samples=1000,
+    nr_samples: int|Literal['all']=1000,
     flush_freq=50,
 ) -> h5py.File:
     """ Create reachability samples.
@@ -18,6 +19,10 @@ def clone_dataset(
     arguments:
     rd : dataset to draw positions from
     """
+
+    in_dset = infile[DATASET_KEY]
+    if nr_samples is not 'all':
+        assert len(in_dset) >= nr_samples, f"Trying to clone {nr_samples} samples from dataset with only {len(in_dset)}"
 
     f = h5py.File(out_filename, 'a')
 
@@ -47,8 +52,6 @@ def clone_dataset(
         out_dset = f.create_dataset(DATASET_KEY, data=np.array([], dtype=dtype), dtype=dtype, maxshape=(nr_samples,), compression="gzip")
         start_index = 0
 
-    in_dset = infile[DATASET_KEY]
-
     bar = tqdm(initial=start_index, total=nr_samples)
     for i in range(start_index, nr_samples, flush_freq):
         actual_block_size = min(flush_freq, nr_samples - i)
@@ -74,7 +77,7 @@ if __name__ == "__main__":
     parser.add_argument('infile', help='Dataset file to copy')
     parser.add_argument('outfile', help='Output file', nargs='?')
     parser.add_argument('-w', '--wall-colors', help='how to color the walls', choices=['1color', '3colors', 'patterns'], default='1color')
-    parser.add_argument('-n', '--num-samples', type=int, dest='num_samples', default=200000)
+    parser.add_argument('-n', '--num-samples', type=lambda s: 'all' if s == 'all' else int(s), dest='num_samples', default=200000)
     parser.add_argument('--flush-freq', type=int, dest='flush_freq', default=1000)
     parser.add_argument('--image-plot', action=argparse.BooleanOptionalAction, help='Show image of samples taken')
     args = parser.parse_args()
