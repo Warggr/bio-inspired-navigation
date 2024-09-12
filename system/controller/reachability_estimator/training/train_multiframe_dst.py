@@ -397,6 +397,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--load', help='Load network from file')
     parser.add_argument('--resume', action='store_true', help='Continue training from last saved model')
+    parser.add_argument('--load', help='Load weights from provided file')
     parser.add_argument('--save-interval', type=optional(int))
 
     args = parser.parse_args()

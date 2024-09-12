@@ -52,7 +52,9 @@ pc_network.max_capacity = len(pc_network.place_cells)
 start, end = 73, 82
 start, end = pc_network.place_cells[start], pc_network.place_cells[end]
 
-compass = AnalyticalCompass()
+#compass = AnalyticalCompass()
+gc_network = GridCellNetwork(from_data=True)
+compass = Compass.factory('combo', gc_network=gc_network)
 tj = TopologicalNavigation(env_model, pc_network, cogmap, compass)
 
 from system.controller.simulation.pybullet_environment import PybulletEnvironment
@@ -101,7 +103,10 @@ def plot_every_gc_error(double_compass: DoubleCompass):
     ax.quiver(quivers[:, 0], quivers[:, 1], quivers[:, 2], quivers[:, 3], label='Grid cell drift as measured by start node', width=0.005)
 
     fig.legend()
-    plt.show()
+    #plt.show()
+    global invocation_counter
+    plt.savefig(f'./logs/gc_drift_{invocation_counter}.png')
+    invocation_counter += 1
 
 with PybulletEnvironment(env_model, visualize=False, start=start.pos, build_data_set=True) as env:
     robot = env.robot

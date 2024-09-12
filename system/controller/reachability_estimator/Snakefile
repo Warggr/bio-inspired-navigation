@@ -37,7 +37,7 @@ for wall_colors in ('3colors', 'patterns'):
     rule:
         input: "data/reachability/{basename}.hd5"
         output: f"data/reachability/{{basename}}-{wall_colors}.hd5"
-        shell: f"python data_generation/clone_dataset.py {{input}} {{output}} --wall-colors {wall_colors}"
+        shell: f"python data_generation/clone_dataset.py {{input}} {{output}} -n 'all' --wall-colors {wall_colors}"
 
 def dataset_for(wildcards):
     if wildcards.flags.startswith('-3colors'):

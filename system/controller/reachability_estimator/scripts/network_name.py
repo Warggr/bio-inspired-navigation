@@ -137,23 +137,21 @@ if __name__ == "__main__":
     import sys
 
     reverse = False
+    lines = map(lambda line: line.strip(), sys.stdin)
 
-    match sys.argv:
-        case _, 'cmdline':
-            reverse = True
-        case _, 'tags':
-            reverse = False
-        case _, _:
-            raise ValueError('Too many arguments')
-        case _:
-            reverse = False
+    if len(sys.argv) == 1:
+        reverse = False
+    else:
+        reverse = {'cmdline': True, 'tags': False}[sys.argv[1]]
+        if len(sys.argv) > 2:
+            lines = sys.argv[2:]
 
     if reverse:
-        for line in sys.stdin:
+        for line in lines:
             try:
-                print(flags_for(line.strip()))
+                print(flags_for(line))
             except ValueError:
-                print(f'"{line.strip()}": couldn\'t parse')
+                print(f'"{line.strip()}": couldn\'t parse', file=sys.stderr)
     else:
-        for line in sys.stdin:
-            print(suffix_for(line.strip().split(' ')))
+        for line in lines:
+            print(suffix_for(line.split(' ')))
