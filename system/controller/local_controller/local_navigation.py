@@ -115,12 +115,15 @@ class GcCompass(Compass[Spikings]):
     def factory(mode, gc_network: GridCellNetwork, *args,
         pod_network: Optional[PhaseOffsetDetectorNetwork] = None,
         arena_size: Optional[float] = None,
+        cache = True,
         **kwargs
     ):
         if mode == "pod":
-            return GoalVectorCache(PodGcCompass(pod_network, gc_network, *args, **kwargs))
+            compass = PodGcCompass(pod_network, gc_network, *args, **kwargs)
+            return GoalVectorCache(compass) if cache else compass
         if mode == "linear_lookahead":
-            return GoalVectorCache(LinearLookaheadGcCompass(arena_size, gc_network, *args, **kwargs))
+            compass = LinearLookaheadGcCompass(arena_size, gc_network, *args, **kwargs)
+            return GoalVectorCache(compass) if cache else compass
         elif mode == "combo":
             return ComboGcCompass(gc_network, pod_network, *args, **kwargs)
         else:
