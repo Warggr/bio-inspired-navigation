@@ -46,9 +46,7 @@ import itertools
 from typing import Optional, Any, Callable
 from random import Random
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../.."))
 import system.plotting.plotResults as plot
-
 from system.controller.simulation.math_utils import compute_angle
 from system.types import AllowedMapName, types, LidarReading, Vector2D
 from system.controller.simulation.environment_config import environment_dimensions

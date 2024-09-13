@@ -24,6 +24,7 @@ if __name__ == "__main__":
 from system.controller.reachability_estimator.types import PlaceInfo, untranspose_image
 from system.plotting.plotHelper import add_environment, TUM_colors
 from system.types import Vector2D
+from system.debug import DEBUG
 from typing import Optional
 
 def get_path_top():
@@ -50,6 +51,8 @@ class PlaceCell(PlaceInfo):
         assert observations[0] is not None
         self.lidar = lidar
         self.angle = angle
+        if 'strict_place_cells' in DEBUG:
+            assert self.angle is not NotImplemented
 
     @staticmethod
     def from_data(data: PlaceInfo):
@@ -114,7 +117,7 @@ class PlaceCell(PlaceInfo):
                                                          atol=1e-10, equal_nan=False).all()
 
     def __hash__(self):
-        return hash(tuple(self.env_coordinates))
+        return hash(self.env_coordinates[0])
 
     # Introducing aliases for some properties so this can be used as a PlaceInfo
     @property

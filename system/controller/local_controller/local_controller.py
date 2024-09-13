@@ -242,11 +242,14 @@ class OptimalController(Hook):
         i = 1.0
         for i in range(10, 0, -1):
             goal = start + (i/10) * np.array(goal_vector)
-            try:
-                current_pos, next_waypoint, *_ignored = self.map.find_path(start, goal)
-                # assert current_pos == start
-                break
-            except ValueError:
+            if self.map.suitable_position_for_robot(start) and self.map.suitable_position_for_robot(goal):
+                try:
+                    current_pos, next_waypoint, *_ignored = self.map.find_path(start, goal)
+                    # assert current_pos == start
+                    break
+                except ValueError:
+                    continue
+            else:
                 continue
         else: #not suitable position found
             return goal_vector

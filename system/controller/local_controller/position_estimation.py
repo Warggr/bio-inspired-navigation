@@ -159,7 +159,11 @@ class PositionEstimation:
             ax.plot(*true_goal, 'gx', label='True goal position')
             fig.legend()
             ax.set_title(name)
-            plt.show()
+            if 'headless' in PLOTTING:
+                plt.savefig('/tmp/grid_cell_drift-' + name + '.png')
+                plt.close()
+            else:
+                plt.show()
 
     def on_reset_goal(self, new_goal: Vector2D, robot: 'Robot'):
         current_observed_position = place_info((*robot.position_and_angle, self.gc_network.consolidate_gc_spiking().flatten()), robot.env)

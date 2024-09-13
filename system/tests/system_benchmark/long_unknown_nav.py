@@ -18,7 +18,7 @@ from system.parsers import controller_parser, controller_creator
 parser = argparse.ArgumentParser(parents=[controller_parser], formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('env_model', nargs='?', default='Savinov_val3')
 parser.add_argument('map_file', nargs='?', default="after_exploration.gpickle")
-parser.add_argument('start_stop', nargs='?', type=lambda ab: map(int, ab.split(',')), default=(73, 21))
+parser.add_argument('start_stop', nargs='?', type=lambda ab: map(int, ab.split(',')), default=(73, 21), help='Start and stop node indices, joined by a comma. Negative indices (-1 for the last node) are allowed.')
 parser.add_argument('--compass', choices=['analytical', 'combo', 'pod', 'linear_lookahead'], default='analytical')
 parser.add_argument('--env-variant', '--variant')
 parser.add_argument('--visualize', action='store_true')

@@ -337,7 +337,7 @@ def train_multiframedst(
 def validate_func(net: Model, dataset: ReachabilityDataset, batch_size,
     loss_function: LossFunction,
     model_suffix: str,
-    loaded_epoch: int,
+    start_epoch: int,
 ):
     train_size = int(0.8 * len(dataset))
     valid_size = len(dataset) - train_size
@@ -350,7 +350,7 @@ def validate_func(net: Model, dataset: ReachabilityDataset, batch_size,
                               num_workers=0)
 
     # log performance on the validation set
-    tensor_log(valid_loader, writer, loaded_epoch, net, loss_function, print_confusion_matrix=True)
+    tensor_log(valid_loader, writer, start_epoch, net, loss_function, print_confusion_matrix=True)
     writer.flush()
     print("Run info written to", writer.log_dir)
 
@@ -384,6 +384,11 @@ if __name__ == '__main__':
     parser.add_argument('--dataset-features', nargs='+', default=[])
     parser.add_argument('--dataset-basename', help='The base name of the reachability dataset HD5 file', default='dataset')
     parser.add_argument('--tag', help=f'Network saved in `{model_basename}-{{tag}}`', default='')
+    parser.add_argument('--train-dataset-tags', nargs='+', default=[])
+    # dataset features are an actual configuration option, e.g. a network trained with 3-color walls would not work (or barely work) on single-color walls
+    # dataset tags are just a tag added to both the dataset name and the trained network name
+    # they also identify only the training config and are ignored during validation.
+    # use case: training a network on e.g. `dataset-boolor` and validating it on `dataset-simulation` -> you can add --train-dataset-tags simulation to both training and val runs
 
     parser.add_argument('--images', help='Images are included in the dataset', nargs='?', default=True, choices=[True, False, 'zeros', 'fixed'], type=lambda s: False if s in ['no', 'off'] else s)
     parser.add_argument('--spikings', help='Grid cell spikings are included in the dataset', action='store_true')
@@ -397,7 +402,6 @@ if __name__ == '__main__':
 
     parser.add_argument('--load', help='Load network from file')
     parser.add_argument('--resume', action='store_true', help='Continue training from last saved model')
-    parser.add_argument('--load', help='Load weights from provided file')
     parser.add_argument('--save-interval', type=optional(int))
 
     args = parser.parse_args()
@@ -416,6 +420,11 @@ if __name__ == '__main__':
     suffix = ''
     if args.tag:
         suffix += '-' + args.tag
+    if args.mode == 'train':
+        dataset_tags = ''.join([f'-{tag}' for tag in args.train_dataset_tags])
+        suffix += dataset_tags
+    else:
+        dataset_tags = ''
     args.dataset_features = ''.join([ f'-{feature}' for feature in args.dataset_features ])
     suffix += args.dataset_features
     suffix += config.suffix()
@@ -426,7 +435,7 @@ if __name__ == '__main__':
     if args.dropout:
         suffix += '+dropout'
 
-    filename = args.dataset_basename + args.dataset_features + ".hd5"
+    filename = args.dataset_basename + dataset_tags + args.dataset_features + ".hd5"
     dataset = ReachabilityDataset(filename, sample_config=config)
 
     backbone = 'convolutional' # convolutional, res_net
@@ -440,7 +449,7 @@ if __name__ == '__main__':
     if args.load is not None:
         name, epoch = args.load.split('.')
         epoch = int(epoch)
-        _load_weights(args.load, nets, step=epoch)
+        _load_weights(name, nets, step=epoch)
         assert args.resume == False, "resume with "
         # warning: if this assertion is removed, the if resume: block below will be ran and overwrite the loaded network
 
@@ -463,7 +472,7 @@ if __name__ == '__main__':
     global_args = {
         'loss_function': loss_function,
         'model_suffix': suffix,
-        'loaded_epoch': epoch,
+        'start_epoch': epoch,
     }
 
     if args.mode == "validate":

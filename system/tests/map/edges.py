@@ -20,15 +20,19 @@ def random_edges(rng: np.random.Generator, cogmap: CognitiveMap, n=100):
         yield (i, nodei), (j, nodej)
 
 def random_edges_in_map(rng: np.random.Generator, cogmap: CognitiveMap, n=100):
+    pcs_with_edges = set()
     pcs = list(cogmap.node_network.nodes)
-    for k in range(n):
+    for (p1, p2) in cogmap.node_network.edges:
+        pcs_with_edges.add(p1); pcs_with_edges.add(p2)
+    pcs_with_edges = list(pcs_with_edges)
+    if not pcs_with_edges:
+        return
+    from tqdm import tqdm
+    for k in tqdm(range(n)):
         while True:
-            i = rng.integers(len(cogmap.node_network.nodes)).item()
-            nodei = pcs[i]
-            if cogmap.node_network.adj[nodei]:
-                nodej = rng.choice(cogmap.node_network.adj[nodei])
-                break
-        j = pcs.index(nodej)
+            nodei = rng.choice(pcs_with_edges)
+            nodej = rng.choice(cogmap.node_network.adj[nodei])
+        i, j = pcs.index(nodei), pcs.index(nodej)
         yield (i, nodei), (j, nodej)
 
 def agreement_values(
@@ -72,10 +76,13 @@ def agreement(
     total = 40
     edges = random_edges_in_map(rng, cogmap, n=total)
     successes = 0
-    with PybulletEnvironment(env_model, contains_robot=False) as env:
-        for line in tqdm(agreement_values(cogmap, env, edges)):
-            if (line['net_2_success'] >= 0.8) == (line['view_success'] >= 0.4):
-                successes += 1
+    try:
+        with PybulletEnvironment(env_model, contains_robot=False) as env:
+            for line in tqdm(agreement_values(cogmap, env, edges)):
+                if (line['net_2_success'] >= 0.8) == (line['view_success'] >= 0.4):
+                    successes += 1
+    except StopIteration:
+        return float('nan')
     return successes / total
 
 if __name__ == "__main__":

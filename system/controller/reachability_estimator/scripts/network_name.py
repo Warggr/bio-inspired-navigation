@@ -111,30 +111,33 @@ def flags_for(netname: str):
         assert attrs['dropout'] == True
         flags.append('--dropout')
 
-    dataset_features, tag = None, None
-    match attrs['basename'].split('-'):
-        # TODO: this assumes there is only one dataset_feature (in practice, this is always true)
-        case (basename, tag, dataset_features):
-            pass
-        case (basename, tag_or_datasetfeatures):
-            if tag_or_datasetfeatures in ('3colors', 'patterns'):
-                dataset_features = tag_or_datasetfeatures
-            else:
-                tag = tag_or_datasetfeatures
-        case (basename,):
-            pass
+    tag = None
+    basename, *dataset_features = attrs['basename'].split('-')
+    if dataset_features[0] not in ('3colors', 'patterns', 'boolor', 'simulation'):
+        tag, *dataset_features = dataset_features
+
+    dataset_features_and_tags = dataset_features
+    dataset_features = []
+    dataset_tags = []
+    for i in dataset_features_and_tags:
+        if i in ('3colors', 'patterns'): dataset_features.append(i)
+        else: dataset_tags.append(i)
+
     if basename != 'reachability_network':
-        raise ValueError('' + basename)
-    if dataset_features is not None:
-        flags.append(f'--dataset-features "{dataset_features}"')
+        raise ValueError('Unexpected network base name' + basename)
+    if dataset_features:
+        flags.append(f'--dataset-features ' + ' '.join(dataset_features))
+    if dataset_tags:
+        flags.append(f'--train-dataset-tags ' + ' '.join(dataset_tags))
     if tag is not None:
-        flags.append(f'--tag "{tag}"')
+        flags.append(f'--tag {tag}')
 
     return ' '.join(flags)
 
 
 if __name__ == "__main__":
     import sys
+    import os
 
     reverse = False
     lines = map(lambda line: line.strip(), sys.stdin)
@@ -148,10 +151,11 @@ if __name__ == "__main__":
 
     if reverse:
         for line in lines:
+            line = os.path.basename(line)
             try:
                 print(flags_for(line))
-            except ValueError:
-                print(f'"{line.strip()}": couldn\'t parse', file=sys.stderr)
+            except ValueError as err:
+                print(f'"{line.strip()}": couldn\'t parse: {err}', file=sys.stderr)
     else:
         for line in lines:
             print(suffix_for(line.split(' ')))

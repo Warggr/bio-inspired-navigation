@@ -254,11 +254,10 @@ if __name__ == "__main__":
     parser.add_argument('--visualize', action='store_true')
     parser.add_argument('--seed', type=int, default=None, help='Seed for random index generation.') # for reproducibility / debugging purposes
     parser.add_argument('--num-topo-nav', '-n', help='number of topological navigations', type=int, default=100)
-    parser.add_argument('--re-type', help='Type of the reachability estimator', choices=['neural_network', 'view_overlap'], default='neural_network')
+    parser.add_argument('--re-type', help='Type of the reachability estimator', default='neural_network(re_mse_weights.50)')
     parser.add_argument('--log-metrics', action='store_true')
     args = parser.parse_args()
 
-    re_weights_file = "re_mse_weights.50"
     map_file, map_file_after_lifelong_learning = args.map_file, args.map_file_after_lifelong_learning
     if args.env_model != 'Savinov_val3':
         if not map_file.startswith(args.env_model + '.'):
@@ -267,9 +266,10 @@ if __name__ == "__main__":
             map_file_after_lifelong_learning = args.env_model + '.' + map_file_after_lifelong_learning
     model = "combo"
 
-    re = reachability_estimator_factory(args.re_type, env_model=args.env_model, weights_file=re_weights_file)
-    pc_network = PlaceCellNetwork(from_data=True, map_name=args.env_model)
+    re = reachability_estimator_factory(args.re_type, env_model=args.env_model)
+    #pc_network = PlaceCellNetwork(from_data=True, map_name=args.env_model)
     cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from=map_file, debug=('cogmap' in DEBUG or args.log))
+    pc_network = cognitive_map.get_place_cell_network()
     assert len(cognitive_map.node_network.nodes) > 1
     gc_network = GridCellNetwork(from_data=True, dt=1e-2)
     pod = PhaseOffsetDetectorNetwork(16, 9, 40)
@@ -277,7 +277,7 @@ if __name__ == "__main__":
 
     tj = TopologicalNavigation(args.env_model, pc_network, cognitive_map, compass, log=args.log)
 
-    if args.store_metrics:
+    if args.log_metrics:
         from system.tests.map import unobstructed_lines, mean_distance_between_nodes, scalar_coverage, agreement
         def log_metrics(i, endpoints, endpoint_indices, success):
             print('Metrics:')

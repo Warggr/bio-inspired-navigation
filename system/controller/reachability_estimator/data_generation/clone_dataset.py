@@ -14,15 +14,11 @@ def clone_dataset(
     nr_samples: int|Literal['all']=1000,
     flush_freq=50,
 ) -> h5py.File:
-    """ Create reachability samples.
-
-    arguments:
-    rd : dataset to draw positions from
-    """
-
     in_dset = infile[DATASET_KEY]
-    if nr_samples is not 'all':
+    if nr_samples != 'all':
         assert len(in_dset) >= nr_samples, f"Trying to clone {nr_samples} samples from dataset with only {len(in_dset)}"
+    else:
+        nr_samples = len(in_dset)
 
     f = h5py.File(out_filename, 'a')
 

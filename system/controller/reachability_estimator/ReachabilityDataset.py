@@ -69,7 +69,7 @@ class SampleConfig:
                 other_attrs['image_encoder'] = tag
             elif tag.startswith('fc'):
                 other_attrs['fc_layers'] = list(map(int, tag[2:].split(',')))
-            elif tag == '+dropout':
+            elif tag == 'dropout':
                 other_attrs['dropout'] = True
             else:
                 raise ValueError('Unrecognized tag: ', tag)

@@ -18,3 +18,19 @@ for artifact in pc_network_artifacts:
 		input: f"system/bio_model/data/pc_model/{artifact}-Savinov_val3.npy"
 		output: f"system/bio_model/data/pc_model/{artifact}.npy"
 		shell: "ln -s $(basename {input}) {output}"
+
+rule:
+	input: "system/bio_model/data/cognitive_map/artifacts/connect_re_mse_weights+threshold--{thresh}.gpickle"
+	output: "logs/longnav_over_connect_cogmap_{thresh}.log"
+	shell: """
+		input={input}
+		python system/tests/system_benchmark/long_unknown_nav.py Savinov_val3 ${{input#system/bio_model/data/cognitive_map/}} 0,-1 | tee {output}
+	"""
+
+rule:
+	input: "system/bio_model/data/cognitive_map/artifacts/vo_{thresh}.gpickle"
+	output: "logs/longnav_over_cogmap_{thresh}.log"
+	shell: """
+		input={input}
+		python system/tests/system_benchmark/long_unknown_nav.py Savinov_val3 ${{input#system/bio_model/data/cognitive_map/}} 0,-1 | tee {output}
+	"""

@@ -40,28 +40,32 @@ for wall_colors in ('3colors', 'patterns'):
         shell: f"python data_generation/clone_dataset.py {{input}} {{output}} -n 'all' --wall-colors {wall_colors}"
 
 def dataset_for(wildcards):
-    if wildcards.flags.startswith('-3colors'):
-        return 'data/reachability/dataset-3colors.hd5'
-    elif wildcards.flags.startswith('-patterns'):
-        return 'data/reachability/dataset-patterns.hd5'
+    basename, *other_flags = wildcards.flags.split('+')
+    basename, *tags = basename.split('-')
+    if tags[0] not in ('3colors', 'patterns', 'boolor', 'simulation'):
+        tags = tags[1:]
+    if tags:
+        return 'data/reachability/dataset-' + '-'.join(tags) + '.hd5'
     else:
         return 'data/reachability/dataset.hd5'
 
-rule:
+rule train_network:
     output: "data/models/reachability_network{flags}.25"
     input: dataset_for
     shell: """
-        flags=$(python scripts/network_name.py cmdline {wildcards.model})
+        flags=$(python scripts/network_name.py cmdline {output})
 		python training/train_multiframe_dst.py train $flags --resume
     """
 
-rule:
+rule pretrained:
 	output: "data/models/reachability_network{flags}+pretrained.25"
 	input: dataset_for, "data/models/autoencoder20.25"
 	shell: """
-		flags=$(python scripts/network_name.py cmdline {wildcards.model})
+		flags=$(python scripts/network_name.py cmdline {input})
 		python training/train_multiframe_dst.py train $flags --resume
 	"""
+
+ruleorder: pretrained > train_network
 
 rule:
 	input: "data/models/{model}"
@@ -81,11 +85,11 @@ rule:
 
 rule:
 	output: f"data/results/{{model}}-val{{tag}}.log"
-	input: f"data/models/{{model}}", "data/reachability/dataset{tag}.hd5"
+	input: model=f"data/models/{{model}}", dataset="data/reachability/dataset{tag}.hd5"
 	shell: """
 		flags=$(python scripts/network_name.py cmdline {wildcards.model})
 		# we need the eval because of some shell quoting issue
-		eval python training/train_multiframe_dst.py validate --load {input} --dataset-basename "dataset{wildcards.tag}" $flags > {output}
+		eval python training/train_multiframe_dst.py validate --load {input.model} --dataset-basename "dataset{wildcards.tag}" $flags > {output}
 	"""
 
 code_sizes = [0, 1, 4, 16, 20, 50, 80, 100]

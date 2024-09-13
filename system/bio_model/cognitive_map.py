@@ -108,13 +108,13 @@ class CognitiveMapInterface(ABC):
         """ Adds a new node to the cognitive map """
         if self.debug:
             pc_id = len(self.node_network.nodes)
-            filename = os.path.join(self.tmpdir, str(pc_id) + '.npz')
-            with open(filename, 'x') as file:
+            filename = os.path.join(self.tmpdir.name, str(pc_id) + '.npz')
+            with open(filename, 'xb') as file:
                 p.dump(file)
             self.print_debug(f'Adding node: #={pc_id}, position={p.env_coordinates}, angle={p.angle}, dump_file={filename}')
         if self.max_capacity is not None and len(self.node_network.nodes) > self.max_capacity:
             raise self.TooManyPlaceCells()
-        self.node_network.add_node(p, pos=tuple(p.env_coordinates))
+        self.node_network.add_node(p, pos=tuple(p.pos))
 
     @report
     def add_edge_to_map(self, p: PlaceCell, q: PlaceCell, w: float = 1, **kwargs):
