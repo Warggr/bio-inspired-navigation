@@ -20,7 +20,8 @@ from system.plotting.plotThesis import plot_grid_cell
 from system.bio_model.place_cell_model import PlaceCell, PlaceCellNetwork
 ReachabilityEstimator = 'ReachabilityEstimator'
 
-from typing import Optional, Literal
+from system.controller.reachability_estimator.types import PlaceInfo
+from typing import Optional, Literal, Callable, Self, Iterable
 
 def get_path_top() -> str:
     """ returns path to the folder of the current file """
@@ -140,7 +141,7 @@ class CognitiveMapInterface(ABC):
         self.node_network.add_edge(p, q, **kwargs)
         self.node_network.add_edge(q, p, **kwargs)
 
-    def add_bidirectional_edge_to_map(self, p, q, w=1, **kwargs):
+    def add_bidirectional_edge_to_map(self, p, q, w: float=1, **kwargs):
         """ Adds a new bidirectional weighted edge to the cognitive map with given parameters
 
         arguments:
@@ -704,6 +705,61 @@ class LifelongCognitiveMap(CognitiveMapInterface):
                                                        mu=1 - weight,
                                                        sigma=self.sigma)
 
+    def retrace_logs(self, lines: Iterable[str], callback: Callable[[int, Self], None]) -> int:
+        """
+        Read a log file and replay each step described there. So a canceled navigation can be continued later.
+
+        returns:
+        nb_steps: int    -- the number of navigation steps
+        """
+
+        nb_steps = 0
+        pcs = list(self.node_network.nodes)
+        lines = iter(lines)
+        for i, line in enumerate(lines):
+            if any(line.startswith(it) for it in ('Using seed', 'Path', 'Last PC', 'adding edge', 'edge [', 'Vector navigation', 'Recomputed path:', 'LIMIT WAS REACHED STOPPING HERE')):
+                continue
+            elif line.startswith('Navigation '):
+                nb_steps += 1
+            elif line.startswith('Adding bidirectional edge: '):
+                line = line.removeprefix('Adding bidirectional edge: ')
+                kvpairs = [ kv.split('=') for kv in line.split(', ')]
+                kvpairs = { key: value for key, value in kvpairs }
+                self.add_bidirectional_edge_to_map(pcs[int(kvpairs['p'])], pcs[int(kvpairs['q'])], w=float(kvpairs['weight']))
+            elif line.startswith('deleting edge ['):
+                line = line.removeprefix('deleting edge [')
+                line = line.split(']')[0]
+                p, q = line.split('-')
+                p, q = int(p), int(q)
+                self.remove_bidirectional_edge(pcs[p], pcs[q])
+            elif line.startswith('Adding node: '):
+                line = line.removeprefix('Adding node: ')
+                kvpairs = [kv.split('=') for kv in line.split(', ')]
+                kvpairs = {key: value for key, value in kvpairs}
+                assert int(kvpairs['#']) == len(self.node_network.nodes), (int(kvpairs['#']), len(self.node_network.nodes))
+                pos = kvpairs['position']
+                assert pos[0] == '[' and pos[-1] == ']'; pos = pos[1:-1]
+                pos = tuple(map(float, filter(lambda i:i, pos.split(' '))))
+                if 'dump_file' in kvpairs:
+                    pc = PlaceCell.from_data(PlaceCell.load(kvpairs['dump_file']))
+                else:
+                    pc = PlaceCell.from_data(PlaceInfo(pos=pos, angle=NotImplemented, img=[0], lidar=NotImplemented, spikings=None))
+                pcs.append(pc)
+                self.add_node_to_map(pc)
+            elif line.startswith('> /') or line.startswith('Uncaught exception'):
+                next(lines) # consuming next value from iterator
+            elif line.startswith('(Pdb)') or line.startswith('Post mortem debugger') or line.startswith('->'):
+                pass
+            elif line.split(' : ')[0] in ('scalar coverage', 'unobstructed_lines', 'mean_distance_between_nodes'):
+                pass
+            else:
+                try:
+                    int(line.split(' ')[0]) # PDB l
+                except ValueError as err:
+                    raise ValueError('Unrecognized line:', line) from err
+
+            callback(i, self)
+        return nb_steps
 
 if __name__ == "__main__":
     """ Load and visualize cognitive map + observations with grid cell spikings on both ends of distinct edges  """
