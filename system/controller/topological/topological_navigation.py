@@ -256,6 +256,7 @@ if __name__ == "__main__":
     parser.add_argument('--num-topo-nav', '-n', help='number of topological navigations', type=int, default=100)
     parser.add_argument('--re-type', help='Type of the reachability estimator used for connecting nodes', default='neural_network(re_mse_weights.50)')
     parser.add_argument('--log-metrics', action='store_true')
+    parser.add_argument('--load', help='Load and replay log file, then continue navigation')
     args = parser.parse_args()
 
     map_file, map_file_after_lifelong_learning = args.map_file, args.map_file_after_lifelong_learning
@@ -269,6 +270,14 @@ if __name__ == "__main__":
     re = reachability_estimator_factory(args.re_type, env_model=args.env_model)
     #pc_network = PlaceCellNetwork(from_data=True, map_name=args.env_model)
     cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from=map_file, debug=('cogmap' in DEBUG or args.log))
+
+    if args.load:
+        print('Loading log file', args.load)
+        with open(args.load) as log_file:
+            start_step = cognitive_map.retrace_logs(map(lambda line: line.strip(), log_file.readlines()))
+    else:
+        start_step = 0
+
     pc_network = cognitive_map.get_place_cell_network()
     assert len(cognitive_map.node_network.nodes) > 1
     gc_network = GridCellNetwork(from_data=True, dt=1e-2)
