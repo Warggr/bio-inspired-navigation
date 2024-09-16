@@ -79,6 +79,8 @@ class DoubleCompass(Compass):
         norm_error = np.linalg.norm(true_position - estimated_position)
         angle_error = np.arccos(np.dot(true_position, estimated_position) / np.linalg.norm(true_position) / np.linalg.norm(estimated_position))
         return norm_error, angle_error
+    def record_error(self):
+        self.errors.append(self.error())
     def error_linearlookahead(self):
         true_position = self.true_compass.calculate_goal_vector()
         compass = LinearLookaheadGcCompass(gc_network=self.compass.gc_network, arena_size=1.5*np.linalg.norm(true_position))
@@ -108,7 +110,7 @@ class PositionEstimation:
     ):
         """
         PositionEstimation constructor
-        
+
         arguments:
         pc_network: the place cells
         gc_network: a GridCellNetwork that tracks the agent's position

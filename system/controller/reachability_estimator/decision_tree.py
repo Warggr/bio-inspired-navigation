@@ -14,7 +14,7 @@ from system.controller.reachability_estimator.types import Batch, Prediction, Sa
 from system.controller.reachability_estimator.ReachabilityDataset import ReachabilityDataset, SampleConfig
 
 from system.types import Image
-from typing import Iterable
+from typing import Any
 
 def relevant_info_from_lidar(batch_lidar: Batch[list[float]]) -> Batch[list[float]]:
     return batch_lidar[:, [0, 25, 26, 51]]
@@ -80,6 +80,10 @@ class DecisionTree(Model):
             data[i:ilast] = batch_model_args
 
         self.tree.fit(data, labels)
+
+    def get_args(self) -> dict[str, Any]:
+        return {}
+
 
 if __name__ == "__main__":
     import argparse

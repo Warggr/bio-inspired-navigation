@@ -53,7 +53,7 @@ def run_test_model(dataset, filename = "trained_model_new.50"):
 
     from system.controller.reachability_estimator.reachability_estimation import NetworkReachabilityEstimator
     filepath = os.path.join(DATA_STORAGE_FOLDER, filename)
-    reach_estimator = NetworkReachabilityEstimator(weights_file=filepath)
+    reach_estimator = NetworkReachabilityEstimator.from_file(weights_file=filepath)
 
     n_samples = 6400
     sampler = RandomSampler(dataset, True, n_samples)

@@ -19,3 +19,15 @@ for artifact, file in zip(pc_network_artifacts, pc_network_artifact_files):
 
 rule pc_network:
 	input: pc_network_artifact_files
+
+gc_network_artifacts = ['gm_values', 'h_vectors', 's_vectors_initialized', 'w_vectors']
+gc_network_artifact_files = [ f"system/bio_model/data/gc_model_6/{artifact}.npy" for artifact in gc_network_artifacts ]
+
+for artifact, file in zip(pc_network_artifacts, pc_network_artifact_files):
+	rule:
+		input: "data/data.zip"
+		output: file
+		shell: "unzip -p {input} data/bio_model/grid_cells/{artifact}.npy > {output}"
+
+rule gc_network:
+	input: gc_network_artifact_files

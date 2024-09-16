@@ -254,7 +254,7 @@ if __name__ == "__main__":
     parser.add_argument('--visualize', action='store_true')
     parser.add_argument('--seed', type=int, default=None, help='Seed for random index generation.') # for reproducibility / debugging purposes
     parser.add_argument('--num-topo-nav', '-n', help='number of topological navigations', type=int, default=100)
-    parser.add_argument('--re-type', help='Type of the reachability estimator', default='neural_network(re_mse_weights.50)')
+    parser.add_argument('--re-type', help='Type of the reachability estimator used for connecting nodes', default='neural_network(re_mse_weights.50)')
     parser.add_argument('--log-metrics', action='store_true')
     args = parser.parse_args()
 

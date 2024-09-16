@@ -5,6 +5,8 @@ def add_connections_to_map(cognitive_map, re, add=True, remove=False):
 
     for i, ni in enumerate(node_network.nodes):
         for j, nj in enumerate(node_network.nodes):
+            if i < j:
+                continue
             if i != j:
                 reachable, factor = re.get_reachability(ni, nj)
                 if reachable and add and (nj not in node_network[ni] or 'connectivity_probability' not in node_network.edges[nj, ni]):
@@ -17,6 +19,7 @@ def add_connections_to_map(cognitive_map, re, add=True, remove=False):
                     )
                 if not reachable and remove and (nj in node_network[ni]):
                     cognitive_map.remove_bidirectional_edge(ni, nj)
+    node_network.graph.update({'re_algorithm': str(re), 'threshold_reachable': re.threshold_reachable})
 
 def guess_env_model(filename):
     match filename.split("."):
@@ -26,4 +29,3 @@ def guess_env_model(filename):
             return "Savinov_val3"
         case _:
             raise ValueError()
-

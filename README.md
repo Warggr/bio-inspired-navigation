@@ -46,6 +46,21 @@ This folder contains:
 - bio_data: model of grid cells, place cells and the cognitive map
 - re: trajectory and reachability dataset for training as well as the final model
 
+## Debugging
+
+The code reads the environment variables `DEBUG` and `PLOTTING`.
+Depending on their contents, multiple debug configurations can be activated.
+To debug multiple things, you can separate them by the sign `&`, e.g.
+```shell
+export DEBUG='localctrl&gains'
+```
+
+#### Flags for DEBUG
+- `gains`: prints a line with the robot gains at each simulation time step.
+
+#### Flags for PLOTTING
+
+
 ## Known bugs and corresponding fixes
 ### If you encounter bugs related to OpenGL
 (@TUM students: this happens when running on LXHalle computers)
@@ -68,7 +83,7 @@ python -m pybullet_utils.runServer &
 export BULLET_SHMEM_SERVER=True
 ```
 
-You can reuse the same server for multiple script runs - each script should clean up the simulation environment after it has run.
+You can reuse the same server for multiple script runs - each script cleans up the simulation environment after it has run.
 
 ## Code
 This code implements the methodology as well as performs the experiments described in the thesis.

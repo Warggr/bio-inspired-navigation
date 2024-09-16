@@ -13,13 +13,9 @@ import random
 import networkx as nx
 import numpy as np
 
-import sys
 import os
 
 from matplotlib import pyplot as plt
-
-if __name__ == "__main__":
-    sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from system.controller.reachability_estimator.types import PlaceInfo, untranspose_image
 from system.plotting.plotHelper import add_environment, TUM_colors
@@ -188,9 +184,12 @@ class PlaceCellNetwork:
 
         return [firing_values, created_new_pc]
 
-    def compute_firing_values(self, gc_network: 'GridCellNetwork', axis=None, plot=False):
+    def compute_firing_values(self, gc_network: 'GridCellNetwork|Spikings', axis=None, plot=False):
 
-        s_vectors = gc_network.consolidate_gc_spiking()
+        if type(gc_network) == np.ndarray:
+            s_vectors = gc_network
+        else:
+            s_vectors = gc_network.consolidate_gc_spiking()
 
         firing_values = []
         for i, pc in enumerate(self.place_cells):

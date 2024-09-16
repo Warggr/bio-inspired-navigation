@@ -99,7 +99,9 @@ class GcCompass(Compass[Spikings]):
     def parse(pc: 'PlaceInfo'):
         return pc.spikings
 
-    def __init__(self, gc_network: GridCellNetwork):
+    def __init__(self, gc_network: GridCellNetwork|None = None):
+        if gc_network is None:
+            gc_network = GridCellNetwork(from_data=True)
         self.gc_network = gc_network
 
     def reset_position(self, new_position: Spikings):
@@ -188,17 +190,17 @@ class ComboGcCompass(GcCompass):
     def update_position(self, robot: Robot):
         self.impl.update_position(robot)
         goal_reached = self.impl.reached_goal()
-        if goal_reached and type(self.impl) == PodGcCompass:
+        if goal_reached and type(self.impl.impl) == PodGcCompass:
             # switch from pod to linear lookahead
-            self.impl = LinearLookaheadGcCompass(arena_size=robot.env.arena_size, gc_network=self.gc_network, goal_pos=self.impl.goal_pos)
+            self.impl = LinearLookaheadGcCompass(arena_size=robot.env.arena_size, gc_network=self.gc_network)
             self.impl = GoalVectorCache(self.impl)
             # robot.turn_to_goal(goal_vector)
 
 
 def create_gc_spiking(start: Vector2D, goal: Vector2D, gc_network_at_start: Optional[GridCellNetwork]=None, plotting=plotting) -> types.Spikings:
     """ 
-    Agent navigates from start to goal accross a plane without any obstacles, using the analyticallly 
-    calculated goal vector to genereate the grid cell spikings necessary for the decoders. During actual
+    Agent navigates from start to goal across a plane without any obstacles, using the analytically
+    calculated goal vector to generate the grid cell spikings necessary for the decoders. During actual
     navigation this would have happened in the exploration phase.
     """
 
@@ -216,7 +218,7 @@ def create_gc_spiking(start: Vector2D, goal: Vector2D, gc_network_at_start: Opti
     history: list[Vector2D] = [robot_position]
 
     if compass.reached_goal():
-        assert False, "Positions are too close to each other!"
+        raise ValueError("Positions are too close to each other!")
 
     i = 0
     while not compass.reached_goal():

@@ -19,9 +19,6 @@ from typing import Tuple, Iterator, Dict, Optional, Callable, Iterable, List
 import sys
 import os
 
-if __name__ == "__main__":
-    sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
-
 from system.controller.reachability_estimator.reachability_utils import ViewOverlapReachabilityController, RCCache
 
 from system.controller.simulation.pybullet_environment import PybulletEnvironment, all_possible_textures

@@ -1,6 +1,7 @@
 import math
 import numpy as np
 from .types import Vector2D, Angle
+from functools import wraps
 
 
 def normalize(v: Vector2D) -> Vector2D:
@@ -24,3 +25,16 @@ def angle_abs_difference(a: Angle, b: Angle):
 
 def average(li):
     return sum(li) / len(li)
+
+
+def call_every(nb_steps, start_counter = 0):
+    def _decorator(fun):
+        counter = start_counter
+        @wraps(fun)
+        def _wrapper(*args, **kwargs):
+            nonlocal counter
+            if counter % nb_steps == 0:
+                fun(*args, **kwargs)
+            counter += 1
+        return _wrapper
+    return _decorator

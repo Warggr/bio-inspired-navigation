@@ -34,6 +34,7 @@ class PlaceInfo:
     def dump(self, file):
         np.savez(file, **asdict(self))
 
+    @staticmethod
     def load(file):
         data = np.load(file, allow_pickle=True)
         return PlaceInfo(**data)

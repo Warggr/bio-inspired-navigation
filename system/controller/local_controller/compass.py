@@ -35,6 +35,13 @@ class Compass(ABC, Generic[PositionRepresentation]):
     def reset_position(self, new_position: PositionRepresentation):
         ...
 
+    @classmethod
+    def goal_vector_between(cls, p: 'PlaceInfo', q: 'PlaceInfo') -> Vector2D:
+        compass = cls()
+        compass.reset_position_pc(p)
+        compass.reset_goal_pc(q)
+        return compass.calculate_goal_vector()
+
     def reset_position_pc(self, pc: 'PlaceInfo'):
         self.reset_position(self.parse(pc))
 

@@ -12,35 +12,46 @@ def parse_coords(coords: str):
 img_root = "system/controller/simulation/environment/"
 folder = sys.argv[1]
 
-filename = os.path.join(img_root, folder, "plane.urdf")
-tree = ET.parse(filename)
-root = tree.getroot()
+if len(sys.argv) > 2:
+    filename = sys.argv[2]
+else:
+    filename = "maze_topview_binary.png"
+outfile = os.path.join(img_root, folder, filename)
 
-links = [el for el in root if el.tag == "link"]
-joints = [el for el in root if el.tag == "joint"]
+files = ['plane.urdf'] + sys.argv[3:]
 
-children = dict()
-for joint in joints:
-    assert joint.find("parent").attrib["link"] == "planeLink"
-    origin = parse_coords(joint.find("origin").attrib["xyz"])
-    children[joint.find("child").attrib["link"]] = origin
+starts, stops = [], []
 
-starts = np.zeros((len(links), 2), dtype=float)
-stops = np.zeros((len(links), 2), dtype=float)
+for file in files:
+    filename = os.path.join(img_root, folder, file)
+    tree = ET.parse(filename)
+    root = tree.getroot()
 
-for i, link in enumerate(links):
-    if link.attrib["name"] == "planeLink":
-        continue
-    origin = children[link.attrib["name"]]
-    link = link.find("collision")
-    obj_origin = link.find("origin").attrib["xyz"]
-    size = link.find("geometry").find("box").attrib["size"]
-    obj_origin, size = parse_coords(obj_origin), parse_coords(size)
-    origin = np.array(obj_origin) + np.array(origin)
-    #assert origin[2] == 0 and size[2] == 1, (origin, size)
-    origin, size = origin[:2], np.array(size[:2])
-    starts[i] = origin - size / 2
-    stops[i] = origin + size / 2
+    links = [el for el in root if el.tag == "link"]
+    joints = [el for el in root if el.tag == "joint"]
+
+    children = dict()
+    for joint in joints:
+        assert joint.find("parent").attrib["link"] == "planeLink"
+        origin = parse_coords(joint.find("origin").attrib["xyz"])
+        children[joint.find("child").attrib["link"]] = origin
+
+    for i, link in enumerate(links):
+        if link.attrib["name"] == "planeLink":
+            continue
+        origin = children[link.attrib["name"]]
+        link = link.find("collision")
+        obj_origin = link.find("origin").attrib["xyz"]
+        size = link.find("geometry").find("box").attrib["size"]
+        obj_origin, size = parse_coords(obj_origin), parse_coords(size)
+        origin = np.array(obj_origin) + np.array(origin)
+        #assert origin[2] == 0 and size[2] == 1, (origin, size)
+        origin, size = origin[:2], np.array(size[:2])
+        starts.append(origin - size / 2)
+        stops.append(origin + size / 2)
+
+starts = np.array(starts, dtype=float)
+stops = np.array(stops, dtype=float)
 
 resolution = 0.05
 corner = np.min(starts, axis=0)
@@ -57,4 +68,4 @@ for start, stop in zip(starts, stops):
     draw.rectangle([tuple(start), tuple(stop)], fill=0)
 
 image = ImageOps.flip(image)
-image.save(os.path.join(img_root, folder, "maze_topview_binary.png"))
+image.save(outfile)
