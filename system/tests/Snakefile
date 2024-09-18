@@ -197,19 +197,19 @@ def translate_slug_to_flags(slug):
 
 rule:
 	input: 'in/random_positions.in'
-	output: 'results/local_controller/results{controller_spec}.out'
+	output: 'results/local_controller/results{controller_spec, .*}.out'
 	run:
 		flags = translate_slug_to_flags(wildcards.controller_spec)
 		shell(f"cat {input} | python local_controller_test.py {flags} > {output}")
 
 rule:
-    output: 'results/local_controller/results{controller_spec}-angle.log'
+    output: 'results/local_controller/results{controller_spec, .*}-angle.log'
     run:
         flags = translate_slug_to_flags(wildcards.controller_spec)
         shell(f"python local_controller_angle_test.py {flags} > {output}")
 
 rule:
-    output: 'results/local_controller/results{controller_spec}-width.log'
+    output: 'results/local_controller/results{controller_spec, .*}-width.log'
     run:
         flags = translate_slug_to_flags(wildcards.controller_spec)
         shell(f"python local_controller_narrow_test.py {flags} > {output}")
