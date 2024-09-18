@@ -191,3 +191,13 @@ for root, dirs, files in os.walk('../bio_model/data/cognitive_map/'):
 
 rule map_metrics:
 	input: map_metrics
+
+def translate_slug_to_flags(slug):
+	return slug.replace('--', ' ').replace('+', '--')
+
+rule:
+	input: 'in/random_positions.in'
+	output: 'results/local_controller/results{controller_spec}.out'
+	run:
+		flags = translate_slug_to_flags(wildcards.controller_spec)
+		shell(f"cat {input} | python local_controller_test.py {flags} > {output}")
