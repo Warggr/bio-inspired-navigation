@@ -194,7 +194,10 @@ rule map_metrics:
 
 rule:
 	output: 'in/random_positions.in'
-	shell: "python ../../scripts/create_random_test_positions.py"
+	shell: """
+		python ../../scripts/create_random_test_positions.py random_grid -n 50 > {output}
+		python ../../scripts/create_random_test_positions.py traj -n 50 >> {output}
+	"""
 
 def translate_slug_to_flags(slug):
 	return slug.replace('--', ' ').replace('+', '--')
