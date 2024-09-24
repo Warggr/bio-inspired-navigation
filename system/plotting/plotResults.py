@@ -87,6 +87,36 @@ def plotTrajectory(xy_coordinates):
     plt.legend(['Trajectory'])
     plt.show()
 
+def plotCognitiveMap(
+    ax, cognitive_map,
+    path: list['PlaceCell']|None=None,
+    with_labels = False,
+    with_directions = False,
+):
+    G = cognitive_map.node_network
+    pos = nx.get_node_attributes(G, 'pos')
+    kwargs = {}
+    if with_labels:
+        kwargs['label'] = {j: str(i) for i, j in enumerate(G.nodes)}
+    nx.draw_networkx_edges(G, pos, edge_color='#CCCCC6', ax=ax)
+
+    if with_directions:
+        for node in G.nodes:
+            pos, angle = node.position, node.angle
+            circle = plt.Circle(pos, 0.2, color=TUM_colors['TUMAccentBlue'], alpha=1)
+            ax.add_artist(circle)
+            arrow = plt.Arrow(pos[0], pos[1], math.cos(angle), math.sin(angle),
+                              color=TUM_colors['TUMAccentBlue'], alpha=1)
+            ax.add_artist(arrow)
+    else:
+        nx.draw_networkx_nodes(G, pos, node_color='#0065BD80', node_size=60, ax=ax, **kwargs)
+
+    if path:
+        # draw_path
+        path_edges = list(zip(path, path[1:]))
+        nx.draw_networkx_nodes(G, pos, nodelist=path, node_color='#E3722280', node_size=60, ax=ax)
+        G = G.to_undirected()
+        nx.draw_networkx_edges(G, pos, edgelist=path_edges, edge_color='#E3722280', width=3, ax=ax)
 
 def plotTrajectoryInEnvironment(
     env: Optional['PybulletEnvironment'] = None,
@@ -112,17 +142,8 @@ def plotTrajectoryInEnvironment(
         q = ax.quiver(X, Y, U, V, units='xy', scale=1, color=TUM_colors["TUMAccentGreen"])
 
     if cognitive_map:
-        G = cognitive_map.node_network
-        pos = nx.get_node_attributes(G, 'pos')
-        nx.draw_networkx_nodes(G, pos, node_color='#0065BD80', node_size=60)
-        nx.draw_networkx_edges(G, pos, edge_color='#CCCCC6')
+        plotCognitiveMap(ax, cognitive_map, path=path)
 
-        if path:
-            # draw_path
-            path_edges = list(zip(path, path[1:]))
-            nx.draw_networkx_nodes(G, pos, nodelist=path, node_color='#E3722280', node_size=60)
-            G = G.to_undirected()
-            nx.draw_networkx_edges(G, pos, edgelist=path_edges, edge_color='#E3722280', width=3)
     if start is not None:
         circle = plt.Circle((start[0], start[1]), 0.2, color=TUM_colors['TUMAccentOrange'], alpha=0.8)
         ax.add_artist(circle)
