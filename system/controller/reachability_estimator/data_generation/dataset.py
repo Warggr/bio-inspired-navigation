@@ -14,7 +14,7 @@ import itertools
 import bisect
 import random
 import matplotlib.pyplot as plt
-from typing import Tuple, Iterator, Dict, Optional, Callable, Iterable, List
+from typing import Iterator, Optional, Callable, Iterable
 
 import sys
 import os
@@ -157,13 +157,18 @@ class TrajectoriesDataset(data.Dataset):
         self.load_to_mem = False
         self.first = True
 
-    def _init_once(self, seed):
+    def _seed(self, seed: int):
+        self.rng = np.random.RandomState(12345 + (seed % 1000000) * 666)
+
+    def _init_once(self, seed: int|None=None) -> 'TrajectoriesDataset':
         # Should be called after the dataset runs in a separate process
         if self.first:
             self._open_datasets()
-            self.rng = np.random.RandomState(12345 + (seed % 1000000) * 666)
             self.first = False
-            print("Init finished")
+            print("Init finished", file=sys.stderr)
+        if seed is not None:
+            self._seed(seed)
+        return self # for chaining
 
     # open the dataset
     def _open_datasets(self):
@@ -349,6 +354,20 @@ class TrajectoriesDataset(data.Dataset):
 
     def subset(self, map_name: str, seed: int):
         return TrajectoriesDatasetSingleMap(parent=self, map_name=map_name, seed=seed)
+
+    def subset_single_point(self, map_name: AllowedMapName, seed: int):
+        return PointsDatasetSingleMap(self, map_name)
+
+class PointsDatasetSingleMap(data.Dataset):
+    def __init__(self, parent: TrajectoriesDataset, map_name: AllowedMapName):
+        self.parent = parent
+        self.map_name = map_name
+    def __len__(self):
+        return self.parent.traj_len_cumsum_per_map[self.map_name][-1]
+    def __getitem__(self, index) -> PositionAndOrientation:
+        dataset_idx, traj_id, src_idx = self.parent._locate_sample_single_map(index, self.map_name)
+        point = self.parent.fds[dataset_idx][traj_id][src_idx]
+        return (point[0], point[1])
 
 
 class TrajectoriesDatasetSingleMap(data.Dataset):
