@@ -1,0 +1,11 @@
++spikings+lidar--raw_lidar+conv
++spikings+lidar--ego_bc+conv
++spikings+lidar--allo_bc+conv
++spikings+conv
++spikings+lidar--raw_lidar+fc
++lidar--raw_lidar+conv
+-3colors+spikings+lidar--raw_lidar+conv
++spikings+lidar--raw_lidar+noimages+conv
++spikings+lidar--raw_lidar+dist+conv
++dist+fc
+-3colors+lidar--ego_bc+fc

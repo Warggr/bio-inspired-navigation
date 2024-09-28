@@ -1,0 +1,11 @@
+--spikings --lidar=raw_lidar
+--spikings --lidar=ego_bc
+--spikings --lidar=allo_bc
+--spikings
+--spikings --image-encoder fc --lidar=raw_lidar
+--lidar=raw_lidar
+--spikings --lidar=raw_lidar --dataset-features 3colors
+--spikings --lidar=raw_lidar --images=no
+--spikings --lidar=raw_lidar --dist
+--image-encoder fc --dist
+--image-encoder fc --lidar=ego_bc --dataset-features 3colors

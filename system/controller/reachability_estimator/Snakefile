@@ -133,4 +133,38 @@ for format in ('png', 'pgf'):
 			plt.scatter(data[x], data[y])
 			plt.title("Autoencoder performance")
 			plt.xlabel(x); plt.ylabel(y)
+			plt.tight_layout()
+			plt.gcf().set_size_inches(5, 4)
 			plt.savefig(str(output))
+
+rule: # TODO: make it a checkpoint or something
+	input: "scripts/experiments.csv"
+	output: "scripts/combinations.csv"
+	shell: """ cat {input} | python scripts/network_name.py > {output} """
+
+from scripts.train_results import combinations
+
+rule:
+	input: [f'data/results/reachability_network-{j}{tags}.25' for tags in combinations for j in range(1,5+1)]
+	output: "data/results/all_runs.mat"
+	run:
+		from scripts.train_results import get_fscore
+		import scipy
+
+		x, y = [], []
+		best_perf = []
+		for tags in combinations:
+		    values[tags] = []
+		    for j in range(1, 5+1):
+		        value = get_fscore(f'reachability_network-{j}{tags}.25', None)
+		        x.append(tags)
+		        y.append(value)
+
+		scipy.io.savemat(output, dict(x=x, y=y))
+
+rule:
+	input: "data/results/all_runs.mat"
+	output: "data/results/train_results.pgf"
+	shell: "cd scripts && matlab -nosplash -nodesktop -r scatterplot {input} {output}"
+	# or with octave:
+	# shell: 'cd scripts/ && octave -qf <<<"scatterplot {input} {output}"'
