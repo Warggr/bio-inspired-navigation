@@ -11,7 +11,7 @@
 import os
 import sys
 
-from system.controller.reachability_estimator.types import PlaceInfo
+from system.controller.reachability_estimator._types import PlaceInfo
 
 if __name__ == "__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))

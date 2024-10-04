@@ -20,7 +20,7 @@ from system.plotting.plotThesis import plot_grid_cell
 from system.bio_model.place_cell_model import PlaceCell, PlaceCellNetwork
 ReachabilityEstimator = 'ReachabilityEstimator'
 
-from system.controller.reachability_estimator.types import PlaceInfo
+from system.controller.reachability_estimator._types import PlaceInfo
 from typing import Optional, Literal, Callable, Self, Iterable
 
 def get_path_top() -> str:

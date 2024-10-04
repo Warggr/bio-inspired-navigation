@@ -18,7 +18,7 @@ from torch.utils.tensorboard import SummaryWriter
 from system.controller.reachability_estimator.networks import Model
 from system.controller.reachability_estimator.ReachabilityDataset import ReachabilityDataset, SampleConfig
 from system.controller.reachability_estimator.training.utils import load_model, DATA_STORAGE_FOLDER
-from system.controller.reachability_estimator.types import Prediction
+from system.controller.reachability_estimator._types import Prediction
 from typing import Literal, Callable, Any
 
 TrainDevice = Literal['cpu', 'cuda']

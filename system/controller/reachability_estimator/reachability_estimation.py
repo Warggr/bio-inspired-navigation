@@ -20,7 +20,7 @@ from system.bio_model.bc_network.parameters import HeadingCellActivity, Boundary
 from system.bio_model.bc_network.bc_activity import bcActivityForLidar
 from system.controller.simulation.environment.map_occupancy import MapLayout
 import system.types as types
-from system.controller.reachability_estimator.types import Prediction, SpecificReachabilityController, PlaceInfo
+from system.controller.reachability_estimator._types import Prediction, SpecificReachabilityController, PlaceInfo
 
 try:
     from typing import override

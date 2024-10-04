@@ -3,7 +3,7 @@ import numpy as np
 from tqdm import tqdm
 from system.controller.simulation.pybullet_environment import PybulletEnvironment, all_possible_textures
 from system.controller.reachability_estimator.data_generation.dataset import DATASET_KEY, display_samples
-from system.controller.reachability_estimator.types import Sample
+from system.controller.reachability_estimator._types import Sample
 import sys
 from typing import Literal
 

@@ -17,7 +17,7 @@ import os
 
 from matplotlib import pyplot as plt
 
-from system.controller.reachability_estimator.types import PlaceInfo, untranspose_image
+from system.controller.reachability_estimator._types import PlaceInfo, untranspose_image
 from system.plotting.plotHelper import add_environment, TUM_colors
 from system.types import Vector2D
 from system.debug import DEBUG

@@ -24,7 +24,7 @@ from abc import ABC, abstractmethod
 from typing import Callable, Literal, Type, Any
 from itertools import pairwise
 
-from .types import Batch, Prediction, transpose_image
+from ._types import Batch, Prediction, transpose_image
 
 from torch.optim import Optimizer
 

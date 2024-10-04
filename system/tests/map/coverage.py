@@ -7,7 +7,7 @@ from system.controller.reachability_estimator.data_generation.dataset import pla
 from system.controller.simulation.pybullet_environment import PybulletEnvironment
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.types import AllowedMapName, PositionAndOrientation
-from system.controller.reachability_estimator.types import PlaceInfo
+from system.controller.reachability_estimator._types import PlaceInfo
 from system.controller.reachability_estimator.data_generation.dataset import TrajectoriesDataset, get_path
 from system.controller.local_controller.local_navigation import RandomTaker
 import numpy as np

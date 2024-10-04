@@ -14,7 +14,7 @@ from matplotlib import pyplot as plt
 
 from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.plotting.plotResults import plotStartGoalPair
-from system.controller.reachability_estimator.types import PlaceInfo, SpecificReachabilityController, ReachabilityController
+from system.controller.reachability_estimator._types import PlaceInfo, SpecificReachabilityController, ReachabilityController
 
 from typing import Optional, Callable
 

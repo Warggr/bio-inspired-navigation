@@ -13,7 +13,7 @@ if __name__ == "__main__":
 
 from system.plotting.plotResults import plotStartGoalDataset
 from system.bio_model.bc_network import bcActivityForLidar, BoundaryCellNetwork, HDCActivity
-from system.controller.reachability_estimator.types import Sample, Prediction, ModelInput
+from system.controller.reachability_estimator._types import Sample, Prediction, ModelInput
 
 import sys
 import os

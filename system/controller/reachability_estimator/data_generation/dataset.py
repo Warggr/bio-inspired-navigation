@@ -28,7 +28,7 @@ from system.controller.simulation.environment.map_occupancy import MapLayout
 from system.controller.simulation.environment.map_occupancy_helpers.map_utils import path_length
 from system.plotting.plotResults import plotStartGoalDataset
 from system.types import PositionAndOrientation, types, FlatSpikings, WaypointInfo, Vector2D, AllowedMapName
-from system.controller.reachability_estimator.types import Sample, PlaceInfo, ReachabilityController
+from system.controller.reachability_estimator._types import Sample, PlaceInfo, ReachabilityController
 from system.debug import PLOTTING, DEBUG
 
 def get_path():

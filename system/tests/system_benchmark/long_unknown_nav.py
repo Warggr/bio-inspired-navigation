@@ -7,7 +7,7 @@ from system.controller.local_controller.local_controller import LocalController,
 from system.controller.local_controller.local_navigation import PhaseOffsetDetectorNetwork, setup_gc_network
 from system.controller.reachability_estimator.reachability_estimation import reachability_estimator_factory, SpikingsReachabilityEstimator
 from system.controller.reachability_estimator.ReachabilityDataset import SampleConfig
-from system.controller.reachability_estimator.types import PlaceInfo
+from system.controller.reachability_estimator._types import PlaceInfo
 from system.controller.simulation.pybullet_environment import PybulletEnvironment
 from system.controller.topological.topological_navigation import TopologicalNavigation
 import numpy as np

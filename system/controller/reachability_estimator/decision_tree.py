@@ -10,7 +10,7 @@ if __name__ == "__main__":
 
 from system.controller.reachability_estimator.networks import Model, get_grid_cell
 from system.controller.reachability_estimator.autoencoders import ImageEncoder
-from system.controller.reachability_estimator.types import Batch, Prediction, Sample
+from system.controller.reachability_estimator._types import Batch, Prediction, Sample
 from system.controller.reachability_estimator.ReachabilityDataset import ReachabilityDataset, SampleConfig
 
 from system.types import Image
