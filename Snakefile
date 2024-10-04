@@ -1,3 +1,6 @@
+wildcard_constraints:
+	thresh="0\.[0-9]+"
+
 rule:
 	output: "system/controller/simulation/environment/{map}/maze_topview_binary.png"
 	input: "system/controller/simulation/environment/{map}/plane.urdf"
@@ -20,12 +23,25 @@ for artifact in pc_network_artifacts:
 		shell: "ln -s $(basename {input}) {output}"
 
 rule:
+	output: "system/bio_model/data/cognitive_map/artifacts/nn({model})+threshold--{thresh}.gpickle"
+	input: "system/controller/reachability_estimator/data/models/{model}.25"
+	shell: """
+		model={wildcards.model}
+		python system/controller/topological/exploration_phase.py --output-filename 'artifacts/nn({wildcards.model})+threshold--{wildcards.thresh}.gpickle' --re 'neural_network({wildcards.model}.25)' --mini threshold {wildcards.thresh}
+	"""
+
+rule:
 	input: "system/bio_model/data/cognitive_map/artifacts/connect_re_mse_weights+threshold--{thresh}.gpickle"
 	output: "logs/longnav_over_connect_cogmap_{thresh}.log"
 	shell: """
 		input={input}
 		python system/tests/system_benchmark/long_unknown_nav.py Savinov_val3 ${{input#system/bio_model/data/cognitive_map/}} 0,-1 | tee {output}
 	"""
+
+rule:
+	input: "{map_in}.gpickle"
+	output: "{map_in}+treach--{thresh}.gpickle"
+	shell: "python scripts/cogmap_utils.py connect '{input}' 'neural_network(reachability_network-boolor+lidar--raw_lidar+conv.25)' '{output}' --threshold-reachable {wildcards.thresh}"
 
 rule:
 	input: "system/bio_model/data/cognitive_map/artifacts/vo_{thresh}.gpickle"
