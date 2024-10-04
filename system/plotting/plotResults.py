@@ -102,7 +102,7 @@ def plotCognitiveMap(
 
     if with_directions:
         for node in G.nodes:
-            pos, angle = node.position, node.angle
+            pos, angle = node.pos, node.angle
             circle = plt.Circle(pos, 0.2, color=TUM_colors['TUMAccentBlue'], alpha=1)
             ax.add_artist(circle)
             arrow = plt.Arrow(pos[0], pos[1], math.cos(angle), math.sin(angle),

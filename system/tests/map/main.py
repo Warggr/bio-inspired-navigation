@@ -49,7 +49,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     from node_distance import mean_distance_between_nodes
-    from .coverage import scalar_coverage
+    from coverage import scalar_coverage
     import os
 
     functions: dict[str, Callable[[CognitiveMap, AllowedMapName], Any]] = {

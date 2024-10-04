@@ -12,6 +12,7 @@ import sys
 import os
 import torch
 import time
+import numpy as np
 from torchmetrics.classification import BinaryPrecision, BinaryRecall, BinaryAccuracy, BinaryF1Score
 from torch.utils.data import DataLoader, RandomSampler
 from torch.utils.tensorboard import SummaryWriter
@@ -133,7 +134,7 @@ def make_loss_function(position_loss_weight = 0.6, angle_loss_weight = 0.3) -> L
             # d**2 = x**2 + y**2, so MSE(d) = MSE(a) + MSE(b); hence the torch.sum over dim=1
             loss_position = torch.sum(torch.nn.functional.mse_loss(position_prediction, position, reduction='none'), dim=1)
             loss_angle = (1 - torch.cos(angle_prediction - angle)) ** 2 # see e.g. https://stats.stackexchange.com/a/425270
-            loss = loss_reachability + reachability @ (position_loss_weight * loss_position + angle_loss_weight * loss_angle) / sum(reachability)
+            loss = loss_reachability + np.nan_to_num(reachability @ (position_loss_weight * loss_position + angle_loss_weight * loss_angle) / sum(reachability))
 
         # Loss
         loss = loss.sum()
@@ -445,18 +446,16 @@ if __name__ == '__main__':
 
     nets = Model.create_from_config(backbone, config, image_encoder=args.image_encoder, **{key: getattr(args, key) for key in ['hidden_fc_layers', 'dropout'] if getattr(args, key) is not None})
 
+    model_filename = model_basename + suffix
+    model_file = os.path.join(DATA_STORAGE_FOLDER, model_filename)
+
     epoch = 0
     if args.load is not None:
         name, epoch = args.load.split('.')
         epoch = int(epoch)
         _load_weights(name, nets, step=epoch)
-        assert args.resume == False, "resume with "
-        # warning: if this assertion is removed, the if resume: block below will be ran and overwrite the loaded network
-
-    model_filename = model_basename + suffix
-    model_file = os.path.join(DATA_STORAGE_FOLDER, model_filename)
-
-    if args.resume or args.mode == "validate":
+        assert args.resume == False, "--resume with --load does not make sense"
+    elif args.resume or args.mode == "validate":
         try:
             epoch = _load_weights(model_file, nets)
             torch.manual_seed(231239 + epoch)

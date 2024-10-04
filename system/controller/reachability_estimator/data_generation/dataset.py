@@ -20,6 +20,7 @@ import sys
 import os
 
 from system.controller.reachability_estimator.reachability_utils import ViewOverlapReachabilityController, RCCache
+from system.controller.reachability_estimator.reachability_estimation import SimulationReachabilityEstimator
 
 from system.controller.simulation.pybullet_environment import PybulletEnvironment, all_possible_textures
 from system.controller.simulation.environment_config import environment_dimensions
@@ -519,10 +520,13 @@ def create_and_save_reachability_samples(
             if map_name not in map_names:
                 map_names.add(map_name)
 
-            if True: #try:
+            try:
                 reachable = reachability_controller.reachable(map_name, sample.src, sample.dst, path_l)
-            #except AssertionError:
-            #    continue
+            except AssertionError:
+                if type(samples) == RandomSamplesWithLimitedDistance and type(reachability_controller.rcs[map_name]) == SimulationReachabilityEstimator:
+                    continue # sometimes this raises an AssertionError during simulation in the lidar() function
+                else:
+                    raise
 
         sum_r += int(reachable)
 

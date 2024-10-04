@@ -113,18 +113,21 @@ def flags_for(netname: str):
 
     tag = None
     basename, *dataset_features = attrs['basename'].split('-')
-    if dataset_features[0] not in ('3colors', 'patterns', 'boolor', 'simulation'):
-        tag, *dataset_features = dataset_features
-
-    dataset_features_and_tags = dataset_features
     dataset_features = []
     dataset_tags = []
-    for i in dataset_features_and_tags:
-        if i in ('3colors', 'patterns'): dataset_features.append(i)
-        else: dataset_tags.append(i)
+    if len(dataset_features) >= 1:
+        if dataset_features[0] not in ('3colors', 'patterns', 'boolor', 'simulation'):
+            tag, *dataset_features = dataset_features
+
+        dataset_features_and_tags = dataset_features
+        for i in dataset_features_and_tags:
+            if i in ('3colors', 'patterns'): dataset_features.append(i)
+            else: dataset_tags.append(i)
 
     if basename != 'reachability_network':
-        raise ValueError('Unexpected network base name' + basename)
+        if basename == 're_mse_weights':
+            return '--spikings'
+        raise ValueError('Unexpected network base name: ' + basename)
     if dataset_features:
         flags.append(f'--dataset-features ' + ' '.join(dataset_features))
     if dataset_tags:

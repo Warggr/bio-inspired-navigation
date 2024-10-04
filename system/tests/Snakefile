@@ -155,42 +155,26 @@ rule:
 		png = 'results/local_controller_width/view_overlap.png',
 	shell: 'python ../../scripts/overlap_plot.py'
 
-def create_map_metric_rule(infile, outfile, metric):
+for metric in ['mean-distance', 'coverage', 'edges']:
 	rule:
-		input: infile
-		output: outfile
-		shell: f"python map/main.py {metric} {{input}} > {{output}}"
+		input: '../bio_model/data/cognitive_map/{map}.gpickle'
+		output: f'../bio_model/data/cognitive_map/results/{{map}}-{metric}.v'
+		shell: f"python map/main.py {metric} '{{input}}' > '{{output}}'"
 
-map_metrics = []
-import os
-for root, dirs, files in os.walk('../bio_model/data/cognitive_map/'):
-	for file in files:
-		if not file.endswith('.gpickle'):
-			continue
-		for metric in ['mean-distance', 'coverage', 'edges']:
-			output = os.path.join(root, file.replace('.gpickle', '-' + metric + '.v'))
-			map_metrics.append(output)
-			create_map_metric_rule(os.path.join(root, file), output, metric)
+rule:
+	input: '../bio_model/data/cognitive_map/{map}.gpickle'
+	output: '../bio_model/data/cognitive_map/results/{map}-edge_agreement.csv'
+	shell: 'python map/edges.py \'{input}\' > \'{output}\''
 
-		prefix = os.path.join(root, file.removesuffix('.gpickle'))
-		rule:
-			input: os.path.join(root, file)
-			output: prefix + '-edge_agreement.csv'
-			shell: 'python map/edges.py {input} > {output}'
-		rule:
-			input: prefix + '-edge_agreement.csv'
-			output: prefix + '-edge_agreement.v'
-			run:
-				import pandas as pd
-				df = pd.read_csv(str(input))
-				value = sum((df['net_2_success'] >= 0.5) == (df['view_success'] >= 0.4)) / len(df)
-				with open(str(output), 'w') as file:
-					print(value, file=file)
-		map_metrics.append(prefix + '-edge_agreement.v')
-
-
-rule map_metrics:
-	input: map_metrics
+rule:
+	input: '../bio_model/data/cognitive_map/results/{map}-edge_agreement.csv'
+	output: '../bio_model/data/cognitive_map/results/{map}-edge_agreement.v'
+	run:
+		import pandas as pd
+		df = pd.read_csv(str(input))
+		value = sum((df['net_2_success'] >= 0.5) == (df['view_success'] >= 0.4)) / len(df)
+		with open(str(output), 'w') as file:
+			print(value, file=file)
 
 rule:
 	output: 'in/random_positions.in'

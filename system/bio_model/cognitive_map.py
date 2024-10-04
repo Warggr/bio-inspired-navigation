@@ -48,6 +48,7 @@ class CognitiveMapInterface(ABC):
         debug = True,
         metadata: dict = {},
         max_capacity: int|None = None,
+        absolute_path=False,
     ):
         """ Abstract base class defining the interface for cognitive map implementations.
 
@@ -64,7 +65,7 @@ class CognitiveMapInterface(ABC):
         self.node_network.graph.update(metadata)
         self.debug = debug
         if load_data_from is not None:
-            self.load(filename=load_data_from)
+            self.load(filename=load_data_from, absolute_path=absolute_path)
         # threshold used for determining nodes that represents current location of the agent
         self.active_threshold = 0.9
         # last active node
@@ -110,8 +111,11 @@ class CognitiveMapInterface(ABC):
         if self.debug:
             pc_id = len(self.node_network.nodes)
             filename = os.path.join(self.tmpdir.name, str(pc_id) + '.npz')
-            with open(filename, 'xb') as file:
-                p.dump(file)
+            try:
+                with open(filename, 'xb') as file:
+                    p.dump(file)
+            except Exception:
+                filename = '(could not dump)'
             self.print_debug(f'Adding node: #={pc_id}, position={p.env_coordinates}, angle={p.angle}, dump_file={filename}')
         if self.max_capacity is not None and len(self.node_network.nodes) > self.max_capacity:
             raise self.TooManyPlaceCells()
@@ -705,13 +709,14 @@ class LifelongCognitiveMap(CognitiveMapInterface):
                                                        mu=1 - weight,
                                                        sigma=self.sigma)
 
-    def retrace_logs(self, lines: Iterable[str], callback: Callable[[int, Self], None]) -> int:
+    def retrace_logs(self, lines: Iterable[str], callback: Callable[[int, Self], None] = lambda i, m: None) -> int:
         """
         Read a log file and replay each step described there. So a canceled navigation can be continued later.
 
         returns:
         nb_steps: int    -- the number of navigation steps
         """
+        gc_network = None
 
         nb_steps = 0
         pcs = list(self.node_network.nodes)
@@ -740,10 +745,16 @@ class LifelongCognitiveMap(CognitiveMapInterface):
                 pos = kvpairs['position']
                 assert pos[0] == '[' and pos[-1] == ']'; pos = pos[1:-1]
                 pos = tuple(map(float, filter(lambda i:i, pos.split(' '))))
-                if 'dump_file' in kvpairs:
+                try:
                     pc = PlaceCell.from_data(PlaceCell.load(kvpairs['dump_file']))
-                else:
-                    pc = PlaceCell.from_data(PlaceInfo(pos=pos, angle=NotImplemented, img=[0], lidar=NotImplemented, spikings=None))
+                except (KeyError, FileNotFoundError):
+                    from system.controller.local_controller.local_navigation import create_gc_spiking
+                    from system.bio_model.grid_cell_model import GridCellNetwork
+                    if gc_network is None:
+                        gc_network = GridCellNetwork(from_data=True)
+                    gc_network.set_as_current_state(pcs[-1].spikings)
+                    spikings = create_gc_spiking(start=pcs[-1].pos, goal=pos, gc_network_at_start=gc_network)
+                    pc = PlaceCell.from_data(PlaceInfo(pos=pos, angle=NotImplemented, img=[0], lidar=NotImplemented, spikings=spikings))
                 pcs.append(pc)
                 self.add_node_to_map(pc)
             elif line.startswith('> /') or line.startswith('Uncaught exception'):

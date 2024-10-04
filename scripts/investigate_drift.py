@@ -5,7 +5,7 @@ from system.controller.local_controller.compass import Compass, AnalyticalCompas
 from system.controller.local_controller.local_navigation import PodGcCompass
 from system.controller.local_controller.position_estimation import DoubleCompass
 from system.utils import normalize
-from typing import BinaryIO
+from typing import BinaryIO, Literal
 
 
 class MockEnv:
@@ -25,7 +25,7 @@ class MockEnv:
         self.robot_position = np.array(start)
         self.t = 0
 
-    def go_to(self, goal, robot_speed=0.5, dt=1e-2):
+    def go_to(self, goal, robot_speed=0.5, dt=1e-2, report: Literal['errors', 'positions']='errors'):
         norm_errors = []
         angle_errors = []
 
@@ -47,14 +47,18 @@ class MockEnv:
             if (loops - 1) % self.print_freq == 0:
                 self.error_calculator.reset_goal((self.gc_network.consolidate_gc_spiking(), self.robot_position))
                 true_pos, est_pos = self.error_calculator.true_compass.calculate_goal_vector(), self.error_calculator.compass.calculate_goal_vector()
-                # assert np.all(robot_position == true_pos)
-                # assert not np.all(start_spikings == gc_network.consolidate_gc_spiking())
-                norm_error, angle_error = self.error_calculator.error()
-                print(
-                    f"{loops=}: {true_pos=}, {est_pos=}. Error norm={norm_error}, error angle={np.degrees(angle_error)}°",
-                    end='\r')
-                for li, i in zip((norm_errors, angle_errors), (norm_error, angle_error)):
-                    li.append(i)
+                if report == 'errors':
+                    # assert np.all(robot_position == true_pos)
+                    # assert not np.all(start_spikings == gc_network.consolidate_gc_spiking())
+                    norm_error, angle_error = self.error_calculator.error()
+                    print(
+                        f"{loops=}: {true_pos=}, {est_pos=}. Error norm={norm_error}, error angle={np.degrees(angle_error)}°",
+                        end='\r')
+                    for li, i in zip((norm_errors, angle_errors), (norm_error, angle_error)):
+                        li.append(i)
+                else:
+                    for li, i in zip((norm_errors, angle_errors), (true_pos, est_pos)):
+                        li.append(i)
         return norm_errors, angle_errors
 
     def dump(self, file: BinaryIO|str):

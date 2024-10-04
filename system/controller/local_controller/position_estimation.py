@@ -69,6 +69,9 @@ class DoubleCompass(Compass):
         return tuple(c.parse(pc) for c in (self.compass, self.true_compass))
     def calculate_goal_vector(self):
         return self.compass.calculate_goal_vector()
+    def calculate_estimated_position(self):
+        estimated_position = np.array(self.compass.calculate_goal_vector())
+        return self.true_compass.current_pos + estimated_position
     @property
     def arrival_threshold(self):
         return self.compass.arrival_threshold

@@ -204,7 +204,7 @@ class TopologicalNavigation:
         if cognitive_map_filename is not None:
             self.cognitive_map.save(filename=cognitive_map_filename)
         if curr_path_length >= path_length_limit:
-            print(f"LIMIT WAS REACHED STOPPING HERE: remaining_path={path}")
+            print(f"LIMIT WAS REACHED STOPPING HERE: remaining_path={_printable_path(path_indices[i:])}")
             return False
         return True
 
@@ -273,8 +273,10 @@ if __name__ == "__main__":
 
     if args.load:
         print('Loading log file', args.load)
+        saved_debug_state = cognitive_map.debug; cognitive_map.debug = False
         with open(args.load) as log_file:
             start_step = cognitive_map.retrace_logs(map(lambda line: line.strip(), log_file.readlines()))
+        cognitive_map.debug = saved_debug_state
     else:
         start_step = 0
 

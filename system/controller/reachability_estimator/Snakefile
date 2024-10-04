@@ -42,7 +42,7 @@ for wall_colors in ('3colors', 'patterns'):
 def dataset_for(wildcards):
     basename, *other_flags = wildcards.flags.split('+')
     basename, *tags = basename.split('-')
-    if tags[0] not in ('3colors', 'patterns', 'boolor', 'simulation'):
+    if len(tags) > 0 and tags[0] not in ('3colors', 'patterns', 'boolor', 'simulation'):
         tags = tags[1:]
     if tags:
         return 'data/reachability/dataset-' + '-'.join(tags) + '.hd5'
@@ -84,7 +84,7 @@ rule:
 	"""
 
 rule:
-	output: f"data/results/{{model}}-val{{tag}}.log"
+	output: f"data/results/{{model}}-val{{tag, .{0}|.*}}.log" # allow tag to be the empty string
 	input: model=f"data/models/{{model}}", dataset="data/reachability/dataset{tag}.hd5"
 	shell: """
 		flags=$(python scripts/network_name.py cmdline {wildcards.model})
@@ -145,7 +145,7 @@ rule: # TODO: make it a checkpoint or something
 from scripts.train_results import combinations
 
 rule:
-	input: [f'data/results/reachability_network-{j}{tags}.25' for tags in combinations for j in range(1,5+1)]
+	input: [f'data/results/reachability_network-{j}{tags}.25-val.log' for tags in combinations for j in range(1,5+1)]
 	output: "data/results/all_runs.mat"
 	run:
 		from scripts.train_results import get_fscore
@@ -154,17 +154,16 @@ rule:
 		x, y = [], []
 		best_perf = []
 		for tags in combinations:
-		    values[tags] = []
 		    for j in range(1, 5+1):
 		        value = get_fscore(f'reachability_network-{j}{tags}.25', None)
 		        x.append(tags)
 		        y.append(value)
 
-		scipy.io.savemat(output, dict(x=x, y=y))
+		scipy.io.savemat(output[0], dict(x=x, y=y))
 
 rule:
 	input: "data/results/all_runs.mat"
 	output: "data/results/train_results.pgf"
-	shell: "cd scripts && matlab -nosplash -nodesktop -r scatterplot {input} {output}"
+	shell: "cd scripts && matlab -nosplash -nodesktop -r scatterplot ../{input} ../{output}"
 	# or with octave:
-	# shell: 'cd scripts/ && octave -qf <<<"scatterplot {input} {output}"'
+	# shell: 'cd scripts/ && octave -qf <<<"scatterplot ../{input} ../{output}"'

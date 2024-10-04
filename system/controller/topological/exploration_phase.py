@@ -97,12 +97,12 @@ if __name__ == "__main__":
     from system.controller.reachability_estimator.reachability_estimation import reachability_estimator_factory
     from system.controller.reachability_estimator.training.train_multiframe_dst import Hyperparameters
     from system.controller.reachability_estimator.ReachabilityDataset import SampleConfig
+    from system.controller.reachability_estimator.training.train_multiframe_dst import Hyperparameters
     import os
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('-e', "--env-model", default="Savinov_val3", choices=["Savinov_val3", "linear_sunburst", 'plane'])
-    parser.add_argument('--re', dest='re_type', default='neural_network', choices=['neural_network', 'view_overlap', 'bvc', 'distance'])
-    parser.add_argument('--re-from')
+    parser.add_argument('--re', dest='re_type', default='neural_network')
     parser.add_argument('--visualize', action='store_true')
     parser.add_argument('--mini', help='Use only a few trajectories', action='store_true')
     modes = parser.add_subparsers(dest='subcommand')
@@ -168,13 +168,8 @@ if __name__ == "__main__":
         args.output_filename = args.env_model + '.' + args.output_filename
 
     gc_network = GridCellNetwork(from_data=True)
-    if args.re_from is None:
-        args.re_from = 're_mse_weights.50'
-        config = SampleConfig(grid_cell_spikings=True)
-    else:
-        config, kwargs = SampleConfig.from_filename(os.path.basename(args.re_from))
 
-    re = reachability_estimator_factory(args.re_type, weights_file=args.re_from, debug=('plan' in DEBUG), config=config, env_model=args.env_model)
+    re = reachability_estimator_factory(args.re_type, debug=('plan' in DEBUG), env_model=args.env_model)
 
     def create_cogmap(threshold, max_capacity=200):
         re.threshold_same = threshold
