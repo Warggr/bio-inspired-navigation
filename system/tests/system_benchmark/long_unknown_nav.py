@@ -1,42 +1,30 @@
+import argparse
 import pickle
-from system.bio_model.grid_cell_model import GridCellNetwork
+
 from system.bio_model.cognitive_map import LifelongCognitiveMap
-from system.bio_model.place_cell_model import PlaceCellNetwork
+from system.bio_model.grid_cell_model import GridCellNetwork
 from system.controller.local_controller.compass import Compass
-from system.controller.local_controller.local_controller import LocalController, controller_rules
-from system.controller.local_controller.local_navigation import PhaseOffsetDetectorNetwork, setup_gc_network
-from system.controller.reachability_estimator.reachability_estimation import reachability_estimator_factory, SpikingsReachabilityEstimator
 from system.controller.reachability_estimator.ReachabilityDataset import SampleConfig
 from system.controller.reachability_estimator._types import PlaceInfo
+from system.controller.reachability_estimator.reachability_estimation import reachability_estimator_factory
 from system.controller.simulation.pybullet_environment import PybulletEnvironment
-from system.controller.topological.topological_navigation import TopologicalNavigation
-import numpy as np
-
-import argparse
+from system.controller.topological.topological_navigation import TopologicalNavigation, parser
 from system.parsers import controller_parser, controller_creator
+from system.debug import DEBUG
 
-parser = argparse.ArgumentParser(parents=[controller_parser], formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('env_model', nargs='?', default='Savinov_val3')
-parser.add_argument('map_file', nargs='?', default="after_exploration.gpickle")
+
+parser = argparse.ArgumentParser(parents=[controller_parser, parser], formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('start_stop', nargs='?', type=lambda ab: map(int, ab.split(',')), default=(73, 21), help='Start and stop node indices, joined by a comma. Negative indices (-1 for the last node) are allowed.')
-parser.add_argument('--compass', choices=['analytical', 'combo', 'pod', 'linear_lookahead'], default='analytical')
-parser.add_argument('--env-variant', '--variant')
-parser.add_argument('--visualize', action='store_true')
 parser.add_argument('--dump-all-steps', action='store_true')
 parser.add_argument('--restore', type=int, help='Restore from dumped step')
 parser.add_argument('--head', type=int, help='Only perform navigation to the first n nodes')
 args = parser.parse_args()
 
-re_type = 'view_overlap' #"neural_network"
-re_weights_file = "re_mse_weights.50"
 if args.env_model != 'Savinov_val3' and not args.map_file.startswith(args.env_model):
     args.map_file = args.env_model + '.' + args.map_file
 
-model = "combo"
-log = True
-input_config = SampleConfig(grid_cell_spikings=True)
-re = reachability_estimator_factory(re_type, weights_file=re_weights_file, config=input_config, env_model=args.env_model)
-cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from=args.map_file, debug=False)
+re = reachability_estimator_factory(args.re_type, env_model=args.env_model)
+cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from=args.map_file, debug=('cogmap' in DEBUG or args.log))
 pc_network = cognitive_map.get_place_cell_network()
 gc_network = GridCellNetwork(dt=1e-2, from_data=True)
 #compass = ComboGcCompass(gc_network, pod)
@@ -55,7 +43,7 @@ vector_step_counter = Counter()
 controller = controller_creator(args, env_model=args.env_model)
 controller.on_reset_goal.append(vector_step_counter)
 
-tj = TopologicalNavigation(args.env_model, pc_network=pc_network, cognitive_map=cognitive_map, compass=compass, log=log)
+tj = TopologicalNavigation(args.env_model, pc_network=pc_network, cognitive_map=cognitive_map, compass=compass, log=args.log)
 
 if args.dump_all_steps:
     def hook(i, success: bool, endpoints: tuple['PlaceCell', 'PlaceCell'], endpoint_indices: tuple[int, int]):

@@ -9,7 +9,7 @@
 """
 import numpy as np
 
-from typing import Callable, Optional, Protocol
+from typing import Optional, Protocol
 
 from system.bio_model.grid_cell_model import GridCellNetwork
 from system.controller.local_controller.decoder.phase_offset_detector import PhaseOffsetDetectorNetwork
@@ -17,11 +17,12 @@ from system.controller.local_controller.decoder.phase_offset_detector import Pha
 from system.controller.simulation.pybullet_environment import PybulletEnvironment, Robot
 from system.bio_model.cognitive_map import LifelongCognitiveMap, CognitiveMapInterface
 from system.bio_model.place_cell_model import PlaceCellNetwork, PlaceCell
-from system.controller.local_controller.compass import Compass, AnalyticalCompass
+from system.controller.local_controller.compass import Compass
 from system.controller.local_controller.local_controller import LocalController, ObstacleAvoidance, StuckDetector, ObstacleBackoff, TurnToGoal
-from system.controller.local_controller.local_navigation import vector_navigation, setup_gc_network, PodGcCompass, LinearLookaheadGcCompass
+from system.controller.local_controller.local_navigation import vector_navigation
 import system.plotting.plotResults as plot
 from system.types import AllowedMapName
+import argparse
 
 from system.debug import DEBUG, PLOTTING
 plotting = 'topo' in PLOTTING # if True plot results
@@ -236,25 +237,27 @@ class TopologicalNavigation:
         return closest_node or pc, None
 
 
+parser = argparse.ArgumentParser(add_help=False)
+parser.add_argument('env_model', choices=['Savinov_val3', 'linear_sunburst'], default='Savinov_val3')
+parser.add_argument('--env-variant', '--variant', help='Environment model variant')
+parser.add_argument('map_file', nargs='?', default='after_exploration.gpickle')
+parser.add_argument('--compass', choices=['analytical', 'pod', 'linear_lookahead', 'combo'], default='combo')
+parser.add_argument('--log', help='Log everything to stdout', action='store_true')
+parser.add_argument('--visualize', action='store_true')
+parser.add_argument('--re-type', help='Type of the reachability estimator used for connecting nodes', default='neural_network(re_mse_weights.50)')
+
+
 if __name__ == "__main__":
     """
     Test navigation through the maze.
     The exploration should be completed before running this script. 
     """
     from system.controller.reachability_estimator.reachability_estimation import reachability_estimator_factory
-    from system.controller.reachability_estimator.ReachabilityDataset import SampleConfig
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('env_model', choices=['Savinov_val3', 'linear_sunburst'], default='Savinov_val3')
-    parser.add_argument('--env-variant', '--variant', help='Environment model variant')
-    parser.add_argument('map_file', nargs='?', default='after_exploration.gpickle')
+
+    parser = argparse.ArgumentParser(parents=[parser])
     parser.add_argument('map_file_after_lifelong_learning', nargs='?', default='after_lifelong_learning.gpickle')
-    parser.add_argument('--compass', choices=['analytical', 'pod', 'linear_lookahead', 'combo'], default='combo')
-    parser.add_argument('--log', help='Log everything to stdout', action='store_true')
-    parser.add_argument('--visualize', action='store_true')
-    parser.add_argument('--seed', type=int, default=None, help='Seed for random index generation.') # for reproducibility / debugging purposes
+    parser.add_argument('--seed', type=int, default=None, help='Seed for random index generation.')  # for reproducibility / debugging purposes
     parser.add_argument('--num-topo-nav', '-n', help='number of topological navigations', type=int, default=100)
-    parser.add_argument('--re-type', help='Type of the reachability estimator used for connecting nodes', default='neural_network(re_mse_weights.50)')
     parser.add_argument('--log-metrics', action='store_true')
     parser.add_argument('--load', help='Load and replay log file, then continue navigation')
     args = parser.parse_args()
@@ -265,7 +268,6 @@ if __name__ == "__main__":
             map_file = args.env_model + '.' + map_file
         if not map_file_after_lifelong_learning.startswith(args.env_model + '.'):
             map_file_after_lifelong_learning = args.env_model + '.' + map_file_after_lifelong_learning
-    model = "combo"
 
     re = reachability_estimator_factory(args.re_type, env_model=args.env_model)
     #pc_network = PlaceCellNetwork(from_data=True, map_name=args.env_model)
@@ -284,7 +286,7 @@ if __name__ == "__main__":
     assert len(cognitive_map.node_network.nodes) > 1
     gc_network = GridCellNetwork(from_data=True, dt=1e-2)
     pod = PhaseOffsetDetectorNetwork(16, 9, 40)
-    compass = Compass.factory(model, gc_network=gc_network, pod_network=pod)
+    compass = Compass.factory(args.compass, gc_network=gc_network, pod_network=pod)
 
     tj = TopologicalNavigation(args.env_model, pc_network, cognitive_map, compass, log=args.log)
 
@@ -297,9 +299,10 @@ if __name__ == "__main__":
         tj.step_hooks.append(log_metrics)
 
     with PybulletEnvironment(args.env_model, variant=args.env_variant, build_data_set=True, visualize=args.visualize, contains_robot=False) as env:
-        # TODO Pierre figure out how to remove unnecessary xy_coordinates
         if plotting:
-            plot.plotTrajectoryInEnvironment(env, xy_coordinates=[0,0], goal=False, cognitive_map=tj.cognitive_map, trajectory=False)
+            from system.plotting.plotHelper import environment_plot
+            ax = environment_plot(args.env_model, args.env_variant)
+            plot.plotCognitiveMap(ax, cognitive_map)
 
         if not args.seed:
             args.seed = np.random.default_rng().integers(low=0, high=0b100000000)
@@ -326,7 +329,8 @@ if __name__ == "__main__":
             #tj.cognitive_map.draw()
             print(f"Navigation {navigation_i} finished")
             if plotting:
-                plot.plotTrajectoryInEnvironment(env, goal=False, cognitive_map=tj.cognitive_map, trajectory=False)
+                ax = environment_plot(env.env_model, args.env_variant)
+                plot.plotCognitiveMap(ax, cognitive_map=tj.cognitive_map)
 
     print(f"{successful} successful navigations")
     print("Navigation finished")

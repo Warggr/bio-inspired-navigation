@@ -101,6 +101,12 @@ def add_environment(ax, env_model: AllowedMapName, variant: str|None = None):
         ax.add_artist(box3)
 
 
+def environment_plot(env_model: AllowedMapName, variant: str|None = None):
+    fig, ax = plt.subplots()
+    add_environment(ax, env_model, variant)
+    return ax
+
+
 def add_robot(ax, xy: tuple[float, float], angle: float):
     circle = plt.Circle((xy[0], xy[1]), 0.2, color=TUM_colors['TUMDarkGray'], alpha=1)
     ax.add_artist(circle)
