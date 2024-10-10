@@ -35,23 +35,22 @@
 *
 ***************************************************************************************
 '''
-import pybullet as p
-import time
-import os
-import sys
-import pybullet_data
-import numpy as np
-import math
 import itertools
-from typing import Optional, Any, Callable
+import math
+import os
+import pickle
 from random import Random
+from typing import Optional, Any, Callable, Literal
+
+import numpy as np
+import pybullet as p
+import pybullet_data
 
 import system.plotting.plotResults as plot
-from system.controller.simulation.math_utils import compute_angle
-from system.types import AllowedMapName, types, LidarReading, Vector2D
 from system.controller.simulation.environment_config import environment_dimensions
+from system.controller.simulation.math_utils import compute_angle
 from system.debug import DEBUG
-import pickle
+from system.types import AllowedMapName, types, LidarReading, Vector2D
 
 try:
     itertools.batched
@@ -63,6 +62,9 @@ try:
     from typing import Self
 except ImportError:
     Self = 'Self'
+
+Lazy = Optional
+Orientation = Literal['horizontal', 'vertical']
 
 def closest_subsegment(values: list[float]) -> tuple[int, int]:
     values = np.array(values)
@@ -84,6 +86,17 @@ def resource_path(*filepath):
     return os.path.realpath(os.path.join(DIRNAME, "environment", *filepath))
 
 WALL_TEXTURE_PATH = resource_path("textures", "walls")
+
+loaded_textures = {}
+def load_texture(texture_name: str):
+    if texture_name not in loaded_textures:
+        try:
+            loaded_textures[texture_name] = p.loadTexture(os.path.join(WALL_TEXTURE_PATH, texture_name))
+        except Exception:
+            print("Couldn't load", texture_name, f"({os.path.join(WALL_TEXTURE_PATH, texture_name)})")
+            raise
+    return loaded_textures[texture_name]
+
 
 class PybulletEnvironment:
     """This class deals with everything pybullet or environment (obstacles) related"""
@@ -143,8 +156,9 @@ class PybulletEnvironment:
 
         base_position = [0, 0.05]  # [0, 0.05] ensures that it actually starts at origin
 
-        self.planeID = None
+        self.planeID: Lazy[int] = None
         self.mazeID: list[int] = []
+        self.unit_walls: Lazy[dict[Orientation, tuple[int, int]]] = None
 
         # environment choices
         if env_model == "Savinov_val3":
@@ -173,7 +187,7 @@ class PybulletEnvironment:
 
         elif env_model == "linear_sunburst":
             base_position = [5.5, 0.55]
-            if variant == None:
+            if variant is None:
                 variant = "plane"
             assert variant in ['plane', 'plane_doors', 'plane_doors_individual']
             self.planeID = p.loadURDF(resource_path("linear_sunburst", variant + ".urdf"))
@@ -188,7 +202,7 @@ class PybulletEnvironment:
             self.planeID = self.__load_obj(resource_path(self.env_model, "plane100.obj"), resource_path("textures", "green_floor.png"))
             all_wall_kwargs = { 'textures': resource_path("textures", "walls", "yellow_wall.png") }
             all_wall_kwargs.update(wall_kwargs)
-            self.mazeID = self.__load_walls(resource_path(self.env_model), **all_wall_kwargs)
+            self._load_walls(resource_path(self.env_model), **all_wall_kwargs)
 
         p.setGravity(0, 0, -9.81)
 
@@ -274,7 +288,41 @@ class PybulletEnvironment:
     def dimensions(self):
         return environment_dimensions(self.env_model)
 
-    def __load_walls(self, model_folder, textures: str | Callable[[int], str] | list[str], nb_batches = None) -> list[int]:
+    def add_unit_walls(self, walls: list[tuple[Vector2D, Orientation]]) -> list[int]:
+        if self.unit_walls is None:
+            self.unit_walls = {}
+            for direction in ('vertical', 'horizontal'):
+                filename = resource_path('Savinov_val3', 'walls', f'unit_wall_{direction}.obj')
+                visual_shape_id = p.createVisualShape(
+                    shapeType=p.GEOM_MESH,
+                    fileName=filename,
+                )
+                collision_shape_id = p.createCollisionShape(
+                    shapeType=p.GEOM_MESH,
+                    fileName=filename,
+                )
+                self.unit_walls[direction] = (visual_shape_id, collision_shape_id)
+        wall_ids = []
+        for pos, direction in walls:
+            visual_shape_id, collision_shape_id = self.unit_walls[direction]
+            multibody_id = p.createMultiBody(
+                baseMass=0.0,
+                baseCollisionShapeIndex=collision_shape_id,
+                baseVisualShapeIndex=visual_shape_id,
+                basePosition=[*pos, 0],
+                baseOrientation=p.getQuaternionFromEuler([0, 0, 0]))
+            texture_id = load_texture(resource_path("textures", "walls", "yellow_wall.png"))
+            p.changeVisualShape(multibody_id, -1, textureUniqueId=texture_id)
+            wall_ids.append(multibody_id)
+        self.mazeID += wall_ids
+        return wall_ids
+
+    def remove_walls(self, wall_ids: list[int]):
+        for wall_id in wall_ids:
+            p.removeBody(wall_id)
+            self.mazeID.remove(wall_id)
+
+    def _load_walls(self, model_folder, textures: str | Callable[[int], str] | list[str], nb_batches = None):
         MAXIMUM_BATCH_SIZE = 16 # bullet doesn't accept multibodies with >16 bodies
 
         wall_dir = os.path.join(model_folder, "walls")
@@ -296,21 +344,12 @@ class PybulletEnvironment:
                 textures = [ textures(i) for i in range(len(wall_files)) ]
             elif type(textures) is str:
                 batches = list(itertools.batched(wall_files, n=MAXIMUM_BATCH_SIZE))
-                textures = [ textures for _ in batches ]
-
-        loaded_textures = {}
-        def load_texture(texture_name: str):
-            if texture_name not in loaded_textures:
-                try:
-                    loaded_textures[texture_name] = p.loadTexture(os.path.join(WALL_TEXTURE_PATH, texture_name))
-                except Exception:
-                    print("Couldn't load", texture_name, f"({os.path.join(WALL_TEXTURE_PATH, texture_name)})")
-                    raise
-            return loaded_textures[texture_name]
+                textures = [textures for _ in batches]
+            else:
+                raise ValueError()
 
         textures = map(load_texture, textures)
 
-        walls=[]
         for batch, textureId in zip(batches, textures):
             batch = list(batch) # tuples cause a segfault in PyBullet
             visualShapeId = p.createVisualShapeArray(
@@ -328,10 +367,7 @@ class PybulletEnvironment:
                 basePosition=[0, 0, 0],
                 baseOrientation=p.getQuaternionFromEuler([0, 0, 0]))
             p.changeVisualShape(multiBodyId, -1, textureUniqueId=textureId)
-            walls.append(multiBodyId)
-
-        return walls
-
+            self.mazeID.append(multiBodyId)
 
     def __load_obj(self, objectFilename: str, texture: str) -> int:
         """load object files with specified texture into the environment"""
