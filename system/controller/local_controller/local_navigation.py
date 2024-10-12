@@ -13,9 +13,6 @@ import sys
 
 from system.controller.reachability_estimator._types import PlaceInfo
 
-if __name__ == "__main__":
-    sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-
 from system.bio_model.cognitive_map import CognitiveMapInterface
 from system.bio_model.place_cell_model import PlaceCell, PlaceCellNetwork
 
@@ -31,7 +28,7 @@ from system.utils import normalize
 
 import system.plotting.plotResults as plot
 import numpy as np
-from typing import Callable, Iterable, Optional, Sequence, Any, Generic, TypeVar
+from typing import Callable, Iterable, Optional, Sequence, Generic, TypeVar
 from system.debug import PLOTTING, DEBUG
 
 plotting = ('localctrl' in PLOTTING)  # if True: plot everything
@@ -254,13 +251,17 @@ def setup_gc_network(dt) -> GridCellNetwork:
     return gc_network
 
 
+NavStepHook = Callable[[int, Robot], None]
+
+
 def vector_navigation(
     env: PybulletEnvironment, compass: Compass, gc_network: Optional[GridCellNetwork] = None, controller: Optional[LocalController] = None, target_gc_spiking=None,
     step_limit=float('inf'), plot_it=plotting,
     collect_data_freq=False, collect_data_reachable=False, collect_nr_steps=False, exploration_phase=False,
     pc_network: Optional[PlaceCellNetwork] = None, cognitive_map: Optional[CognitiveMapInterface] = None,
     goal_pos: Optional[Vector2D] = None,
-    add_nodes = True,
+    add_nodes=True,
+    hooks: list[NavStepHook] = [],
 ) -> tuple[bool, list[WaypointInfo]|tuple|int|PlaceCell|None]:
     """
     Agent navigates towards goal.
@@ -362,6 +363,9 @@ def vector_navigation(
             # collect grid cell spikings for trajectory generation
             spiking = gc_network.consolidate_gc_spiking().flatten()
             data.append((*robot.position_and_angle, spiking))
+
+        for hook in hooks:
+            hook(n, robot)
 
         n += 1
 
