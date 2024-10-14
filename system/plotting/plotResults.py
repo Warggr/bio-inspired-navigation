@@ -96,8 +96,6 @@ def plotCognitiveMap(
     G = cognitive_map.node_network
     pos = nx.get_node_attributes(G, 'pos')
     kwargs = {}
-    if with_labels:
-        kwargs['label'] = {j: str(i) for i, j in enumerate(G.nodes)}
     nx.draw_networkx_edges(G, pos, edge_color='#CCCCC6', ax=ax)
 
     if with_directions:
@@ -110,6 +108,8 @@ def plotCognitiveMap(
             ax.add_artist(arrow)
     else:
         nx.draw_networkx_nodes(G, pos, node_color='#0065BD80', node_size=60, ax=ax, **kwargs)
+        if with_labels:
+            nx.draw_networkx_labels(G, pos, labels={j: str(i) for i, j in enumerate(G.nodes)})
 
     if path:
         # draw_path
@@ -117,6 +117,14 @@ def plotCognitiveMap(
         nx.draw_networkx_nodes(G, pos, nodelist=path, node_color='#E3722280', node_size=60, ax=ax)
         G = G.to_undirected()
         nx.draw_networkx_edges(G, pos, edgelist=path_edges, edge_color='#E3722280', width=3, ax=ax)
+
+
+def plotTrajectory(ax, xy_coordinates):
+    if len(xy_coordinates) == 0:
+        return
+    x, y = zip(*xy_coordinates)
+    ax.scatter(x, y, color='#992225', s=10, linewidths=0.5)
+    ax.plot(x, y, color='#992225')
 
 def plotTrajectoryInEnvironment(
     env: Optional['PybulletEnvironment'] = None,
@@ -152,8 +160,7 @@ def plotTrajectoryInEnvironment(
         ax.add_artist(circle)
 
     if trajectory:
-        x, y = zip(*xy_coordinates)
-        ax.scatter(x, y, color='#992225', s=10, linewidths=0.5)
+        plotTrajectory(ax, xy_coordinates)
 
     # add_robot(ax, env)
     # if env.goal_pos:

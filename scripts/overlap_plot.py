@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from system.controller.reachability_estimator.reachability_estimation import ViewOverlapReachabilityEstimator
-from system.controller.reachability_estimator.types import PlaceInfo
+from system.controller.reachability_estimator._types import PlaceInfo
 
 env_model = 'obstacle_map_0'
 env_variant = '1.0'
