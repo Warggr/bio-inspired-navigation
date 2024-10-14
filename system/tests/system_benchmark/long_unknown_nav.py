@@ -89,7 +89,7 @@ with env:
     # TODO: put it into the cognitive_map code?
     # cognitive_map.get_place_cell_network().add_angles_and_lidar(env)
 
-    success = tj.navigate(start_pc, goal_pc, gc_network=gc_network, env=env, controller=controller, head=args.head)
+    success = tj.navigate(start_pc, goal_pc, gc_network=gc_network, env=env, controller=controller, head=args.head, path_length_limit=args.max_path_length)
     if success:
         print(f"Success! simulation time: {env.t}. Navigation steps: {vector_step_counter.counter}")
     else:

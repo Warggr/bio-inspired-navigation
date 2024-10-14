@@ -9,7 +9,7 @@
 """
 import numpy as np
 
-from typing import Optional, Protocol
+from typing import Optional, Protocol, Literal
 
 from system.bio_model.grid_cell_model import GridCellNetwork
 from system.controller.local_controller.decoder.phase_offset_detector import PhaseOffsetDetectorNetwork
@@ -66,7 +66,7 @@ class TopologicalNavigation:
         env: Optional[PybulletEnvironment] = None,
         robot: Optional[Robot] = None,
         head: Optional[int] = None,
-        path_length_limit = 30,
+        path_length_limit: int|Literal[float('inf')] = 30,
         *nav_args, **nav_kwargs,
     ):
         """ Navigates the agent through the environment with topological navigation.
@@ -253,6 +253,7 @@ parser.add_argument('--compass', choices=['analytical', 'pod', 'linear_lookahead
 parser.add_argument('--log', help='Log everything to stdout', action='store_true')
 parser.add_argument('--visualize', action='store_true')
 parser.add_argument('--re-type', help='Type of the reachability estimator used for connecting nodes', default='neural_network(re_mse_weights.50)')
+parser.add_argument('--max-path-length', '-m', help='Maximimum path length after which topological navigation will be aborted; number or "inf"', type=lambda m: float('inf') if m == 'inf' else int(m), default=30)
 
 
 if __name__ == "__main__":
