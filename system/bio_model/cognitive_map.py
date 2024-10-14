@@ -437,6 +437,7 @@ class CognitiveMap(CognitiveMapInterface):
                 pc = list(self.node_network.nodes)[idx_pc_active]
                 self.node_network.add_weighted_edges_from([(q, pc, 1)])
 
+            print(f"Updating {self.prior_idx_pc_firing=}")
             self.prior_idx_pc_firing = idx_pc_active
 
     def save(self, *args, **kwargs):
@@ -709,7 +710,7 @@ class LifelongCognitiveMap(CognitiveMapInterface):
                                                        mu=1 - weight,
                                                        sigma=self.sigma)
 
-    def retrace_logs(self, lines: Iterable[str], callback: Callable[[int, Self], None] = lambda i, m: None) -> int:
+    def retrace_logs(self, lines: Iterable[str], callback: Callable[[int, Self], None] = lambda i, m: None, robot_positions: list|None = None) -> int:
         """
         Read a log file and replay each step described there. So a canceled navigation can be continued later.
 
@@ -757,6 +758,16 @@ class LifelongCognitiveMap(CognitiveMapInterface):
                     pc = PlaceCell.from_data(PlaceInfo(pos=pos, angle=NotImplemented, img=[0], lidar=NotImplemented, spikings=spikings))
                 pcs.append(pc)
                 self.add_node_to_map(pc)
+            elif line.startswith('Updating self.prior_idx_pc_firing'):
+                pass
+            elif line.startswith('Robot position'):
+                if robot_positions is not None:
+                    line = line.removeprefix('Robot position: ')
+                    assert line[0] == '[' and line[-1] == ']'; line = line[1:-1]
+                    line = line.strip()
+                    x, *_optional_space, y = line.split(' ')
+                    x, y = float(x), float(y)
+                    robot_positions.append((x, y))
             elif line.startswith('> /') or line.startswith('Uncaught exception'):
                 next(lines) # consuming next value from iterator
             elif line.startswith('(Pdb)') or line.startswith('Post mortem debugger') or line.startswith('->'):

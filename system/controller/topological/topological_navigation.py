@@ -132,6 +132,14 @@ class TopologicalNavigation:
                 hooks=[StuckDetector()],
             )
 
+        if self.log:
+            if 'hooks' not in nav_kwargs:
+                nav_kwargs['hooks'] = []
+            def print_position(i, robot):
+                if (i+1) % 100 == 0:
+                    print('Robot position:', robot.position)
+            nav_kwargs['hooks'].append(print_position)
+
         #self.gc_network.set_as_current_state(path[0].gc_connections)
         last_pc = path[0]
         i = 0
