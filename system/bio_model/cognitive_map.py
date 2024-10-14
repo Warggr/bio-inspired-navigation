@@ -516,7 +516,9 @@ class LifelongCognitiveMap(CognitiveMapInterface):
             if self.add_edges:
                 self.process_add_edge(pc_firing, pc_network)
         if np.max(pc_firing) > self.active_threshold:
-            self.prior_idx_pc_firing = np.argmax(pc_firing)
+            if self.prior_idx_pc_firing is None or pc_firing[self.prior_idx_pc_firing] / np.max(pc_firing) < 0.8:
+                self.prior_idx_pc_firing = np.argmax(pc_firing)
+                print(f'Updating {self.prior_idx_pc_firing=}')
             return pc_network.place_cells[self.prior_idx_pc_firing]
 #        else:
 #            print(f'max. firing[{np.argmax(pc_firing)}] = {np.max(pc_firing)} does not meet threshold {self.active_threshold}')
@@ -534,7 +536,7 @@ class LifelongCognitiveMap(CognitiveMapInterface):
         pc_active_firing = np.max(pc_firing)
 
         if pc_active_firing > self.active_threshold and self.prior_idx_pc_firing != idx_pc_active:
-            if self.prior_idx_pc_firing:
+            if self.prior_idx_pc_firing and pc_firing[self.prior_idx_pc_firing] / pc_firing[idx_pc_active] < 0.8:
                 # If we have entered place cell p after being in place cell q during
                 # navigation, q is definitely reachable and the edge gets updated accordingly.
                 q = pc_network.place_cells[self.prior_idx_pc_firing]

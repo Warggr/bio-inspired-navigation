@@ -144,7 +144,7 @@ class PodGcCompass(GcCompass):
 
 
 class LinearLookaheadGcCompass(GcCompass):
-    arrival_threshold = 0.02
+    arrival_threshold = 0.1
     def __init__(self, arena_size, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.arena_size = arena_size
