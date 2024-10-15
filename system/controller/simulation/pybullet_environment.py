@@ -292,7 +292,7 @@ class PybulletEnvironment:
         if self.unit_walls is None:
             self.unit_walls = {}
             for direction in ('vertical', 'horizontal'):
-                filename = resource_path('Savinov_val3', 'walls', f'unit_wall_{direction}.obj')
+                filename = resource_path('walls', f'unit_wall_{direction}.obj')
                 visual_shape_id = p.createVisualShape(
                     shapeType=p.GEOM_MESH,
                     fileName=filename,
