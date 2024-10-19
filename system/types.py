@@ -43,10 +43,10 @@ Quaternion = tuple[float, float, float, float]
 Spikings = 'np.ndarray[float, (40, 40, 6)]' # TODO: actual non-string type hint
 Image = 'np.ndarray[float, (64, 64, 4)]'
 
-allowed_map_names = [
-    'Savinov_val3', 'linear_sunburst', 'obstacle_map_0'
+AllowedMapName = Literal['Savinov_val3', 'Savinov_val2', 'Savinov_test7', 'linear_sunburst', 'obstacle_map_0', 'obstacle_map_1', 'plane', 'final_layout']
+allowed_map_names: list[AllowedMapName] = [
+    'Savinov_val3', 'linear_sunburst', 'obstacle_map_0', 'final_layout',
 ]
-AllowedMapName = Literal['Savinov_val3', 'Savinov_val2', 'Savinov_test7', 'linear_sunburst', 'obstacle_map_0', 'obstacle_map_1', 'plane']
 AllowedMapName.options = allowed_map_names
 
 

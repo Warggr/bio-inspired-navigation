@@ -59,7 +59,7 @@ export DEBUG='localctrl&gains'
 - `gains`: prints a line with the robot gains at each simulation time step.
 
 #### Flags for PLOTTING
-
+- `exploration`: plots trajectories used for exploration phase
 
 ## Known bugs and corresponding fixes
 ### If you encounter bugs related to OpenGL

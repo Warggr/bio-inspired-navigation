@@ -101,8 +101,8 @@ if __name__ == "__main__":
     import os
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('-e', "--env-model", default="Savinov_val3", choices=["Savinov_val3", "linear_sunburst", 'plane'])
-    parser.add_argument('--re', dest='re_type', default='neural_network')
+    parser.add_argument('-e', "--env-model", default="Savinov_val3", choices=["Savinov_val3", "linear_sunburst", 'plane', 'final_layout'])
+    parser.add_argument('--re', dest='re_type', default='neural_network(re_mse_weights.50)')
     parser.add_argument('--visualize', action='store_true')
     parser.add_argument('--mini', help='Use only a few trajectories', action='store_true')
     modes = parser.add_subparsers(dest='subcommand')
@@ -127,6 +127,11 @@ if __name__ == "__main__":
         ]
         if args.mini:
             goals = goals[7:11]
+    elif args.env_model == "final_layout":
+        from numpy import loadtxt
+        from system.controller.simulation.pybullet_environment import resource_path
+        goals = loadtxt(resource_path(args.env_model, 'path.csv'), delimiter=',')
+        assert not args.mini, "No mini path defined yet"
     elif args.env_model == "linear_sunburst":
         goals = [
              [5.5, 4.5],

@@ -161,7 +161,7 @@ class PybulletEnvironment:
         self.unit_walls: Lazy[dict[Orientation, tuple[int, int]]] = None
 
         # environment choices
-        if env_model == "Savinov_val3":
+        if env_model == "Savinov_val3" or env_model == "final_layout":
             base_position = [-2, 0.05]
             p.resetDebugVisualizerCamera(cameraDistance=10, cameraYaw=0, cameraPitch=-70,
                                          cameraTargetPosition=[-2, -0.35, 5.0])
@@ -196,7 +196,7 @@ class PybulletEnvironment:
 
         base_position = start if start is not None else base_position
 
-        if "Savinov" in env_model:
+        if "Savinov" in env_model or env_model == "final_layout":
             # load the plane and maze with desired textures
             # self.mazeID = self.__load_obj(resource_path(self.env_model, "mesh.obj"), wall_texture)
             self.planeID = self.__load_obj(resource_path(self.env_model, "plane100.obj"), resource_path("textures", "green_floor.png"))
