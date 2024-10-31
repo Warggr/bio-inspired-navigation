@@ -25,7 +25,11 @@ if args.env_model != 'Savinov_val3' and not args.map_file.startswith(args.env_mo
 
 re = reachability_estimator_factory(args.re_type, env_model=args.env_model)
 cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from=args.map_file, debug=('cogmap' in DEBUG or args.log))
-pc_network = cognitive_map.get_place_cell_network()
+if args.pc_creation_re is not None:
+    pc_creation_re = reachability_estimator_factory(args.pc_creation_re, env_model=args.env_model)
+else:
+    pc_creation_re = re
+pc_network = cognitive_map.get_place_cell_network(pc_creation_re)
 gc_network = GridCellNetwork(dt=1e-2, from_data=True)
 #compass = ComboGcCompass(gc_network, pod)
 #compass = LinearLookaheadGcCompass(arena_size=15, gc_network=gc_network)

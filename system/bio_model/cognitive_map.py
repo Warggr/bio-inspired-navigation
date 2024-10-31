@@ -53,8 +53,7 @@ class CognitiveMapInterface(ABC):
         """ Abstract base class defining the interface for cognitive map implementations.
 
         arguments:
-        reachability_estimator: ReachabilityEstimator -- reachability estimator that should be used for defining
-                                                         the proximity of nodes
+        reachability_estimator: ReachabilityEstimator -- reachability estimator used to connect nodes
         load_data_from: str                           -- filename of the snapshot of the cognitive map,
                                                          None if a new cognitive map is being created
         debug: bool                                   -- enables logging

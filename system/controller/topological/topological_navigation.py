@@ -253,6 +253,7 @@ parser.add_argument('--compass', choices=['analytical', 'pod', 'linear_lookahead
 parser.add_argument('--log', help='Log everything to stdout', action='store_true')
 parser.add_argument('--visualize', action='store_true')
 parser.add_argument('--re-type', help='Type of the reachability estimator used for connecting nodes', default='neural_network(re_mse_weights.50)')
+parser.add_argument('--pc-creation-re', help='Use an alternative reachability estimator for deciding when to create new nodes')
 parser.add_argument('--max-path-length', '-m', help='Maximimum path length after which topological navigation will be aborted; number or "inf"', type=lambda m: float('inf') if m == 'inf' else int(m), default=30)
 
 
@@ -291,6 +292,10 @@ if __name__ == "__main__":
     else:
         start_step = 0
 
+    if args.pc_creation_re is not None:
+        pc_creation_re = reachability_estimator_factory(args.pc_creation_re, env_model=args.env_model)
+    else:
+        pc_creation_re = re
     pc_network = cognitive_map.get_place_cell_network()
     assert len(cognitive_map.node_network.nodes) > 1
     gc_network = GridCellNetwork(from_data=True, dt=1e-2)
