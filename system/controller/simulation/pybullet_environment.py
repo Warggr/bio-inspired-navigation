@@ -204,6 +204,13 @@ class PybulletEnvironment:
             all_wall_kwargs.update(wall_kwargs)
             self._load_walls(resource_path(self.env_model), **all_wall_kwargs)
 
+        if env_model == "final_layout" and variant == "walls":
+            self.add_unit_walls([
+                ((-3, 2), 'vertical'),
+                ((-3, 3), 'vertical'),
+                ((-4, -2), 'vertical'),
+            ])
+
         p.setGravity(0, 0, -9.81)
 
         self.t = 0.0
