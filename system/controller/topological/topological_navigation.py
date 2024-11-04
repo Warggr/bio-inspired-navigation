@@ -132,13 +132,36 @@ class TopologicalNavigation:
                 hooks=[StuckDetector()],
             )
 
+        i: int # the index of the last found PC in the path
         if self.log:
             if 'hooks' not in nav_kwargs:
                 nav_kwargs['hooks'] = []
             def print_position(i, robot):
                 if (i+1) % 100 == 0:
-                    print('Robot position:', robot.position)
+                    print('[proprioception] Robot position:', robot.position)
             nav_kwargs['hooks'].append(print_position)
+            if self.log and 'drift' in DEBUG:
+                from system.controller.local_controller.position_estimation import DoubleCompass
+                from system.controller.local_controller.local_navigation import PodGcCompass
+                starting_position_compass = DoubleCompass(PodGcCompass())
+                starting_position_compass.reset_position((gc_network.consolidate_gc_spiking(), start))
+
+                def print_drift(i, robot):
+                    if (i + 1) % 100 == 0:
+                        current_position = (gc_network.consolidate_gc_spiking(), robot.position)
+                        starting_position_compass.reset_goal(current_position)
+                        current_compass = DoubleCompass(PodGcCompass())
+                        current_compass.reset_position(current_position)
+                        current_compass.reset_goal(path[i+1])
+                        error_from_start = starting_position_compass.error()
+                        error_to_goal = current_compass.error()
+                        estimated_position_from_start = starting_position_compass.calculate_estimated_position()
+                        estimated_position_from_goal = current_compass.calculate_estimated_position()
+                        print(f'[drift] Drift: ' +
+                            f'{estimated_position_from_start=}, {estimated_position_from_goal=},' +
+                            f'{error_from_start=}, {error_to_goal=}'
+                        )
+                nav_kwargs['hooks'].append(print_drift)
 
         #self.gc_network.set_as_current_state(path[0].gc_connections)
         last_pc = path[0]
@@ -160,15 +183,15 @@ class TopologicalNavigation:
                 hook(curr_path_length, success=success, endpoints=(path[i], path[i+1]), endpoint_indices=(path_indices[i], path_indices[i+1]))
 
             if self.log:
-                print(f'Vector navigation: goal={path_indices[i+1]}, {success=}')
+                print(f'[navigation] Vector navigation: goal={path_indices[i+1]}, {success=}')
             curr_path_length += 1
             if not success:
                 last_pc, new_path = self.locate_node(self.compass, pc, goal)
                 if self.log:
                     if not last_pc:
-                        print('Last PC: status=not found/assuming current place cell still correct')
+                        print('[navigation] Last PC: status=not found/assuming current place cell still correct')
                     else:
-                        print('Last PC: status=found,', f'#={self.cognitive_map._place_cell_number(last_pc)}')
+                        print('[navigation] Last PC: status=found,', f'#={self.cognitive_map._place_cell_number(last_pc)}')
                 if not last_pc:
                     last_pc = path[i]
 
@@ -193,7 +216,7 @@ class TopologicalNavigation:
                 path[i:] = new_path
                 if self.log:
                     path_indices[i:] = [self.cognitive_map._place_cell_number(p) for p in new_path]
-                    print(f'Recomputed path: so_far={_printable_path(path_indices[:i])}, continue={_printable_path(path_indices[i:])}')
+                    print(f'[navigation] Recomputed path: so_far={_printable_path(path_indices[:i])}, continue={_printable_path(path_indices[i:])}')
                 if plotting:
                     plot.plotTrajectoryInEnvironment(env, cognitive_map=self.cognitive_map, path=path)
             else:
@@ -213,7 +236,7 @@ class TopologicalNavigation:
         if cognitive_map_filename is not None:
             self.cognitive_map.save(filename=cognitive_map_filename)
         if curr_path_length >= path_length_limit:
-            print(f"LIMIT WAS REACHED STOPPING HERE: remaining_path={_printable_path(path_indices[i:])}")
+            print(f"[navigation] LIMIT WAS REACHED STOPPING HERE: remaining_path={_printable_path(path_indices[i:])}")
             return False
         return True
 
@@ -246,7 +269,7 @@ class TopologicalNavigation:
 
 
 parser = argparse.ArgumentParser(add_help=False)
-parser.add_argument('env_model', choices=['Savinov_val3', 'linear_sunburst'], default='Savinov_val3')
+parser.add_argument('env_model', choices=AllowedMapName.options, default='Savinov_val3')
 parser.add_argument('--env-variant', '--variant', help='Environment model variant')
 parser.add_argument('map_file', nargs='?', default='after_exploration.gpickle')
 parser.add_argument('--compass', choices=['analytical', 'pod', 'linear_lookahead', 'combo'], default='combo')
@@ -255,6 +278,7 @@ parser.add_argument('--visualize', action='store_true')
 parser.add_argument('--re-type', help='Type of the reachability estimator used for connecting nodes', default='neural_network(re_mse_weights.50)')
 parser.add_argument('--pc-creation-re', help='Use an alternative reachability estimator for deciding when to create new nodes')
 parser.add_argument('--max-path-length', '-m', help='Maximimum path length after which topological navigation will be aborted; number or "inf"', type=lambda m: float('inf') if m == 'inf' else int(m), default=30)
+parser.add_argument('--dump-all-steps', help='(folder to which to dump each step)')
 
 
 if __name__ == "__main__":
@@ -262,6 +286,7 @@ if __name__ == "__main__":
     Test navigation through the maze.
     The exploration should be completed before running this script. 
     """
+    import os
     from system.controller.reachability_estimator.reachability_estimation import reachability_estimator_factory
 
     parser = argparse.ArgumentParser(parents=[parser])
@@ -311,6 +336,22 @@ if __name__ == "__main__":
             for fun in (unobstructed_lines, mean_distance_between_nodes, scalar_coverage, agreement):
                 print(fun.__name__, ':', fun(cognitive_map, args.env_model))
         tj.step_hooks.append(log_metrics)
+
+    if args.dump_all_steps:
+        import pickle
+        def hook(i, success: bool, endpoints: tuple['PlaceCell', 'PlaceCell'], endpoint_indices: tuple[int, int]):
+            if not success:
+                return
+            filename = os.path.join(args.dump_all_steps, 'step{i}.pkl')
+            data = {
+                'i': i,
+                'env': env._dumps_state(),
+                'gc_network': gc_network.consolidate_gc_spiking(),
+                'current_pc_index': endpoint_indices[1],
+            }
+            with open(filename, 'wb') as file:
+                pickle.dump(data, file)
+        tj.step_hooks.append(hook)
 
     with PybulletEnvironment(args.env_model, variant=args.env_variant, build_data_set=True, visualize=args.visualize, contains_robot=False) as env:
         if plotting:
