@@ -72,7 +72,7 @@ class SampleConfig:
             elif tag == 'dropout':
                 other_attrs['dropout'] = True
             else:
-                raise ValueError('Unrecognized tag: ', tag)
+                raise ValueError(f'Unrecognized tag: {repr(tag)}')
         return config, other_attrs
 
 DATA_STORAGE_FOLDER = os.path.join(os.path.dirname(__file__), "data", "reachability")

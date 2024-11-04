@@ -112,14 +112,13 @@ def flags_for(netname: str):
         flags.append('--dropout')
 
     tag = None
-    basename, *dataset_features = attrs['basename'].split('-')
+    basename, *dataset_features_and_tags = attrs['basename'].split('-')
     dataset_features = []
     dataset_tags = []
-    if len(dataset_features) >= 1:
-        if dataset_features[0] not in ('3colors', 'patterns', 'boolor', 'simulation'):
-            tag, *dataset_features = dataset_features
+    if len(dataset_features_and_tags) >= 1:
+        if dataset_features_and_tags[0] not in ('3colors', 'patterns', 'boolor', 'simulation'):
+            tag, *dataset_features_and_tags = dataset_features_and_tags
 
-        dataset_features_and_tags = dataset_features
         for i in dataset_features_and_tags:
             if i in ('3colors', 'patterns'): dataset_features.append(i)
             else: dataset_tags.append(i)

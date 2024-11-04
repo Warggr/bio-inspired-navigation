@@ -764,7 +764,7 @@ class Robot:
                             targetVelocities=gains,
                             forces=[10, 10])
         if 'gains' in DEBUG:
-            print(f"{gains=}")
+            print(f"{gains=} {current_goal_vector=}")
         self.env.step()
         self.save_snapshot(current_goal_vector)
 

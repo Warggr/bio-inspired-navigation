@@ -25,13 +25,23 @@ for artifact in pc_network_artifacts:
 		output: f"system/bio_model/data/pc_model/{artifact}.npy"
 		shell: "ln -s $(basename {input}) {output}"
 
+def maybe_require_nn(wildcards):
+	if wildcards.re_type.startswith('neural_network'):
+		nn_name = wildcards.re_type.removeprefix('neural_network(').removesuffix(')')
+		return ["system/controller/reachability_estimator/data/models/{nn_name}"]
+	return []
+
 rule:
-	output: "system/bio_model/data/cognitive_map/artifacts/nn({model})+threshold--{thresh}.gpickle"
-	input: "system/controller/reachability_estimator/data/models/{model}.25"
+	output: "system/bio_model/data/cognitive_map/artifacts/{re_type}+threshold--{thresh}.gpickle"
+	input: maybe_require_nn
 	shell: """
-		model={wildcards.model}
-		python system/controller/topological/exploration_phase.py --output-filename 'artifacts/nn({wildcards.model})+threshold--{wildcards.thresh}.gpickle' --re 'neural_network({wildcards.model}.25)' --mini threshold {wildcards.thresh}
+		python system/controller/topological/exploration_phase.py --output-filename 'artifacts/{wildcards.re_type}+threshold--{wildcards.thresh}.gpickle' --re '{wildcards.re_type}' --mini threshold {wildcards.thresh}
 	"""
+
+rule:
+	input: "system/bio_model/data/cognitive_map/artifacts/{re_type}+threshold--{tsame}.gpickle"
+	output: "system/bio_model/data/cognitive_map/artifacts/{re_type}+threshold--{tsame}+treach--{treach}.gpickle"
+	shell: "python scripts/cogmap_utils.py connect '{input}' '{wildcards.re_type}' '{output}' --threshold-reachable {wildcards.treach}"
 
 rule:
 	input: "system/bio_model/data/cognitive_map/artifacts/connect_re_mse_weights+threshold--{thresh}.gpickle"
@@ -40,11 +50,6 @@ rule:
 		input={input}
 		python system/tests/system_benchmark/long_unknown_nav.py Savinov_val3 ${{input#system/bio_model/data/cognitive_map/}} 0,-1 | tee {output}
 	"""
-
-rule:
-	input: "{map_in}.gpickle"
-	output: "{map_in}+treach--{thresh}.gpickle"
-	shell: "python scripts/cogmap_utils.py connect '{input}' 'neural_network(reachability_network-boolor+lidar--raw_lidar+conv.25)' '{output}' --threshold-reachable {wildcards.thresh}"
 
 rule:
 	input: "system/bio_model/data/cognitive_map/artifacts/vo_{thresh}.gpickle"

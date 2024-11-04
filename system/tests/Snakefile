@@ -155,18 +155,17 @@ rule:
 		png = 'results/local_controller_width/view_overlap.png',
 	shell: 'python ../../scripts/overlap_plot.py'
 
-for metric in ['mean-distance', 'coverage', 'edges']:
-	rule:
-		input: '../bio_model/data/cognitive_map/{map}.gpickle'
-		output: f'../bio_model/data/cognitive_map/results/{{map}}-{metric}.v'
-		shell: f"python map/main.py {metric} '{{input}}' > '{{output}}'"
+rule metric:
+	input: '../bio_model/data/cognitive_map/{map}.gpickle'
+	output: '../bio_model/data/cognitive_map/results/{map}-{metric}.v'
+	shell: "python map/main.py {wildcards.metric} '{input}' > '{output}'"
 
 rule:
 	input: '../bio_model/data/cognitive_map/{map}.gpickle'
 	output: '../bio_model/data/cognitive_map/results/{map}-edge_agreement.csv'
 	shell: 'python map/edges.py \'{input}\' > \'{output}\''
 
-rule:
+rule edge_agreement_metric:
 	input: '../bio_model/data/cognitive_map/results/{map}-edge_agreement.csv'
 	output: '../bio_model/data/cognitive_map/results/{map}-edge_agreement.v'
 	run:
@@ -175,6 +174,8 @@ rule:
 		value = sum((df['net_2_success'] >= 0.5) == (df['view_success'] >= 0.4)) / len(df)
 		with open(str(output), 'w') as file:
 			print(value, file=file)
+
+ruleorder: edge_agreement_metric > metric
 
 rule:
 	output: 'in/random_positions.in'

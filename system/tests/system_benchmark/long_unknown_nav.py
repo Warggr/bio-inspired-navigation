@@ -15,10 +15,22 @@ from system.debug import DEBUG
 
 parser = argparse.ArgumentParser(parents=[controller_parser, parser], formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('start_stop', nargs='?', type=lambda ab: map(int, ab.split(',')), default=(73, 21), help='Start and stop node indices, joined by a comma. Negative indices (-1 for the last node) are allowed.')
-parser.add_argument('--dump-all-steps', action='store_true')
 parser.add_argument('--restore', type=int, help='Restore from dumped step')
 parser.add_argument('--head', type=int, help='Only perform navigation to the first n nodes')
+parser.add_argument('--wall-colors', choices=['1color', '3colors', 'patterns'], default='1color')
 args = parser.parse_args()
+
+from system.controller.reachability_estimator.data_generation.dataset import all_possible_textures
+
+if args.wall_colors == '1color':
+    textures = [ 'yellow_wall.png' ]
+elif args.wall_colors == '3colors':
+    textures = all_possible_textures[:3]
+elif args.wall_colors == 'patterns':
+    textures = lambda i : f'pattern-{i+1}.png'
+else:
+    raise ValueError(f"Unrecognized textures: '{args.wall_colors}'")
+env_kwargs={'wall_kwargs': {'textures': textures}}
 
 if args.env_model != 'Savinov_val3' and not args.map_file.startswith(args.env_model):
     args.map_file = args.env_model + '.' + args.map_file
@@ -74,11 +86,11 @@ if args.restore:
         data = pickle.load(file)
     start = data['current_pc_index']
     start_pc: 'PlaceCell' = list(cognitive_map.node_network.nodes.keys())[start]
-    env = PybulletEnvironment._loads_state(data['env'], visualize=args.visualize)
+    env = PybulletEnvironment._loads_state(data['env'], visualize=args.visualize, **env_kwargs)
     start_position = PlaceInfo(*env.robot.position_and_angle, spikings=data['gc_network'], img=None, lidar=None)
 else:
     start_pc: 'PlaceCell' = list(cognitive_map.node_network.nodes.keys())[start]
-    env = PybulletEnvironment(args.env_model, variant=args.env_variant, start=start_pc.pos, visualize=args.visualize, build_data_set=True)
+    env = PybulletEnvironment(args.env_model, variant=args.env_variant, start=start_pc.pos, visualize=args.visualize, build_data_set=True, **env_kwargs)
     start_position = start_pc
 
 compass.reset_position(compass.parse(start_position))

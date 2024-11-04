@@ -44,9 +44,9 @@ if __name__ == "__main__":
     if args.function == 'connect':
         from system.controller.reachability_estimator.reachability_estimation import reachability_estimator_factory
         from system.bio_model.cognitive_map import LifelongCognitiveMap
-        re = reachability_estimator_factory(args.re)
+        re = reachability_estimator_factory(args.re, env_model="Savinov_val3")
         cogmap = LifelongCognitiveMap(reachability_estimator=None, load_data_from=args.cogmap, absolute_path=True)
         if args.threshold_reachable is not None:
             re.threshold_reachable = args.threshold_reachable
-        add_connections_to_map(cogmap, re)
+        add_connections_to_map(cogmap, re, add=True, remove=True)
         cogmap.save(args.cogmap_out, absolute_path=True)

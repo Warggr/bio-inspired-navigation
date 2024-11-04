@@ -30,68 +30,7 @@ TUM_colors = {
 }
 
 def add_environment(ax, env_model: AllowedMapName, variant: str|None = None):
-
-    #load topview of maze
-    dirname = os.path.dirname(__file__)
-    dirname = os.path.join(dirname, "..")
-    filename = os.path.join(dirname, "controller/simulation/environment/"+env_model+"/maze_topview_binary.png")
-    filename = os.path.realpath(filename)
-
-    if not env_model == "plane": # and not "obstacle" in env_model:
-        topview = plt.imread(filename)
-        dimensions = environment_dimensions(env_model)
-        ax.imshow(topview,cmap="gray",extent=dimensions,origin="upper")
-    elif env_model == "obstacle_map_2":
-        box1 = plt.Rectangle((-1.75, -1.5), 0.5, 3, color=TUM_colors['TUMDarkGray'])
-        ax.add_artist(box1)
-        box2 = plt.Rectangle((-2.5, -0.75), 1, 0.5, color=TUM_colors['TUMDarkGray'])
-        ax.add_artist(box2)
-        wall = plt.Rectangle((-4, -3), 0.1, 6, color=TUM_colors['TUMDarkGray'])
-        ax.add_artist(wall)
-        wall = plt.Rectangle((2, -3), 0.1, 6, color=TUM_colors['TUMDarkGray'])
-        ax.add_artist(wall)
-        wall = plt.Rectangle((-4, 3), 6, 0.1, color=TUM_colors['TUMDarkGray'])
-        ax.add_artist(wall)
-        wall = plt.Rectangle((-4, -3), 6, 0.1, color=TUM_colors['TUMDarkGray'])
-        ax.add_artist(wall)
-        ax.set_xlim(-4, 2.1)
-        ax.set_ylim(-3, 3.1)
-    elif env_model == "obstacle_map_3":
-        box1 = plt.Rectangle((-0.75, -2.25), 0.5, 2.5, color=TUM_colors['TUMDarkGray'])
-        ax.add_artist(box1)
-        box2 = plt.Rectangle((-2.5, -0.75), 3, 0.5, color=TUM_colors['TUMDarkGray'])
-        ax.add_artist(box2)
-        wall = plt.Rectangle((-4, -3), 0.1, 6, color=TUM_colors['TUMDarkGray'])
-        ax.add_artist(wall)
-        wall = plt.Rectangle((2, -3), 0.1, 6, color=TUM_colors['TUMDarkGray'])
-        ax.add_artist(wall) 
-        wall = plt.Rectangle((-4, 3), 6, 0.1, color=TUM_colors['TUMDarkGray'])
-        ax.add_artist(wall)
-        wall = plt.Rectangle((-4, -3), 6, 0.1, color=TUM_colors['TUMDarkGray'])
-        ax.add_artist(wall)
-        ax.set_xlim(-4, 2.1)
-        ax.set_ylim(-3, 3.1)
-    elif env_model == "obstacle_map_1":
-        box1 = plt.Rectangle((-1.75, -1.5), 0.5, 3, color=TUM_colors['TUMDarkGray'])
-        ax.add_artist(box1)
-        box2 = plt.Rectangle((-2.5, -0.75), 1, 0.5, color=TUM_colors['TUMDarkGray'])
-        ax.add_artist(box2)
-        box3 = plt.Rectangle((-0.25, -2), 0.5, 3, color=TUM_colors['TUMDarkGray'])
-        ax.add_artist(box3)        
-        wall = plt.Rectangle((-4, -3), 0.1, 6, color=TUM_colors['TUMDarkGray'])
-        ax.add_artist(wall)
-        wall = plt.Rectangle((2, -3), 0.1, 6, color=TUM_colors['TUMDarkGray'])
-        ax.add_artist(wall) 
-        wall = plt.Rectangle((-4, 3), 6.1, 0.1, color=TUM_colors['TUMDarkGray'])
-        ax.add_artist(wall)
-        wall = plt.Rectangle((-4, -3), 6, 0.1, color=TUM_colors['TUMDarkGray'])
-        ax.add_artist(wall)   
-        ax.set_xlim(-4, 2.1)
-        ax.set_ylim(-3, 3.1)
-    elif env_model == "plane":
-        pass
-    else:
-        raise ValueError(f"Unrecognized env: `{env_model}`")
+    maze_filename = 'maze_topview_binary'
 
     if env_model == "obstacle_map_0":
         distance = float(variant)-1 if variant is not None else 0
@@ -99,6 +38,36 @@ def add_environment(ax, env_model: AllowedMapName, variant: str|None = None):
         # TODO: read these values from moveable_wall.urdf?
         box3 = plt.Rectangle((-0.25+distance, -4.25-distance), 3.5, 5, color=TUM_colors['TUMDarkGray'])
         ax.add_artist(box3)
+    elif env_model == "final_layout":
+        if variant == "walls":
+            doors = [ # see pybullet_environment.py
+                ((-3, 2), 'vertical'),
+                ((-3, 3), 'vertical'),
+                ((-4, -2), 'vertical'),
+            ]
+            for start, direction in doors:
+                if direction == 'horizontal':
+                    start, h, w = (start[0]-0.05, start[1]), 1, 0.1
+                else:
+                    start, h, w = (start[0], start[1]-0.05), 0.1, 1
+                door = plt.Rectangle(start, h, w, color='blue')
+                ax.add_artist(door)
+    else:
+        if variant is not None:
+            maze_filename += f'+{variant}'
+
+    #load topview of maze
+    dirname = os.path.dirname(__file__)
+    dirname = os.path.join(dirname, "..")
+    filename = os.path.join(dirname, "controller/simulation/environment", env_model, maze_filename+".png")
+    filename = os.path.realpath(filename)
+
+    if env_model == "plane":
+        pass
+    else:
+        topview = plt.imread(filename)
+        dimensions = environment_dimensions(env_model)
+        ax.imshow(topview,cmap="gray",extent=dimensions,origin="upper")
 
 
 def environment_plot(env_model: AllowedMapName, variant: str|None = None):

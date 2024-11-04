@@ -100,12 +100,16 @@ def plotCognitiveMap(
 
     if with_directions:
         for node in G.nodes:
-            pos, angle = node.pos, node.angle
+            pos = node.pos
             circle = plt.Circle(pos, 0.2, color=TUM_colors['TUMAccentBlue'], alpha=1)
             ax.add_artist(circle)
-            arrow = plt.Arrow(pos[0], pos[1], math.cos(angle), math.sin(angle),
+            try:
+                angle = node.angle
+                arrow = plt.Arrow(pos[0], pos[1], math.cos(angle), math.sin(angle),
                               color=TUM_colors['TUMAccentBlue'], alpha=1)
-            ax.add_artist(arrow)
+                ax.add_artist(arrow)
+            except AttributeError:
+                pass
     else:
         nx.draw_networkx_nodes(G, pos, node_color='#0065BD80', node_size=60, ax=ax, **kwargs)
         if with_labels:

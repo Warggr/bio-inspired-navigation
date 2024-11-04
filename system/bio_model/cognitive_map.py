@@ -22,6 +22,9 @@ ReachabilityEstimator = 'ReachabilityEstimator'
 
 from system.controller.reachability_estimator._types import PlaceInfo
 from typing import Optional, Literal, Callable, Self, Iterable
+from system.debug import DEBUG
+from deprecation import deprecated
+
 
 def get_path_top() -> str:
     """ returns path to the folder of the current file """
@@ -40,12 +43,13 @@ def report(fun):
         return fun(self, *args, **kwargs)
     return _wrapper
 
+
 class CognitiveMapInterface(ABC):
     def __init__(
         self,
         reachability_estimator: ReachabilityEstimator,
         load_data_from: Optional[str] = None,
-        debug = True,
+        debug = False,
         metadata: dict = {},
         max_capacity: int|None = None,
         absolute_path=False,
@@ -132,7 +136,6 @@ class CognitiveMapInterface(ABC):
         """
         self.node_network.add_edge(p, q, weight=w, **kwargs)
 
-    @report
     def add_bidirectional_edge_to_map_no_weight(self, p: PlaceCell, q: PlaceCell, **kwargs):
         """ Adds a new bidirectional edge to the cognitive map with given parameters
 
@@ -652,6 +655,18 @@ class LifelongCognitiveMap(CognitiveMapInterface):
         self.node_network.remove_edge(node_p, node_q)
         self.node_network.remove_edge(node_q, node_p)
 
+    def add_bidirectional_edge_to_map(self, node_p: PlaceCell, node_q: PlaceCell, w: float, *, connectivity_probability: float, mu: float, sigma: float):
+        """ Just to assert that all edges in a LifelongCognitiveMap have these properties """
+        super().add_bidirectional_edge_to_map(node_p, node_q, w, connectivity_probability=connectivity_probability, mu=mu, sigma=sigma)
+
+    def add_bidirectional_edge_to_map_by_probability(self, node_p: PlaceCell, node_q: PlaceCell, p: float):
+        self.add_bidirectional_edge_to_map(node_p, node_q,
+            sample_normal(1 - p, self.sigma),
+            connectivity_probability=p,
+            mu = 1 - p,
+            sigma=self.sigma
+        )
+
     def deduplicate_nodes(self):
         """ Helper function, performs node cleanup. If nodes have too many common neighbors,
             they are considered duplicates.
@@ -705,15 +720,16 @@ class LifelongCognitiveMap(CognitiveMapInterface):
                 reachable, weight = self.reach_estimator.get_reachability(node, pc)
                 if reachable:
                     connectivity_probability = self.reach_estimator.get_connectivity_probability(weight)
-                    self.add_bidirectional_edge_to_map(pc, node,
-                                                       sample_normal(1 - weight, self.sigma),
-                                                       connectivity_probability=connectivity_probability,
-                                                       mu=1 - weight,
-                                                       sigma=self.sigma)
+                    self.add_bidirectional_edge_to_map_by_probability(pc, node, weight)
 
-    def retrace_logs(self, lines: Iterable[str], callback: Callable[[int, Self], None] = lambda i, m: None, robot_positions: list|None = None) -> int:
+    def retrace_logs(self, lines: Iterable[str], callbacks: list[Callable[[int, Self], None]] = [], robot_positions: list|None = None, accept_incomplete_last_line=False) -> int:
         """
         Read a log file and replay each step described there. So a canceled navigation can be continued later.
+        parameters:
+        lines -- lines of the log file, without ending newline
+        callback -- a function that will be called after every line
+        robot_positions -- a list that will be filled with the reported positions of the robot
+        accept_incomplete_last_line -- do not raise an error if the last line raises an error. Buffering can cause the last line to be incomplete
 
         returns:
         nb_steps: int    -- the number of navigation steps
@@ -724,64 +740,75 @@ class LifelongCognitiveMap(CognitiveMapInterface):
         pcs = list(self.node_network.nodes)
         lines = iter(lines)
         for i, line in enumerate(lines):
-            if any(line.startswith(it) for it in ('Using seed', 'Path', 'Last PC', 'adding edge', 'edge [', 'Vector navigation', 'Recomputed path:', 'LIMIT WAS REACHED STOPPING HERE')):
-                continue
-            elif line.startswith('Navigation '):
-                nb_steps += 1
-            elif line.startswith('Adding bidirectional edge: '):
-                line = line.removeprefix('Adding bidirectional edge: ')
-                kvpairs = [ kv.split('=') for kv in line.split(', ')]
-                kvpairs = { key: value for key, value in kvpairs }
-                self.add_bidirectional_edge_to_map(pcs[int(kvpairs['p'])], pcs[int(kvpairs['q'])], w=float(kvpairs['weight']))
-            elif line.startswith('deleting edge ['):
-                line = line.removeprefix('deleting edge [')
-                line = line.split(']')[0]
-                p, q = line.split('-')
-                p, q = int(p), int(q)
-                self.remove_bidirectional_edge(pcs[p], pcs[q])
-            elif line.startswith('Adding node: '):
-                line = line.removeprefix('Adding node: ')
-                kvpairs = [kv.split('=') for kv in line.split(', ')]
-                kvpairs = {key: value for key, value in kvpairs}
-                assert int(kvpairs['#']) == len(self.node_network.nodes), (int(kvpairs['#']), len(self.node_network.nodes))
-                pos = kvpairs['position']
-                assert pos[0] == '[' and pos[-1] == ']'; pos = pos[1:-1]
-                pos = tuple(map(float, filter(lambda i:i, pos.split(' '))))
-                try:
-                    pc = PlaceCell.from_data(PlaceCell.load(kvpairs['dump_file']))
-                except (KeyError, FileNotFoundError):
-                    from system.controller.local_controller.local_navigation import create_gc_spiking
-                    from system.bio_model.grid_cell_model import GridCellNetwork
-                    if gc_network is None:
-                        gc_network = GridCellNetwork(from_data=True)
-                    gc_network.set_as_current_state(pcs[-1].spikings)
-                    spikings = create_gc_spiking(start=pcs[-1].pos, goal=pos, gc_network_at_start=gc_network)
-                    pc = PlaceCell.from_data(PlaceInfo(pos=pos, angle=NotImplemented, img=[0], lidar=NotImplemented, spikings=spikings))
-                pcs.append(pc)
-                self.add_node_to_map(pc)
-            elif line.startswith('Updating self.prior_idx_pc_firing'):
-                pass
-            elif line.startswith('Robot position'):
-                if robot_positions is not None:
-                    line = line.removeprefix('Robot position: ')
-                    assert line[0] == '[' and line[-1] == ']'; line = line[1:-1]
-                    line = line.strip()
-                    x, *_optional_space, y = line.split(' ')
-                    x, y = float(x), float(y)
-                    robot_positions.append((x, y))
-            elif line.startswith('> /') or line.startswith('Uncaught exception'):
-                next(lines) # consuming next value from iterator
-            elif line.startswith('(Pdb)') or line.startswith('Post mortem debugger') or line.startswith('->'):
-                pass
-            elif line.split(' : ')[0] in ('scalar coverage', 'unobstructed_lines', 'mean_distance_between_nodes'):
-                pass
-            else:
-                try:
+            full_line = line
+            try:
+                if i == 0 and line.startswith('#') or ('python' in line.split(' ')):
+                    import sys
+                    print(line, file=sys.stderr)
+                elif any(line.startswith(it) for it in ('Using seed', 'Path', '[navigation]', '[cognitive_map] adding edge', 'LIMIT WAS REACHED STOPPING HERE', 'Fail :(')):
+                    pass
+                elif line.startswith('Navigation '):
+                    nb_steps += 1
+                elif line.startswith('[cognitive_map] Adding bidirectional edge: '):
+                    line = line.removeprefix('[cognitive_map] Adding bidirectional edge: ')
+                    kvpairs = [ kv.split('=') for kv in line.split(', ')]
+                    kvpairs = { key: value for key, value in kvpairs }
+                    self.add_bidirectional_edge_to_map_by_probability(pcs[int(kvpairs['p'])], pcs[int(kvpairs['q'])], p=float(kvpairs['weight']))
+                elif line.startswith('[cognitive_map] deleting edge ['):
+                    line = line.removeprefix('[cognitive_map] deleting edge [')
+                    line = line.split(']')[0]
+                    p, q = line.split('-')
+                    p, q = int(p), int(q)
+                    self.remove_bidirectional_edge(pcs[p], pcs[q])
+                elif line.startswith('[cognitive_map] Adding node: '):
+                    line = line.removeprefix('[cognitive_map] Adding node: ')
+                    kvpairs = [kv.split('=') for kv in line.split(', ')]
+                    kvpairs = {key: value for key, value in kvpairs}
+                    assert int(kvpairs['#']) == len(self.node_network.nodes), (int(kvpairs['#']), len(self.node_network.nodes))
+                    pos = kvpairs['position']
+                    assert pos[0] == '[' and pos[-1] == ']'; pos = pos[1:-1]
+                    pos = tuple(map(float, filter(lambda i:i, pos.split(' '))))
+                    try:
+                        pc = PlaceCell.from_data(PlaceCell.load(kvpairs['dump_file']))
+                    except (KeyError, FileNotFoundError):
+                        from system.controller.local_controller.local_navigation import create_gc_spiking
+                        from system.bio_model.grid_cell_model import GridCellNetwork
+                        if gc_network is None:
+                            gc_network = GridCellNetwork(from_data=True)
+                        gc_network.set_as_current_state(pcs[-1].spikings)
+                        if np.linalg.norm(np.array(pos) - np.array(pcs[-1].pos)) < 0.1:
+                            spikings = pcs[-1].spikings
+                        else:
+                            spikings = create_gc_spiking(start=pcs[-1].pos, goal=pos, gc_network_at_start=gc_network)
+                        pc = PlaceCell.from_data(PlaceInfo(pos=pos, angle=NotImplemented, img=[0], lidar=NotImplemented, spikings=spikings))
+                    pcs.append(pc)
+                    self.add_node_to_map(pc)
+                elif line.startswith('[proprioception] Updating self.prior_idx_pc_firing'):
+                    pass
+                elif line.startswith('[proprioception] Robot position'):
+                    if robot_positions is not None:
+                        line = line.removeprefix('[proprioception] Robot position: ')
+                        assert line[0] == '[' and line[-1] == ']'; line = line[1:-1]
+                        line = line.strip()
+                        x, *_optional_space, y = line.split(' ')
+                        x, y = float(x), float(y)
+                        robot_positions.append((x, y))
+                elif line.startswith('> /') or line.startswith('Uncaught exception'):
+                    next(lines) # consuming next value from iterator
+                elif line.startswith('(Pdb)') or line.startswith('Post mortem debugger') or line.startswith('->'):
+                    pass
+                elif line.split(' : ')[0] in ('scalar coverage', 'unobstructed_lines', 'mean_distance_between_nodes'):
+                    pass
+                else:
                     int(line.split(' ')[0]) # PDB l
-                except ValueError as err:
-                    raise ValueError('Unrecognized line:', line) from err
-
-            callback(i, self)
+            except Exception as err:
+                if accept_incomplete_last_line and next(lines, None) is None: # check if the line is really the last
+                    # (this will consume the next line if it exists, but we don't care because if it exists we exit the function)
+                    pass
+                else:
+                    raise ValueError('Couldn\'t parse line:', full_line) from err
+            for callback in callbacks:
+                callback(i, self, line=full_line)
         return nb_steps
 
 if __name__ == "__main__":

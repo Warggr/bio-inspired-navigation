@@ -179,7 +179,7 @@ if __name__ == "__main__":
     def create_cogmap(threshold, max_capacity=200):
         re.threshold_same = threshold
         pc_network = PlaceCellNetwork(reach_estimator=re)
-        cognitive_map = LifelongCognitiveMap(reachability_estimator=re, max_capacity=max_capacity, metadata={'threshold': re.threshold_same})
+        cognitive_map = LifelongCognitiveMap(reachability_estimator=re, max_capacity=max_capacity, metadata={'threshold': re.threshold_same, 're': str(re)}, debug=('cogmap' in DEBUG))
         pc_network, cognitive_map = waypoint_movement(goals, args.env_model, gc_network, pc_network, cognitive_map, visualize=args.visualize)
         cognitive_map.postprocess_topological_navigation()
         return cognitive_map, pc_network
@@ -201,7 +201,7 @@ if __name__ == "__main__":
                 too_strict_threshold = threshold_same
                 print("Too high!")
                 continue
-            if len(pc_network.place_cells) < args.desired_nb_of_place_cells / 2:
+            if len(cognitive_map.node_network.nodes) < args.desired_nb_of_place_cells / 2:
                 too_lax_threshold = threshold_same
                 print("Too low!")
                 continue

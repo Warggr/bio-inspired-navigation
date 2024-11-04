@@ -53,7 +53,7 @@ if __name__ == "__main__":
     import os
 
     functions: dict[str, Callable[[CognitiveMap, AllowedMapName], Any]] = {
-        "mean-distance": mean_distance_between_nodes,
+        "mean_distance": mean_distance_between_nodes,
         "coverage": scalar_coverage,
         "edges": unobstructed_lines,
     }
