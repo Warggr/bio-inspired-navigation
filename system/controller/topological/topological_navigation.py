@@ -131,7 +131,7 @@ class TopologicalNavigation:
                 hooks=[StuckDetector()],
             )
 
-        i: int # the index of the last found PC in the path
+        path_index: int
         if self.log:
             if 'hooks' not in nav_kwargs:
                 nav_kwargs['hooks'] = []
@@ -151,7 +151,7 @@ class TopologicalNavigation:
                         starting_position_compass.reset_goal(current_position)
                         current_compass = DoubleCompass(PodGcCompass())
                         current_compass.reset_position(current_position)
-                        current_compass.reset_goal(path[i+1])
+                        current_compass.reset_goal(path[path_index+1])
                         error_from_start = starting_position_compass.error()
                         error_to_goal = current_compass.error()
                         estimated_position_from_start = starting_position_compass.calculate_estimated_position()
@@ -164,25 +164,25 @@ class TopologicalNavigation:
 
         #self.gc_network.set_as_current_state(path[0].gc_connections)
         last_pc = path[0]
-        i = 0
+        path_index = 0
         curr_path_length = 0
-        while i + 1 < len(path) and curr_path_length < path_length_limit:
-            self.compass.reset_goal(new_goal=self.compass.parse(path[i+1]))
-            goal_spiking = path[i+1].gc_connections
+        while path_index + 1 < len(path) and curr_path_length < path_length_limit:
+            self.compass.reset_goal(new_goal=self.compass.parse(path[path_index+1]))
+            goal_spiking = path[path_index+1].gc_connections
             if gc_network:
                 gc_network.set_as_target_state(goal_spiking)
             success, pc = vector_navigation(env, self.compass, gc_network=gc_network,
                                          controller=controller, exploration_phase=False, pc_network=self.pc_network,
                                          cognitive_map=self.cognitive_map, plot_it=plotting,
-                                         step_limit=self.step_limit, goal_pos=path[i+1].pos, *nav_args, **nav_kwargs)
-            self.cognitive_map.postprocess_vector_navigation(node_p=path[i], node_q=path[i + 1],
+                                         step_limit=self.step_limit, goal_pos=path[path_index+1].pos, *nav_args, **nav_kwargs)
+            self.cognitive_map.postprocess_vector_navigation(node_p=path[path_index], node_q=path[path_index+1],
                                                              observation_p=last_pc, observation_q=pc, success=success)
 
             for hook in self.step_hooks:
-                hook(curr_path_length, success=success, endpoints=(path[i], path[i+1]), endpoint_indices=(path_indices[i], path_indices[i+1]))
+                hook(curr_path_length, success=success, endpoints=(path[path_index], path[path_index+1]), endpoint_indices=(path_indices[path_index], path_indices[path_index+1]))
 
             if self.log:
-                print(f'[navigation] Vector navigation: goal={path_indices[i+1]}, {success=}')
+                print(f'[navigation] Vector navigation: goal={path_indices[path_index+1]}, {success=}')
             curr_path_length += 1
             if not success:
                 last_pc, new_path = self.locate_node(self.compass, pc, goal)
@@ -192,7 +192,7 @@ class TopologicalNavigation:
                     else:
                         print('[navigation] Last PC: status=found,', f'#={self.cognitive_map._place_cell_number(last_pc)}')
                 if not last_pc:
-                    last_pc = path[i]
+                    last_pc = path[path_index]
 
                 # if no path to the goal exists, try to find a random node that has valid path to the goal
                 # if none is found, go straight to the goal
@@ -212,18 +212,18 @@ class TopologicalNavigation:
                             new_path = [np.random.choice(list(self.cognitive_map.node_network.nodes))] + [goal]
                     new_path = [last_pc] + new_path
 
-                path[i:] = new_path
+                path[path_index:] = new_path
                 if self.log:
-                    path_indices[i:] = [self.cognitive_map._place_cell_number(p) for p in new_path]
-                    print(f'[navigation] Recomputed path: so_far={_printable_path(path_indices[:i])}, continue={_printable_path(path_indices[i:])}')
+                    path_indices[path_index:] = [self.cognitive_map._place_cell_number(p) for p in new_path]
+                    print(f'[navigation] Recomputed path: so_far={_printable_path(path_indices[:path_index])}, continue={_printable_path(path_indices[path_index:])}')
                 if plotting:
                     plot.plotTrajectoryInEnvironment(env, cognitive_map=self.cognitive_map, path=path)
             else:
                 last_pc = pc
-                i += 1
-            if i == len(path) - 1:
+                path_index += 1
+            if path_index == len(path) - 1:
                 break
-            elif i == head:
+            elif path_index == head:
                 break
 
         if plotting:
@@ -233,7 +233,7 @@ class TopologicalNavigation:
 
         self.cognitive_map.postprocess_topological_navigation()
         if curr_path_length >= path_length_limit:
-            print(f"[navigation] LIMIT WAS REACHED STOPPING HERE: remaining_path={_printable_path(path_indices[i:])}")
+            print(f"[navigation] LIMIT WAS REACHED STOPPING HERE: remaining_path={_printable_path(path_indices[path_index:])}")
             return False
         return True
 
