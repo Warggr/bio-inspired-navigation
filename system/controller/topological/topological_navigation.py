@@ -143,7 +143,7 @@ class TopologicalNavigation:
                 from system.controller.local_controller.position_estimation import DoubleCompass
                 from system.controller.local_controller.local_navigation import PodGcCompass
                 starting_position_compass = DoubleCompass(PodGcCompass())
-                starting_position_compass.reset_position((gc_network.consolidate_gc_spiking(), start))
+                starting_position_compass.reset_position_pc(start)
 
                 def print_drift(i, robot):
                     if (i + 1) % 100 == 0:
@@ -151,7 +151,7 @@ class TopologicalNavigation:
                         starting_position_compass.reset_goal(current_position)
                         current_compass = DoubleCompass(PodGcCompass())
                         current_compass.reset_position(current_position)
-                        current_compass.reset_goal(path[path_index+1])
+                        current_compass.reset_goal_pc(path[path_index+1])
                         error_from_start = starting_position_compass.error()
                         error_to_goal = current_compass.error()
                         estimated_position_from_start = starting_position_compass.calculate_estimated_position()
@@ -433,6 +433,7 @@ if __name__ == "__main__":
             start = place_cells[start_index]
 
             tj.compass.reset_position(compass.parse(start))
+            tj.compass.reset_goal(compass.parse(place_cells[goals[0]]))
             gc_network.set_as_current_state(start.spikings)
 
             if args.mode == 'path' and args.restore and i == 0:
@@ -454,7 +455,6 @@ if __name__ == "__main__":
                     success = tj.navigate(start, goal,
                         gc_network=gc_network, controller=controller,
                         head=args.head, path_length_limit=args.max_path_length,
-                        cognitive_map_filename=map_file_after_lifelong_learning,
                         env=env,
                     )
                     if success:
@@ -465,6 +465,7 @@ if __name__ == "__main__":
                 else: # no break
                     successful += 1
                 #tj.cognitive_map.draw()
+                tj.cognitive_map.save(filename=map_file_after_lifelong_learning)
                 if len(navigations) != 1:
                     print(f"Navigation {i} finished")
                 if plotting:
