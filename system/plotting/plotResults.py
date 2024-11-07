@@ -64,29 +64,6 @@ rc('font', **{'family': 'serif', 'serif': ['Computer Modern']})
 rc('text', usetex=True)
 
 
-def plotTrajectory(xy_coordinates):
-    x, y = zip(*xy_coordinates)
-    plt.figure(1)
-    plt.scatter(x, y, s=0.2)
-
-    nr_labels = 10
-    step_label = int(len(xy_coordinates) / nr_labels)
-    for i in range(len(x)):
-        if i % step_label == 0:
-            xi = x[i]
-            yi = y[i]
-            label = str(int(i / step_label))
-
-            plt.annotate(label,  # this is the text
-                         (xi, yi),  # this is the point to label
-                         textcoords="offset points",  # how to position the text
-                         xytext=(0, 0.1),  # distance from text to points (x,y)
-                         ha='center')  # horizontal alignment can be left, right or center
-
-    plt.axis('equal')
-    plt.legend(['Trajectory'])
-    plt.show()
-
 def plotCognitiveMap(
     ax, cognitive_map,
     path: list['PlaceCell']|None=None,
@@ -123,12 +100,13 @@ def plotCognitiveMap(
         nx.draw_networkx_edges(G, pos, edgelist=path_edges, edge_color='#E3722280', width=3, ax=ax)
 
 
-def plotTrajectory(ax, xy_coordinates):
+def plotTrajectory(ax, xy_coordinates, color='#992225', **kwargs):
+
     if len(xy_coordinates) == 0:
         return
     x, y = zip(*xy_coordinates)
-    ax.scatter(x, y, color='#992225', s=10, linewidths=0.5)
-    ax.plot(x, y, color='#992225')
+    ax.scatter(x, y, color=color, s=10, linewidths=0.5, **kwargs)
+    ax.plot(x, y, color=color)
 
 def plotTrajectoryInEnvironment(
     env: Optional['PybulletEnvironment'] = None,
