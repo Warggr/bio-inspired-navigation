@@ -276,6 +276,9 @@ parser.add_argument('--re-type', help='Type of the reachability estimator used f
 parser.add_argument('--pc-creation-re', help='Use an alternative reachability estimator for deciding when to create new nodes')
 parser.add_argument('--max-path-length', '-m', help='Maximimum path length after which topological navigation will be aborted; number or "inf"', type=lambda m: float('inf') if m == 'inf' else int(m), default=30)
 parser.add_argument('--dump-all-steps', help='(folder to which to dump each step)')
+# This would've been perfect, but interacts badly with argparse subparsers
+#parser.add_argument('--disable-lifelong-learning-features', nargs='*', choices=['+v', '-v', '+e', '-e'])
+parser.add_argument('--disable-lifelong-learning-features', help='comma-separated list of `/v`,`+v`,`/e`,`+e`. The empty string disables everything.')
 
 
 if __name__ == "__main__":
@@ -324,9 +327,15 @@ if __name__ == "__main__":
         if map_file_after_lifelong_learning is not None and not map_file_after_lifelong_learning.startswith(args.env_model + '.'):
             map_file_after_lifelong_learning = args.env_model + '.' + map_file_after_lifelong_learning
 
+    if args.disable_lifelong_learning_features:
+        if args.disable_lifelong_learning_features == []:
+            args.disable_lifelong_learning_features = '+v,/v,+e,/e'
+        expand = {'+v': 'add_nodes', '/v': 'remove_nodes', '+e': 'add_edges', '/e': 'remove_edges'}
+        lifelong_kwargs = {expand[key]: False for key in args.disable_lifelong_learning_features.split(',')}
+
     re = reachability_estimator_factory(args.re_type, env_model=args.env_model)
     #pc_network = PlaceCellNetwork(from_data=True, map_name=args.env_model)
-    cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from=map_file, debug=('cogmap' in DEBUG or args.log))
+    cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from=map_file, debug=('cogmap' in DEBUG or args.log), **lifelong_kwargs)
 
     if args.load:
         print('Loading log file', args.load)
