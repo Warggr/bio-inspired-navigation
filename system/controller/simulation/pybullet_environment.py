@@ -634,6 +634,14 @@ class Robot:
         self.env.robot = None
         self.delete()
 
+    @staticmethod
+    def loads(env: PybulletEnvironment, env_data_to_load, **kwargs):
+        current_env_data = env._dumps_state()
+        assert current_env_data['contains_robot'] == False and env_data_to_load['contains_robot'] == True
+        for key in ('env_model', 'variant', 'dt'):
+            assert current_env_data[key] == env_data_to_load[key]
+        return Robot(env, base_position=env_data_to_load['start'], base_orientation=env_data_to_load['orientation'], build_data_set=env_data_to_load['build_data_set'], **kwargs)
+
     def navigation_step(self, goal_vector: Vector2D, allow_backwards=False):
         """ One navigation step for the agent. Moves towards goal_vector.
         """
@@ -948,7 +956,21 @@ class DatasetCollector:
         # return [np.transpose(observation[2], (2, 0, 1)) for observation in observations]
         return observations
 
-all_possible_textures = [ file for file in sorted(os.listdir(WALL_TEXTURE_PATH)) if file[-4:] == '.jpg' ]
+
+all_possible_textures = [file for file in sorted(os.listdir(WALL_TEXTURE_PATH)) if file[-4:] == '.jpg']
+
+
+def wall_colors_by_description(description: Literal['1color', '3colors', 'patterns']) -> dict[Literal['textures'], Callable[[int], str]|list[str]]:
+    if description == '1color':
+        textures = [os.path.join('yellow_wall.png')]
+    elif description == '3colors':
+        textures = all_possible_textures[:description]
+    elif description == 'patterns':
+        textures = lambda i: f'pattern-{i + 1}.png'
+    else:
+        raise ValueError(f"Unrecognized textures: '{description}'")
+    return {'textures': textures}
+
 
 if __name__ == "__main__":
     import argparse

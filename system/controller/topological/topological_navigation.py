@@ -14,15 +14,16 @@ from typing import Optional, Protocol, Literal
 from system.bio_model.grid_cell_model import GridCellNetwork
 from system.controller.local_controller.decoder.phase_offset_detector import PhaseOffsetDetectorNetwork
 
-from system.controller.simulation.pybullet_environment import PybulletEnvironment, Robot
+from system.controller.simulation.pybullet_environment import PybulletEnvironment, Robot, wall_colors_by_description
 from system.bio_model.cognitive_map import LifelongCognitiveMap, CognitiveMapInterface
-from system.bio_model.place_cell_model import PlaceCellNetwork, PlaceCell
+from system.bio_model.place_cell_model import PlaceCellNetwork, PlaceCell, PlaceInfo
 from system.controller.local_controller.compass import Compass
 from system.controller.local_controller.local_controller import LocalController, ObstacleAvoidance, StuckDetector, ObstacleBackoff, TurnToGoal
 from system.controller.local_controller.local_navigation import vector_navigation
 import system.plotting.plotResults as plot
 from system.types import AllowedMapName
 import argparse
+import pickle
 
 from system.debug import DEBUG, PLOTTING
 plotting = 'topo' in PLOTTING # if True plot results
@@ -62,7 +63,6 @@ class TopologicalNavigation:
 
     def navigate(self, start: PlaceCell, goal: PlaceCell, gc_network: GridCellNetwork,
         controller: Optional[LocalController] = None,
-        cognitive_map_filename: Optional[str] = None,
         env: Optional[PybulletEnvironment] = None,
         robot: Optional[Robot] = None,
         head: Optional[int] = None,
@@ -74,7 +74,6 @@ class TopologicalNavigation:
         arguments:
         start_ind: int              -- start node in the cognitive map
         goal_ind: int               -- goal node in the cognitive map
-        cognitive_map_filename: str -- name of file to save the cognitive map to
         head: int                   -- only perform the first n steps
 
         returns:
@@ -233,8 +232,6 @@ class TopologicalNavigation:
                                              start=path[0].env_coordinates, end=path[-1].env_coordinates)
 
         self.cognitive_map.postprocess_topological_navigation()
-        if cognitive_map_filename is not None:
-            self.cognitive_map.save(filename=cognitive_map_filename)
         if curr_path_length >= path_length_limit:
             print(f"[navigation] LIMIT WAS REACHED STOPPING HERE: remaining_path={_printable_path(path_indices[i:])}")
             return False
@@ -271,7 +268,7 @@ class TopologicalNavigation:
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument('env_model', choices=AllowedMapName.options, default='Savinov_val3')
 parser.add_argument('--env-variant', '--variant', help='Environment model variant')
-parser.add_argument('map_file', nargs='?', default='after_exploration.gpickle')
+parser.add_argument('map_file')
 parser.add_argument('--compass', choices=['analytical', 'pod', 'linear_lookahead', 'combo'], default='combo')
 parser.add_argument('--log', help='Log everything to stdout', action='store_true')
 parser.add_argument('--visualize', action='store_true')
@@ -288,20 +285,43 @@ if __name__ == "__main__":
     """
     import os
     from system.controller.reachability_estimator.reachability_estimation import reachability_estimator_factory
+    from system.parsers import controller_parser, controller_creator
 
-    parser = argparse.ArgumentParser(parents=[parser])
-    parser.add_argument('map_file_after_lifelong_learning', nargs='?', default='after_lifelong_learning.gpickle')
-    parser.add_argument('--seed', type=int, default=None, help='Seed for random index generation.')  # for reproducibility / debugging purposes
-    parser.add_argument('--num-topo-nav', '-n', help='number of topological navigations', type=int, default=100)
+    class DontSave: pass # Sentinel value
+
+    parser = argparse.ArgumentParser(parents=[parser, controller_parser])
+    parser.add_argument('-o', dest='map_file_after_lifelong_learning', nargs='?', default=DontSave, help='Save the map at end of navigation into a file')
     parser.add_argument('--log-metrics', action='store_true')
     parser.add_argument('--load', help='Load and replay log file, then continue navigation')
+    parser.add_argument('--wall-colors', choices=['1color', '3colors', 'patterns'], default='1color')
+    subparsers = parser.add_subparsers(dest='mode')
+
+    random_parser = subparsers.add_parser('random', help='Perform multiple navigations between random nodes')
+    random_parser.add_argument('--seed', type=int, help='Seed for random index generation.')  # for reproducibility / debugging purposes
+    random_parser.add_argument('--num-topo-nav', '-n', help='number of topological navigations', type=int, default=100)
+
+    one_traj_parser = subparsers.add_parser('path', help='(Try to) Navigate from a start to a goal node')
+    one_traj_parser.add_argument('navigations', nargs='?',
+                                 type=lambda outer: map(lambda inner: map(int, inner.split(',')), outer.split(';')),
+                                 default=((73, 21),),
+                                 help='Start, intermediary nodes, and goal, separated by a comma.'
+                                     +' Multiple navigations can be separated by a semicolon.'
+                                     +' Negative indices (-1 for the last node) are allowed.'
+                                 )
+    one_traj_parser.add_argument('--head', type=int, help='Only perform navigation to the first n nodes')
+    one_traj_parser.add_argument('--restore', type=int, help='Restore from dumped step')
+
     args = parser.parse_args()
 
     map_file, map_file_after_lifelong_learning = args.map_file, args.map_file_after_lifelong_learning
+    if map_file_after_lifelong_learning is None:
+        map_file_after_lifelong_learning = 'after_lifelong_learning.gpickle'
+    if map_file_after_lifelong_learning == DontSave:
+        map_file_after_lifelong_learning = None
     if args.env_model != 'Savinov_val3':
         if not map_file.startswith(args.env_model + '.'):
             map_file = args.env_model + '.' + map_file
-        if not map_file_after_lifelong_learning.startswith(args.env_model + '.'):
+        if map_file_after_lifelong_learning is not None and not map_file_after_lifelong_learning.startswith(args.env_model + '.'):
             map_file_after_lifelong_learning = args.env_model + '.' + map_file_after_lifelong_learning
 
     re = reachability_estimator_factory(args.re_type, env_model=args.env_model)
@@ -321,13 +341,33 @@ if __name__ == "__main__":
         pc_creation_re = reachability_estimator_factory(args.pc_creation_re, env_model=args.env_model)
     else:
         pc_creation_re = re
-    pc_network = cognitive_map.get_place_cell_network()
-    assert len(cognitive_map.node_network.nodes) > 1
+    pc_network = cognitive_map.get_place_cell_network(pc_creation_re)
+
     gc_network = GridCellNetwork(from_data=True, dt=1e-2)
     pod = PhaseOffsetDetectorNetwork(16, 9, 40)
     compass = Compass.factory(args.compass, gc_network=gc_network, pod_network=pod)
 
-    tj = TopologicalNavigation(args.env_model, pc_network, cognitive_map, compass, log=args.log)
+    controller = controller_creator(args, env_model=args.env_model)
+
+    class Counter:
+        def __init__(self): self.counter = 0
+        def __call__(self, *args, **kwargs): self.counter += 1
+        def reset(self): self.counter = 0
+
+    vector_step_counter = Counter()
+    controller.on_reset_goal.append(vector_step_counter)
+
+    if args.position_estimation:
+        raise NotImplementedError()
+        """
+        from system.controller.local_controller.position_estimation import PositionEstimation
+
+        controller.transform_goal_vector.append(
+            PositionEstimation(pc_network, gc_network, re, compass, current_position=start_pc)
+        )
+        """
+
+    tj = TopologicalNavigation(args.env_model, pc_network=pc_network, cognitive_map=cognitive_map, compass=compass, log=args.log)
 
     if args.log_metrics:
         from system.tests.map import unobstructed_lines, mean_distance_between_nodes, scalar_coverage, agreement
@@ -338,7 +378,6 @@ if __name__ == "__main__":
         tj.step_hooks.append(log_metrics)
 
     if args.dump_all_steps:
-        import pickle
         def hook(i, success: bool, endpoints: tuple['PlaceCell', 'PlaceCell'], endpoint_indices: tuple[int, int]):
             if not success:
                 return
@@ -353,39 +392,84 @@ if __name__ == "__main__":
                 pickle.dump(data, file)
         tj.step_hooks.append(hook)
 
-    with PybulletEnvironment(args.env_model, variant=args.env_variant, build_data_set=True, visualize=args.visualize, contains_robot=False) as env:
+    env_kwargs = {'wall_kwargs': wall_colors_by_description(args.wall_colors)}
+
+    place_cells: list[PlaceCell] = list(tj.cognitive_map.node_network.nodes)
+    assert len(place_cells) > 1
+    navigations: list[list[int]]
+    # Will be used in the following way (pseudocode):
+    # for points in navigations:
+    #     reset robot to points[0]
+    #     for point in points[1:]:
+    #         navigate_to_point()
+    if args.mode == 'random':
+        if not args.seed:
+            args.seed = np.random.default_rng().integers(low=0, high=0b100000000)
+            print("Using seed", args.seed)
+        random = np.random.default_rng(seed=args.seed)
+        navigations = []
+        for _ in range(args.num_topo_nav):
+            start_index, goal_index = None, None
+            while start_index == goal_index:
+                start_index, goal_index = random.integers(0, len(place_cells)-1, size=2)
+            navigations.append([start_index, goal_index])
+    elif args.mode == 'path':
+        navigations = args.navigations
+    else:
+        raise AssertionError
+
+    if args.mode == 'path' and args.head:
+        assert len(navigations) == 1 and len(navigations[0]) == 1, "`head` only makes sense for one navigation"
+
+    with PybulletEnvironment(args.env_model, variant=args.env_variant, build_data_set=True, visualize=args.visualize, contains_robot=False, **env_kwargs) as env:
         if plotting:
             from system.plotting.plotHelper import environment_plot
             ax = environment_plot(args.env_model, args.env_variant)
             plot.plotCognitiveMap(ax, cognitive_map)
 
-        if not args.seed:
-            args.seed = np.random.default_rng().integers(low=0, high=0b100000000)
-            print("Using seed", args.seed)
-        random = np.random.default_rng(seed=args.seed)
-
-        place_cells = list(tj.cognitive_map.node_network.nodes)
-
         successful = 0
-        nb_correct_place_cells = len(place_cells) # if a large number of useless place cells are added to the cognitive map,
-        # we want to navigate only between the original place cells. Else we would "dilute" places that are difficult to reach
-        for navigation_i in range(args.num_topo_nav):
-            start_index, goal_index = None, None
-            while start_index == goal_index:
-                start_index, goal_index = random.integers(0, nb_correct_place_cells, size=2)
-                assert len(tj.cognitive_map.node_network.nodes) > 1
+        for i, continuous_navigation in enumerate(navigations):
+            start_index, *goals = continuous_navigation
+            start = place_cells[start_index]
 
-            start, goal = place_cells[start_index], place_cells[goal_index]
+            tj.compass.reset_position(compass.parse(start))
+            gc_network.set_as_current_state(start.spikings)
 
-            compass.reset_position(compass.parse(start))
-            success = tj.navigate(start, goal, cognitive_map_filename=map_file_after_lifelong_learning, env=env, gc_network=gc_network)
-            if success:
-                successful += 1
-            #tj.cognitive_map.draw()
-            print(f"Navigation {navigation_i} finished")
-            if plotting:
-                ax = environment_plot(env.env_model, args.env_variant)
-                plot.plotCognitiveMap(ax, cognitive_map=tj.cognitive_map)
+            if args.mode == 'path' and args.restore and i == 0:
+                filename = f'logs/step{args.restore}.pkl'
+                with open(filename, 'rb') as file:
+                    data = pickle.load(file)
+                start_index = data['current_pc_index']
+                start = place_cells[start_index]
+                robot = Robot.loads(env, data['env'], compass=compass)
+                start_position = PlaceInfo(*robot.position_and_angle, spikings=data['gc_network'], img=None, lidar=None)
+            else:
+                robot = Robot(env, start.pos, start.angle, compass=compass)
+                start_position = start
 
-    print(f"{successful} successful navigations")
-    print("Navigation finished")
+            with robot:
+                for j, goal_index in enumerate(goals):
+                    goal = place_cells[goal_index]
+                    vector_step_counter.reset()
+                    success = tj.navigate(start, goal,
+                        gc_network=gc_network, controller=controller,
+                        head=args.head, path_length_limit=args.max_path_length,
+                        cognitive_map_filename=map_file_after_lifelong_learning,
+                        env=env,
+                    )
+                    if success:
+                        print(f"Success! simulation time: {env.t}. Navigation steps: {vector_step_counter.counter}")
+                    else:
+                        print("Fail :(")
+                        break
+                else: # no break
+                    successful += 1
+                #tj.cognitive_map.draw()
+                if len(navigations) != 1:
+                    print(f"Navigation {i} finished")
+                if plotting:
+                    ax = environment_plot(env.env_model, args.env_variant)
+                    plot.plotCognitiveMap(ax, cognitive_map=tj.cognitive_map)
+
+    if len(navigations) > 1:
+        print(f"{successful} successful navigations")

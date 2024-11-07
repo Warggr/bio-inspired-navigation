@@ -22,7 +22,7 @@ import os
 from system.controller.reachability_estimator.reachability_utils import ViewOverlapReachabilityController, RCCache
 from system.controller.reachability_estimator.reachability_estimation import SimulationReachabilityEstimator
 
-from system.controller.simulation.pybullet_environment import PybulletEnvironment, all_possible_textures
+from system.controller.simulation.pybullet_environment import PybulletEnvironment, wall_colors_by_description
 from system.controller.simulation.environment_config import environment_dimensions
 from system.controller.simulation.environment_cache import EnvironmentCache
 from system.controller.simulation.environment.map_occupancy import MapLayout
@@ -126,10 +126,10 @@ class TrajectoriesDataset(data.Dataset):
         traj_id_map = {(dset_idx, traj_id): maybe_decode(fds[dset_idx].attrs['map_type'])
                        for dset_idx, traj_id in self.traj_ids}
 
-        self.maps = { map_name : MapLayout(map_name) for map_name in maps }
+        self.maps = {map_name : MapLayout(map_name) for map_name in maps}
 
         traj_ids_per_map: dict[types.AllowedMapName, list[TrajId]]
-        traj_ids_per_map = { map_name: [] for map_name in maps }
+        traj_ids_per_map = {map_name: [] for map_name in maps}
         for dset_idx, traj_id in self.traj_ids:
             map_name = traj_id_map[(dset_idx, traj_id)]
             traj_ids_per_map[map_name].append((dset_idx, traj_id))
@@ -634,16 +634,7 @@ if __name__ == "__main__":
         help='How to generate pairs of points',
     )
     args = parser.parse_args()
-
-    if args.wall_colors == '1color':
-        textures = [ os.path.join( 'yellow_wall.png') ]
-    elif args.wall_colors == '3colors':
-        textures = all_possible_textures[:args.wall_colors]
-    elif args.wall_colors == 'patterns':
-        textures = lambda i : f'pattern-{i+1}.png'
-    else:
-        raise ValueError(f"Unrecognized textures: '{args.wall_colors}'")
-    env_kwargs={'wall_kwargs': {'textures': textures}}
+    env_kwargs = {'wall_kwargs': wall_colors_by_description(args.wall_colors)}
 
     with EnvironmentCache(override_env_kwargs=env_kwargs) as env_cache:
         re = CompositeReachabilityEstimator([

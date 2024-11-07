@@ -10,6 +10,8 @@ from system.controller.simulation.environment_cache import EnvironmentCache
 from tqdm import tqdm
 import numpy as np
 
+from system.controller.simulation.pybullet_environment import wall_colors_by_description
+
 
 def crosscheck_rc(
     res: tuple[ReachabilityController, ReachabilityController], samples: SampleGenerator,
@@ -72,14 +74,7 @@ if __name__ == "__main__":
     parser.add_argument('--headless', help='Save plots instead of showing them', action='store_true')
     args = parser.parse_args()
 
-    if args.wall_colors == '1color':
-        textures = [ os.path.join( 'yellow_wall.png') ]
-    elif args.wall_colors == '3colors':
-        from system.controller.simulation.pybullet_environment import all_possible_textures
-        textures = all_possible_textures[:args.wall_colors]
-    elif args.wall_colors == 'patterns':
-        textures = lambda i : f'pattern-{i+1}.png'
-    env_kwargs={ 'wall_kwargs': { 'textures': textures } }
+    env_kwargs={ 'wall_kwargs': wall_colors_by_description(args.wall_colors) }
 
     with EnvironmentCache(override_env_kwargs=env_kwargs) as env_cache:
         env_model = 'Savinov_val3'
