@@ -119,7 +119,7 @@ class CognitiveMapInterface(ABC):
                     p.dump(file)
             except Exception:
                 filename = '(could not dump)'
-            self.print_debug(f'Adding node: #={pc_id}, position={p.env_coordinates}, angle={p.angle}, dump_file={filename}')
+            self.print_debug(f'[cognitive_map] Adding node: #={pc_id}, position={p.env_coordinates}, angle={p.angle}, dump_file={filename}')
         if self.max_capacity is not None and len(self.node_network.nodes) > self.max_capacity:
             raise self.TooManyPlaceCells()
         self.node_network.add_node(p, pos=tuple(p.pos))
@@ -158,7 +158,7 @@ class CognitiveMapInterface(ABC):
         """
         self.node_network.add_edge(p, q, weight=w, **kwargs)
         self.node_network.add_edge(q, p, weight=w, **kwargs)
-        self.print_debug(f'Adding bidirectional edge: p={self._place_cell_number(p)}, q={self._place_cell_number(q)}, weight={w}')
+        self.print_debug(f'[cognitive_map] Adding bidirectional edge: p={self._place_cell_number(p)}, q={self._place_cell_number(q)}, weight={w}')
 
     def save(self, filename: str, absolute_path=False):
         """ Stores the current state of the node_network to the file
@@ -400,10 +400,10 @@ class CognitiveMap(CognitiveMapInterface):
             reachable_qp, reachability_factor_qp = self.reach_estimator.get_reachability(q, p)
 
             if reachable_pq:
-                self.print_debug(f"Connecting new node: p={i}, q={j}, factor={reachability_factor_pq}")
+                self.print_debug(f"[cognitive_map] Connecting new node: p={i}, q={j}, factor={reachability_factor_pq}")
                 self.node_network.add_weighted_edges_from([(p, q, reachability_factor_pq)])
             if reachable_qp:
-                self.print_debug(f"Connecting new node: q={j}, p={i}, factor={reachability_factor_qp}")
+                self.print_debug(f"[cognitive_map] Connecting new node: q={j}, p={i}, factor={reachability_factor_qp}")
                 self.node_network.add_weighted_edges_from([(q, p, reachability_factor_qp)])
 
     def add_node_to_map(self, p: PlaceCell):
@@ -439,7 +439,7 @@ class CognitiveMap(CognitiveMapInterface):
                 pc = list(self.node_network.nodes)[idx_pc_active]
                 self.node_network.add_weighted_edges_from([(q, pc, 1)])
 
-            print(f"Updating {self.prior_idx_pc_firing=}")
+            self.print_debug(f"[proprioception] Updating {self.prior_idx_pc_firing=}")
             self.prior_idx_pc_firing = idx_pc_active
 
     def save(self, *args, **kwargs):
@@ -520,7 +520,7 @@ class LifelongCognitiveMap(CognitiveMapInterface):
         if np.max(pc_firing) > self.active_threshold:
             if self.prior_idx_pc_firing is None or pc_firing[self.prior_idx_pc_firing] / np.max(pc_firing) < 0.8:
                 self.prior_idx_pc_firing = np.argmax(pc_firing)
-                print(f'Updating {self.prior_idx_pc_firing=}')
+                self.print_debug(f'[proprioception] Updating {self.prior_idx_pc_firing=}')
             return pc_network.place_cells[self.prior_idx_pc_firing]
 #        else:
 #            print(f'max. firing[{np.argmax(pc_firing)}] = {np.max(pc_firing)} does not meet threshold {self.active_threshold}')
@@ -545,7 +545,7 @@ class LifelongCognitiveMap(CognitiveMapInterface):
                 pc_new = pc_network.place_cells[idx_pc_active]
                 if (q in self.node_network and pc_new in self.node_network and
                         q not in self.node_network[pc_new] and q != pc_new):
-                    self.print_debug(f"adding edge [{self.prior_idx_pc_firing}-{idx_pc_active}]")
+                    self.print_debug(f"[cognitive_map] adding edge [{self.prior_idx_pc_firing}-{idx_pc_active}]")
                     self.add_bidirectional_edge_to_map(q, pc_new,
                                                        sample_normal(0.5, self.sigma),
                                                        connectivity_probability=0.8,
@@ -595,7 +595,7 @@ class LifelongCognitiveMap(CognitiveMapInterface):
         self.update_edge_parameters(node_p, node_q, observation_p, success)
 
         self.print_debug(
-            f"edge [{list(self.node_network.nodes).index(node_p)}-{list(self.node_network.nodes).index(node_q)}]: " +
+            f"[navigation] edge [{list(self.node_network.nodes).index(node_p)}-{list(self.node_network.nodes).index(node_q)}]: " +
             f"success {success} conn {self.node_network[node_q][node_p]['connectivity_probability']}")
 
         if not success and self.remove_edges:
@@ -650,7 +650,7 @@ class LifelongCognitiveMap(CognitiveMapInterface):
         """ Helper function, removes bidirectional edge between two nodes """
         nodelist = list(self.node_network.nodes)
         self.print_debug(
-            f"deleting edge [{nodelist.index(node_p)}-{nodelist.index(node_q)}]: " +
+            f"[cognitive_map] deleting edge [{nodelist.index(node_p)}-{nodelist.index(node_q)}]: " +
             f"conn {self.node_network[node_q][node_p].get('connectivity_probability', '(no value)')}")
         self.node_network.remove_edge(node_p, node_q)
         self.node_network.remove_edge(node_q, node_p)
@@ -684,7 +684,7 @@ class LifelongCognitiveMap(CognitiveMapInterface):
                 if skip_pair(node_p, node_q):
                     continue
                 if self.are_duplicates(node_p, node_q):
-                    self.print_debug(f"Nodes {nodes.index(node_p)} and {nodes.index(node_q)} are duplicates, " +
+                    self.print_debug(f"[cognitive_map] Nodes {nodes.index(node_p)} and {nodes.index(node_q)} are duplicates, " +
                                      f"deleting {nodes.index(node_p)}")
                     for neighbor in self.node_network[node_p]:
                         if neighbor not in self.node_network[node_q] and neighbor != node_q:
@@ -692,7 +692,7 @@ class LifelongCognitiveMap(CognitiveMapInterface):
                             self.add_bidirectional_edge_to_map_no_weight(node_q, neighbor, **edge_attributes_dict)
                     deleted.append(node_p)
         for node in deleted:
-            self.print_debug(f'Remove node: reason=dedup, #={self._place_cell_number(node)}')
+            self.print_debug(f'[cognitive_map] Remove node: reason=dedup, #={self._place_cell_number(node)}')
             self.node_network.remove_node(node)
 
     def are_duplicates(self, node_p: PlaceCell, node_q: PlaceCell):
@@ -742,26 +742,34 @@ class LifelongCognitiveMap(CognitiveMapInterface):
         for i, line in enumerate(lines):
             full_line = line
             try:
+                tag, line_without_tag = line.split(' ', maxsplit=1)
+                if tag.startswith('[') and tag.endswith(']'):
+                    tag = tag[1:-1]
+                    line = line_without_tag
+                else:
+                    tag = None
                 if i == 0 and line.startswith('#') or ('python' in line.split(' ')):
                     import sys
                     print(line, file=sys.stderr)
-                elif any(line.startswith(it) for it in ('Using seed', 'Path', '[navigation]', '[cognitive_map] adding edge', 'LIMIT WAS REACHED STOPPING HERE', 'Fail :(')):
+                elif tag == 'navigation' or tag == 'drift':
+                    pass
+                elif any(line.startswith(it) for it in ('Using seed', 'Path', 'Last PC', 'adding edge', 'edge [', 'Vector navigation', 'Recomputed path:', 'LIMIT WAS REACHED STOPPING HERE')):
                     pass
                 elif line.startswith('Navigation '):
                     nb_steps += 1
-                elif line.startswith('[cognitive_map] Adding bidirectional edge: '):
-                    line = line.removeprefix('[cognitive_map] Adding bidirectional edge: ')
+                elif line.startswith('Adding bidirectional edge: '):
+                    line = line.removeprefix('Adding bidirectional edge: ')
                     kvpairs = [ kv.split('=') for kv in line.split(', ')]
                     kvpairs = { key: value for key, value in kvpairs }
                     self.add_bidirectional_edge_to_map_by_probability(pcs[int(kvpairs['p'])], pcs[int(kvpairs['q'])], p=float(kvpairs['weight']))
-                elif line.startswith('[cognitive_map] deleting edge ['):
-                    line = line.removeprefix('[cognitive_map] deleting edge [')
+                elif line.startswith('deleting edge ['):
+                    line = line.removeprefix('deleting edge [')
                     line = line.split(']')[0]
                     p, q = line.split('-')
                     p, q = int(p), int(q)
                     self.remove_bidirectional_edge(pcs[p], pcs[q])
-                elif line.startswith('[cognitive_map] Adding node: '):
-                    line = line.removeprefix('[cognitive_map] Adding node: ')
+                elif line.startswith('Adding node: '):
+                    line = line.removeprefix('Adding node: ')
                     kvpairs = [kv.split('=') for kv in line.split(', ')]
                     kvpairs = {key: value for key, value in kvpairs}
                     assert int(kvpairs['#']) == len(self.node_network.nodes), (int(kvpairs['#']), len(self.node_network.nodes))
@@ -783,11 +791,11 @@ class LifelongCognitiveMap(CognitiveMapInterface):
                         pc = PlaceCell.from_data(PlaceInfo(pos=pos, angle=NotImplemented, img=[0], lidar=NotImplemented, spikings=spikings))
                     pcs.append(pc)
                     self.add_node_to_map(pc)
-                elif line.startswith('[proprioception] Updating self.prior_idx_pc_firing'):
+                elif line.startswith('Updating self.prior_idx_pc_firing'):
                     pass
-                elif line.startswith('[proprioception] Robot position'):
+                elif line.startswith('Robot position'):
                     if robot_positions is not None:
-                        line = line.removeprefix('[proprioception] Robot position: ')
+                        line = line.removeprefix('Robot position: ')
                         assert line[0] == '[' and line[-1] == ']'; line = line[1:-1]
                         line = line.strip()
                         x, *_optional_space, y = line.split(' ')
