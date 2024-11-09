@@ -305,7 +305,7 @@ if __name__ == "__main__":
 
     one_traj_parser = subparsers.add_parser('path', help='(Try to) Navigate from a start to a goal node')
     one_traj_parser.add_argument('navigations', nargs='?',
-                                 type=lambda outer: map(lambda inner: map(int, inner.split(',')), outer.split(';')),
+                                 type=lambda outer: [[int(n) for n in inner.split(',')] for inner in outer.split(';')],
                                  default=((73, 21),),
                                  help='Start, intermediary nodes, and goal, separated by a comma.'
                                      +' Multiple navigations can be separated by a semicolon.'
@@ -327,6 +327,7 @@ if __name__ == "__main__":
         if map_file_after_lifelong_learning is not None and not map_file_after_lifelong_learning.startswith(args.env_model + '.'):
             map_file_after_lifelong_learning = args.env_model + '.' + map_file_after_lifelong_learning
 
+    lifelong_kwargs = {}
     if args.disable_lifelong_learning_features:
         if args.disable_lifelong_learning_features == []:
             args.disable_lifelong_learning_features = '+v,/v,+e,/e'
@@ -474,7 +475,8 @@ if __name__ == "__main__":
                 else: # no break
                     successful += 1
                 #tj.cognitive_map.draw()
-                tj.cognitive_map.save(filename=map_file_after_lifelong_learning)
+                if map_file_after_lifelong_learning is not None:
+                    tj.cognitive_map.save(filename=map_file_after_lifelong_learning)
                 if len(navigations) != 1:
                     print(f"Navigation {i} finished")
                 if plotting:

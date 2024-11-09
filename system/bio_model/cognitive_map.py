@@ -511,9 +511,11 @@ class LifelongCognitiveMap(CognitiveMapInterface):
         pc_network: PlaceCellNetwork = kwargs.get('pc_network', None)
         if exploration_phase and created_new_pc:
             is_mergeable, mergeable_values = self.is_mergeable(pc)
-            if is_mergeable:
-                return pc
-            self.add_and_connect_node(pc)
+            if not is_mergeable:
+                self.add_and_connect_node(pc)
+            else:
+                pc_network.place_cells.pop()
+                pc_firing = pc_firing[:-1]
         elif not exploration_phase and not created_new_pc:
             if self.add_edges:
                 self.process_add_edge(pc_firing, pc_network)

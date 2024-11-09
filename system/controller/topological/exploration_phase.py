@@ -102,7 +102,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('-e', "--env-model", default="Savinov_val3", choices=["Savinov_val3", "linear_sunburst", 'plane', 'final_layout'])
-    parser.add_argument('--re', dest='re_type', default='neural_network(re_mse_weights.50)')
+    parser.add_argument('--re', dest='re_type', default='spikings')
     parser.add_argument('--visualize', action='store_true')
     parser.add_argument('--mini', help='Use only a few trajectories', action='store_true')
     modes = parser.add_subparsers(dest='subcommand')

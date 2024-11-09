@@ -963,8 +963,9 @@ all_possible_textures = [file for file in sorted(os.listdir(WALL_TEXTURE_PATH)) 
 def wall_colors_by_description(description: Literal['1color', '3colors', 'patterns']) -> dict[Literal['textures'], Callable[[int], str]|list[str]]:
     if description == '1color':
         textures = [os.path.join('yellow_wall.png')]
-    elif description == '3colors':
-        textures = all_possible_textures[:description]
+    elif description.endswith('colors'):
+        nb_textures = int(description.removesuffix('colors'))
+        textures = all_possible_textures[:nb_textures]
     elif description == 'patterns':
         textures = lambda i: f'pattern-{i + 1}.png'
     else:
