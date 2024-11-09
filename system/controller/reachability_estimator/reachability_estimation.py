@@ -49,9 +49,19 @@ def reachability_estimator_factory(
         if type == 'neural_network':
             return NetworkReachabilityEstimator.from_file(debug=debug, **kwargs)
         else:
+            kwargs_from_type = {}
             type = type.removeprefix('neural_network')
             assert type.startswith('(') and type.endswith(')'); filename = type.strip('(').strip(')')
-            return NetworkReachabilityEstimator.from_file(filename, debug=debug, **kwargs)
+            match filename.split(','):
+                case filename, t_reachable, t_same:
+                    kwargs_from_type.update(threshold_same=float(t_same), threshold_reachable=float(t_reachable))
+                case filename, t_reachable:
+                    kwargs_from_type.update(threshold_reachable=float(t_reachable))
+                case filename,:
+                    pass
+                case _:
+                    raise ValueError(f'Couldn\'t parse {filename}')
+            return NetworkReachabilityEstimator.from_file(filename, debug=debug, **kwargs, **kwargs_from_type)
     elif type == 'simulation':
         return SimulationReachabilityEstimator(debug=debug, env=kwargs.get('env', None), env_cache=kwargs.get('env_cache', None), env_model=kwargs.get('env_model', None))
     elif type == 'view_overlap':
@@ -184,6 +194,8 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         debug: bool = True,
         batch_size: int = 64,
         config: SampleConfig = SampleConfig(),
+        threshold_same=0.933,
+        threshold_reachable=0.4,
         **_kwargs, # kwargs ignored for compatibility with reachability_estimator_factory
     ):
         """
@@ -194,7 +206,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         batch_size: int     -- size of batches (default 64)
         config              -- the SampleConfig to use for inputs
         """
-        super().__init__(threshold_same=0.933, threshold_reachable=0.4, debug=debug)
+        super().__init__(threshold_same=threshold_same, threshold_reachable=threshold_reachable, debug=debug)
 
         self.config = config
         if self.config.lidar == 'allo_bc':
