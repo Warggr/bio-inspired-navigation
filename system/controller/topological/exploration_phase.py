@@ -71,7 +71,6 @@ def waypoint_movement(
 
         compass = AnalyticalCompass(start_pos=path[0])
         for i, goal in enumerate(tqdm(goals)):
-            #print_debug(f"new waypoint with coordinates {goal}.", f'{i / len(goals) * 100} % completed.')
             try:
                 compass.reset_goal(goal)
                 goal_reached, last_pc = vector_navigation(env, compass, gc_network, step_limit=5000,
@@ -95,10 +94,6 @@ if __name__ == "__main__":
     Agent follows a hard-coded path to explore the environment and build the cognitive map. 
     """
     from system.controller.reachability_estimator.reachability_estimation import reachability_estimator_factory
-    from system.controller.reachability_estimator.training.train_multiframe_dst import Hyperparameters
-    from system.controller.reachability_estimator.ReachabilityDataset import SampleConfig
-    from system.controller.reachability_estimator.training.train_multiframe_dst import Hyperparameters
-    import os
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('-e', "--env-model", default="Savinov_val3", choices=["Savinov_val3", "linear_sunburst", 'plane', 'final_layout'])

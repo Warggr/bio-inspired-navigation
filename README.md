@@ -57,6 +57,7 @@ export DEBUG='localctrl&gains'
 
 #### Flags for DEBUG
 - `gains`: prints a line with the robot gains at each simulation time step.
+- `cogmap`: prints whenever the cognitive map is modified
 
 #### Flags for PLOTTING
 - `exploration`: plots trajectories used for exploration phase

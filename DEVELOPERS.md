@@ -9,3 +9,9 @@ However, some types are given only for the developer's convenience and would emi
 
 # Misc
 There's a type `AllowedMapName` in system.types. Variable of that type are usually called either `env_model` or `map_name`, there's no logic behind when they're called what.
+
+# Feature backlog
+
+- During the exploration phase, we create a trajectories dataset. Couldn't we reuse this for future exploration phases,
+instead of actually doing the simulation?
+- CognitiveMaps should have an `env_model` attribute

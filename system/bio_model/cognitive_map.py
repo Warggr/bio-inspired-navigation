@@ -21,6 +21,7 @@ from system.bio_model.place_cell_model import PlaceCell, PlaceCellNetwork
 ReachabilityEstimator = 'ReachabilityEstimator'
 
 from system.controller.reachability_estimator._types import PlaceInfo
+from system.types import AllowedMapName, PositionAndOrientation
 from typing import Optional, Literal, Callable, Self, Iterable
 from system.debug import DEBUG
 from deprecation import deprecated
@@ -191,7 +192,7 @@ class CognitiveMapInterface(ABC):
             filename = os.path.join(directory, filename)
         self.node_network = nx.read_gpickle(filename)
 
-    def draw(self, with_labels: bool = True, colors: Optional[list[float]] = None):
+    def draw(self, with_labels: bool = True, colors: Optional[list[float]] = None, **draw_kwargs):
         """ Plot the cognitive map
 
         arguments:
@@ -206,7 +207,7 @@ class CognitiveMapInterface(ABC):
             kwargs.update(dict(node_color='#0065BD', node_size=120, edge_color='#4A4A4A80', width=2))
         if colors:
             kwargs['node_color'] = colors
-        nx.draw(self.node_network, pos, **kwargs)
+        nx.draw(self.node_network, pos, **kwargs, **draw_kwargs)
         plt.show()
 
     def print_debug(self, *params):
@@ -241,13 +242,21 @@ class CognitiveMapInterface(ABC):
         """
         reach_estimator = reach_estimator or self.reach_estimator
 
-        pc_network = PlaceCellNetwork(self.reach_estimator)
+        pc_network = PlaceCellNetwork(reach_estimator)
         pc_network.place_cells = list(self.node_network.nodes.keys())
         return pc_network
 
-    def test_place_cell_network(self, env: 'PybulletEnvironment', gc_network, from_data=False):
+    def test_place_cell_network(
+        self,
+        start_pos_angle: PositionAndOrientation,
+        arena_size: int,
+        env_model: AllowedMapName,
+        gc_network,
+        from_data: str|bool=False,
+        display_freq: int=8,
+    ):
         """ Test the drift error of place cells stored in the cognitive map """
-        from system.controller.local_controller.local_navigation import LinearLookaheadGcCompass
+        from system.controller.local_controller.local_navigation import LinearLookaheadGcCompass, PodGcCompass
         from system.controller.local_controller.compass import AnalyticalCompass
 
         delta_avg = 0
@@ -258,29 +267,37 @@ class CognitiveMapInterface(ABC):
         if from_data:
             dirname = os.path.join(os.path.dirname(__file__), "../../experiments/drift_error")
 
-            pred_gvs = np.load(os.path.join(dirname, "pred_gvs.npy"))
-            true_gvs = np.load(os.path.join(dirname, "true_gvs.npy"))
+            suffix = f'-{from_data}' if type(from_data) == str else ''
+
+            pred_gvs = np.load(os.path.join(dirname, f"pred_gvs{suffix}.npy"))
+            true_gvs = np.load(os.path.join(dirname, f"true_gvs{suffix}.npy"))
             error = true_gvs - pred_gvs
             delta = [np.linalg.norm(i) for i in error]
             delta_avg = np.mean(delta)
 
         else:
-            compass = LinearLookaheadGcCompass(arena_size=env.arena_size, gc_network=gc_network)
+            dirname = os.path.join(os.path.dirname(__file__), "../../experiments/drift_error")
+            suffix = '-plane-ll'
+            pred_gvs = np.load(os.path.join(dirname, f"pred_gvs{suffix}.npy"))
+
+            from tqdm import tqdm
+
+            compass = LinearLookaheadGcCompass(arena_size=arena_size, gc_network=gc_network)
             # decode goal vectors from current position to every place cell on the cognitive map
             node_list: list[PlaceCell] = list(self.node_network.nodes)
             nodes_length = len(node_list)
-            for i, p in enumerate(node_list):
-                print("Decoding goal vector to place Cell", i, "out of", nodes_length)
-                compass.reset_goal(compass.parse(p))
+            for i, p in enumerate(tqdm(node_list)):
+                compass.reset_goal_pc(p)
 
-                pred_gv = compass.calculate_goal_vector()
-                true_gv = AnalyticalCompass(start_pos=env.robot.position, goal_pos=p.pos).calculate_goal_vector()
+                #pred_gv = compass.calculate_goal_vector()
+                pred_gv = pred_gvs[i]
+                true_gv = AnalyticalCompass(start_pos=start_pos_angle[0], goal_pos=p.pos).calculate_goal_vector()
 
                 error_gv = true_gv - pred_gv
                 delta = np.linalg.norm(error_gv)
 
                 delta_avg += delta
-                pred_gvs.append(pred_gv)
+                #pred_gvs.append(pred_gv)
                 true_gvs.append(true_gv)
                 error.append(error_gv)
 
@@ -293,10 +310,10 @@ class CognitiveMapInterface(ABC):
 
         plt.figure()
         ax = plt.gca()
-        pH.add_environment(ax, env.env_model)
-        pH.add_robot(ax, *env.robot.position_and_angle)
+        pH.add_environment(ax, env_model)
+        pH.add_robot(ax, *start_pos_angle)
         pos = nx.get_node_attributes(self.node_network, 'pos')
-        nx.draw_networkx_nodes(self.node_network, pos, node_color='#0065BD80', node_size=3000)
+        nx.draw_networkx_nodes(self.node_network, pos, node_color='#0065BD80')
 
         directory = "experiments/"
         if not os.path.exists(directory):
@@ -311,11 +328,11 @@ class CognitiveMapInterface(ABC):
 
         for i, gv in enumerate(pred_gvs):
             # control the amount of goal vectors displayed in the plot
-            if i % 2 == 0 or i % 3 == 0 or i % 5 == 0:
+            if i % display_freq != 0:
                 continue
-            plt.quiver(env.robot.position[0], env.robot.position[1], gv[0], gv[1], color='grey', angles='xy',
+            plt.quiver(start_pos_angle[0][0], start_pos_angle[0][1], gv[0], gv[1], color='grey', angles='xy',
                        scale_units='xy', scale=1, width=0.005)
-            plt.quiver(env.robot.position[0] + gv[0], env.robot.position[1] + gv[1], error[i][0], error[i][1],
+            plt.quiver(start_pos_angle[0][0] + gv[0], start_pos_angle[0][1] + gv[1], error[i][0], error[i][1],
                        color='red', angles='xy', scale_units='xy', scale=1, width=0.005)
 
         plt.show()
@@ -724,7 +741,12 @@ class LifelongCognitiveMap(CognitiveMapInterface):
                     connectivity_probability = self.reach_estimator.get_connectivity_probability(weight)
                     self.add_bidirectional_edge_to_map_by_probability(pc, node, weight)
 
-    def retrace_logs(self, lines: Iterable[str], callbacks: list[Callable[[int, Self], None]] = [], robot_positions: list|None = None, accept_incomplete_last_line=False) -> int:
+    def retrace_logs(self, lines: Iterable[str],
+        callbacks: list[Callable[[int, Self], None]] = [],
+        robot_positions: list|None = None,
+        accept_incomplete_last_line=False,
+        recreate_pcs=True,
+    ) -> int:
         """
         Read a log file and replay each step described there. So a canceled navigation can be continued later.
         parameters:
@@ -732,6 +754,7 @@ class LifelongCognitiveMap(CognitiveMapInterface):
         callback -- a function that will be called after every line
         robot_positions -- a list that will be filled with the reported positions of the robot
         accept_incomplete_last_line -- do not raise an error if the last line raises an error. Buffering can cause the last line to be incomplete
+        recreate_pcs -- recreate the PCs that are reported as created in the log. Not necessary if you don't need the full final cognitive map.
 
         returns:
         nb_steps: int    -- the number of navigation steps
@@ -755,7 +778,7 @@ class LifelongCognitiveMap(CognitiveMapInterface):
                     print(line, file=sys.stderr)
                 elif tag == 'navigation' or tag == 'drift':
                     pass
-                elif any(line.startswith(it) for it in ('Using seed', 'Path', 'Last PC', 'adding edge', 'edge [', 'Vector navigation', 'Recomputed path:', 'LIMIT WAS REACHED STOPPING HERE')):
+                elif any(line.startswith(it) for it in ('Using seed', 'Path', 'Last PC', 'adding edge', 'edge [', 'Vector navigation', 'Recomputed path:', 'LIMIT WAS REACHED STOPPING HERE', 'Fail :(')):
                     pass
                 elif line.startswith('Navigation '):
                     nb_steps += 1
@@ -781,15 +804,18 @@ class LifelongCognitiveMap(CognitiveMapInterface):
                     try:
                         pc = PlaceCell.from_data(PlaceCell.load(kvpairs['dump_file']))
                     except (KeyError, FileNotFoundError):
-                        from system.controller.local_controller.local_navigation import create_gc_spiking
-                        from system.bio_model.grid_cell_model import GridCellNetwork
-                        if gc_network is None:
-                            gc_network = GridCellNetwork(from_data=True)
-                        gc_network.set_as_current_state(pcs[-1].spikings)
-                        if np.linalg.norm(np.array(pos) - np.array(pcs[-1].pos)) < 0.1:
-                            spikings = pcs[-1].spikings
+                        if recreate_pcs:
+                            from system.controller.local_controller.local_navigation import create_gc_spiking
+                            from system.bio_model.grid_cell_model import GridCellNetwork
+                            if gc_network is None:
+                                gc_network = GridCellNetwork(from_data=True)
+                            gc_network.set_as_current_state(pcs[-1].spikings)
+                            if np.linalg.norm(np.array(pos) - np.array(pcs[-1].pos)) < 0.1:
+                                spikings = pcs[-1].spikings
+                            else:
+                                spikings = create_gc_spiking(start=pcs[-1].pos, goal=pos, gc_network_at_start=gc_network)
                         else:
-                            spikings = create_gc_spiking(start=pcs[-1].pos, goal=pos, gc_network_at_start=gc_network)
+                            spikings = NotImplemented
                         pc = PlaceCell.from_data(PlaceInfo(pos=pos, angle=NotImplemented, img=[0], lidar=NotImplemented, spikings=spikings))
                     pcs.append(pc)
                     self.add_node_to_map(pc)

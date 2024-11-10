@@ -31,6 +31,7 @@ TUM_colors = {
 
 def add_environment(ax, env_model: AllowedMapName, variant: str|None = None):
     maze_filename = 'maze_topview_binary'
+    ax.axis('off')
 
     if env_model == "obstacle_map_0":
         distance = float(variant)-1 if variant is not None else 0
@@ -76,8 +77,8 @@ def environment_plot(env_model: AllowedMapName, variant: str|None = None):
     return ax
 
 
-def add_robot(ax, xy: tuple[float, float], angle: float):
-    circle = plt.Circle((xy[0], xy[1]), 0.2, color=TUM_colors['TUMDarkGray'], alpha=1)
+def add_robot(ax, xy: tuple[float, float], angle: float, color=TUM_colors['TUMDarkGray']):
+    circle = plt.Circle((xy[0], xy[1]), 0.2, color=color, alpha=1)
     ax.add_artist(circle)
 
     ax.quiver(xy[0], xy[1], np.cos(angle) * 0.4, np.sin(angle) * 0.4, color=TUM_colors['TUMDarkGray'], headwidth=7,

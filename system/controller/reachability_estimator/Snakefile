@@ -163,7 +163,7 @@ rule:
 
 rule:
 	input: "data/results/all_runs.mat"
-	output: "data/results/train_results.pgf"
-	shell: "cd scripts && matlab -nosplash -nodesktop -r scatterplot ../{input} ../{output}"
+	output: pgf="data/results/train_results.pgf", png="data/results/train_results.png"
+	shell: "cd scripts && matlab -nosplash -nodesktop -r scatterplot ../{input} ../{output.png} ../{output.pgf}"
 	# or with octave:
-	# shell: 'cd scripts/ && octave -qf <<<"scatterplot ../{input} ../{output}"'
+	# shell: 'cd scripts/ && octave -qf <<<"scatterplot ../{input} ../{output.png} {output.pgf}"'

@@ -11,7 +11,8 @@ from system.controller.reachability_estimator.data_generation.dataset import pla
 from system.controller.simulation.pybullet_environment import PybulletEnvironment
 from system.types import Vector2D
 from typing import Optional
-from system.debug import PLOTTING
+from system.debug import PLOTTING, DEBUG
+
 plotting = 'drift' in PLOTTING
 
 if plotting:
@@ -185,7 +186,8 @@ class PositionEstimation:
         #print("Calling PositionEstimation")
         current_observed_position = place_info((*robot.position_and_angle, self.gc_network.consolidate_gc_spiking().flatten()), robot.env)
         confidence = self.re.reachability_factor(self.current_position, current_observed_position)
-        self.print_error(end='\r')
+        if 'drift' in DEBUG:
+            self.print_error(end='\r')
         if confidence < self.confidence_threshold:
             priors = self.pc_network.compute_firing_values(self.gc_network)
             likelihoods = self.re.reachability_factor_batch(current_observed_position, self.pc_network.place_cells)
@@ -200,10 +202,12 @@ class PositionEstimation:
                     actual_position = self.pc_network.place_cells[max_likelihood_estimate]
                     self.compass.reset_position(self.compass.parse(actual_position))
                     goal_vector = self.compass.calculate_goal_vector()
-                    print('\nCorrecting:', end='\t')
-                    self.print_error()
+                    if 'drift' in DEBUG:
+                        print('\nCorrecting:', end='\t')
+                        self.print_error()
                 self.counter = 20
         return goal_vector
+
 
 if __name__ == "__main__":
     from system.controller.topological.topological_navigation import TopologicalNavigation

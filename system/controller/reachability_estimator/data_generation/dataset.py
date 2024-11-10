@@ -400,7 +400,8 @@ def assert_conforms_to_type(data, dtype):
         else:
             assert dtyp.shape[0] == len(field), f"{dtyp.shape} != {len(field)}"
 
-from system.controller.local_controller.local_navigation import setup_gc_network
+from system.bio_model.grid_cell_model import GridCellNetwork
+from system.controller.local_controller.local_navigation import create_gc_spiking
 
 def random_coordinates(xmin, xmax, ymin, ymax):
     return np.array([ random.uniform(xmin, xmax), random.uniform(ymin, ymax) ])
@@ -437,16 +438,18 @@ class RandomSamples:
 
         dt = 1
         # TODO Pierre: does that actually work?
-        gc_network = setup_gc_network(dt)
+        gc_network = GridCellNetwork(dt, from_data=True)
         start_spikings: FlatSpikings = gc_network.consolidate_gc_spiking().flatten()
-        gc_network.track_movement(xy_speed=(p2 - p1)/dt)
-        goal_spikings: FlatSpikings = gc_network.consolidate_gc_spiking().flatten()
+        goal_spikings: FlatSpikings = create_gc_spiking(p1, p2, gc_network).flatten()
 
         a1, a2 = [ random.uniform(-np.pi, np.pi) for _ in range(2) ]
         return Sample(place_info((p1, a1, start_spikings), self.env), place_info((p2, a2, goal_spikings), self.env)), path_l, self.map.name
 
     def sample(self) -> tuple[Sample, float, str]:
         return self.points_to_sample(*self.points())
+
+    def __iter__(self):
+        return self
 
     def __next__(self):
         return self.sample()
@@ -570,12 +573,11 @@ def display_samples(hf: h5py.File, imageplot=False):
             break
 
         if imageplot and i < 5:
-            img = np.reshape(datapoint[0], (64, 64, 4))
-            imgplot = plt.imshow(img)
-            plt.show()
-
-            img = np.reshape(datapoint[1], (64, 64, 4))
-            imgplot = plt.imshow(img)
+            fig, axes = plt.subplots(2, 2)
+            for j, column in enumerate(('start_observation', 'goal_observation')):
+                img = np.reshape(datapoint[column], (64, 64, 4))
+                axes[j,0].imshow(img[:,:,:3])
+                axes[j,1].imshow(img[:,:,3])
             plt.show()
         if datapoint[2] == 1.0:
             reached += 1
@@ -600,6 +602,20 @@ class CompositeReachabilityEstimator(ReachabilityController):
     #override
     def reachable(self, *args, **kwargs):
         return any(controller.reachable(*args, **kwargs) for controller in self.controllers)
+
+
+def sample_generator_factory(type: str, env_cache: EnvironmentCache) -> Iterable[tuple[Vector2D, Vector2D]]:
+    if type.endswith('_traj'):
+        filename = os.path.join(get_path(), "data", "trajectories", args.traj_file)
+        filename = os.path.realpath(filename)
+        rd = TrajectoriesDataset([filename], env_cache=env_cache)
+        return rd.iterate(mode=type)
+    elif type == 'random':
+        return RandomSamples(env_cache["Savinov_val3"])
+    elif type == 'random_circle':
+        return RandomSamplesWithLimitedDistance(env_cache["Savinov_val3"])
+    else:
+        raise ValueError(type)
 
 
 if __name__ == "__main__":
@@ -642,17 +658,7 @@ if __name__ == "__main__":
             for controller_type in args.re.split('|')
         ])
 
-        if args.gen.endswith('_traj'):
-            filename = os.path.join(get_path(), "data", "trajectories", args.traj_file)
-            filename = os.path.realpath(filename)
-            rd = TrajectoriesDataset([filename], env_cache=env_cache)
-            samples = rd.iterate(mode=args.gen)
-        else:
-            if args.gen == 'random':
-                samples = RandomSamples(env_cache["Savinov_val3"])
-            elif args.gen == 'random_circle':
-                samples = RandomSamplesWithLimitedDistance(env_cache["Savinov_val3"])
-            else: raise ValueError(args.gen)
+        samples = sample_generator_factory(args.gen, env_cache)
 
         # Output file
         suffix = '' if args.wall_colors == '1color' else f'-{args.wall_colors}'
@@ -665,7 +671,7 @@ if __name__ == "__main__":
             ('wall_colors', args.wall_colors),
         ]:
             if attribute in f.attrs:
-                assert f.attrs[attribute] == value
+                assert f.attrs[attribute] == value, f"{attribute}: expected {value}, is {f.attrs[attribute]}"
             else:
                 f.attrs.create(attribute, value)
 

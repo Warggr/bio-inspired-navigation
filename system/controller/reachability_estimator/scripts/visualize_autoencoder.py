@@ -17,10 +17,10 @@ def show(net: ImageAutoencoder, images: np.ndarray[Image]):
     with torch.no_grad():
         decodeds = net(torch.tensor(images).float()).int().numpy()
     for image, decoded in zip(images, decodeds):
-        fig, axes = plt.subplots(2, 2)
-        for i, img in enumerate([image, decoded]):
-            axes[i,0].imshow(img)
-            axes[i,1].imshow(img[:,:,3], cmap='gray')
+        fig, axes = plt.subplots(1, 2)
+        for i, (img, name) in enumerate(zip([image, decoded], ('Original', 'Decoded'))):
+            axes[i].imshow(img[:,:,:3])
+            axes[i].title.set_text(name + ' image')
         plt.show()
 
 if __name__ == "__main__":

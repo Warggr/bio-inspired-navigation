@@ -1,4 +1,4 @@
-function []=scatterplot(input_mat, output_pgf)
+function []=scatterplot(input_mat, output_pgf, output_png)
 
 T = load(input_mat);
 labels = cellstr(T.x);
@@ -14,7 +14,6 @@ yticks(1:11)
 yticklabels(labels)
 ylabel('Configurations')
 saveas (1, output_pgf, 'tikz')
-
-disp("Hello World")
+saveas (1, output_png, 'png')
 
 end

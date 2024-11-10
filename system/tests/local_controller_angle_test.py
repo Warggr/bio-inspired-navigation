@@ -55,29 +55,31 @@ def angle_test(
         success, _ = vector_navigation(env, compass, controller=controller)
     return success
 
+
 min_fail_angle = np.radians(90)
 max_succ_angle = np.radians(0)
 
-import argparse
-from system.parsers import controller_parser, controller_creator
+if __name__ == "__main__":
+    import argparse
+    from system.parsers import controller_parser, controller_creator
 
-parser = argparse.ArgumentParser(parents=[controller_parser])
-parser.add_argument('precision', nargs='?', type=float, default=5, help='Precision, in degrees')
-parser.add_argument('--visualize', action='store_true')
-args = parser.parse_args()
+    parser = argparse.ArgumentParser(parents=[controller_parser])
+    parser.add_argument('precision', nargs='?', type=float, default=5, help='Precision, in degrees')
+    parser.add_argument('--visualize', action='store_true')
+    args = parser.parse_args()
 
-precision = np.radians(args.precision)
-controller = controller_creator(args)
-controller.on_reset_goal = [hook for hook in controller.on_reset_goal if type(hook) != controller_rules.TurnToGoal]
+    precision = np.radians(args.precision)
+    controller = controller_creator(args, env_model="obstacle_map_2")
+    controller.on_reset_goal = [hook for hook in controller.on_reset_goal if type(hook) != controller_rules.TurnToGoal]
 
-with PybulletEnvironment(env_model="obstacle_map_2", visualize=args.visualize, contains_robot=False) as env:
-    while(min_fail_angle - max_succ_angle > precision):
-        angle = (max_succ_angle + min_fail_angle) / 2
-        print(f"Trying angle={np.degrees(angle)}...", file=sys.stderr)
-        success = angle_test(angle, controller, env)
-        print("Success!" if success else "Fail :(", file=sys.stderr)
-        if success:
-            max_succ_angle = angle
-        else:
-            min_fail_angle = angle
-    print(f"Maximum handle-able angle is {np.degrees(max_succ_angle)} ~ {np.degrees(min_fail_angle)}")
+    with PybulletEnvironment(env_model="obstacle_map_2", visualize=args.visualize, contains_robot=False) as env:
+        while(min_fail_angle - max_succ_angle > precision):
+            angle = (max_succ_angle + min_fail_angle) / 2
+            print(f"Trying angle={np.degrees(angle)}...", file=sys.stderr)
+            success = angle_test(angle, controller, env)
+            print("Success!" if success else "Fail :(", file=sys.stderr)
+            if success:
+                max_succ_angle = angle
+            else:
+                min_fail_angle = angle
+        print(f"Maximum handle-able angle is {np.degrees(max_succ_angle)} ~ {np.degrees(min_fail_angle)}")

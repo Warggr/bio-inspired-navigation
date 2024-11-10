@@ -26,16 +26,18 @@ boundaryCellEncoder = BoundaryCellNetwork.load()
 class SampleConfig:
     def __init__(self,
         grid_cell_spikings=False,
-        lidar: Optional[Literal['raw_lidar', 'ego_bc', 'allo_bc']]=None,
+        lidar: Literal['raw_lidar', 'ego_bc', 'allo_bc']|None=None,
         images: bool|Literal['zeros', 'fixed'] = True,
         image_crop: int|None = None,
         dist = False,
+        depth = False,
     ):
         self.with_grid_cell_spikings = grid_cell_spikings
         self.lidar = lidar
         self.images = images
         self.image_crop = image_crop
         self.with_dist = dist
+        self.depth = depth
 
     def suffix(self) -> str:
         return (''
@@ -44,6 +46,7 @@ class SampleConfig:
             + ('+noimages' if not self.images else '' if self.images is True else f'+{self.images}images')
             + (('+crop' + ('X' if self.image_crop > 0 else 'N') + str(abs(self.image_crop))) if self.image_crop is not None else '')
             + ('+dist' if self.with_dist else '')
+            + ('+depth' if self.depth else '')
         )
 
     @staticmethod
@@ -71,6 +74,8 @@ class SampleConfig:
                 other_attrs['fc_layers'] = list(map(int, tag[2:].split(',')))
             elif tag == 'dropout':
                 other_attrs['dropout'] = True
+            elif tag == '+depth':
+                config.depth = True
             else:
                 raise ValueError(f'Unrecognized tag: {repr(tag)}')
         return config, other_attrs
@@ -143,7 +148,10 @@ class ReachabilityDataset(torch.utils.data.Dataset):
                 img_src, img_dst = self.fixed_image, self.fixed_image
             else:
                 img_src, img_dst = sample.src.img, sample.dst.img
+
             for image in (img_src, img_dst):
+                if not self.config.depth:
+                    image[:, :, 3] = 255
                 if self.config.image_crop is not None and self.config.image_crop > 0:
                     image = image.copy()
                     lowbound, upbound = self.config.image_crop, 64-self.config.image_crop

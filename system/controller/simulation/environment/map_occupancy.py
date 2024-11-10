@@ -43,6 +43,7 @@ else:
 
 from system.types import Vector2D, AllowedMapName
 from system.types import Angle, Vector2D, PositionAndOrientation, AllowedMapName
+from typing import Literal
 
 
 class Map:
@@ -253,7 +254,9 @@ class Map:
         return dilated
 
     def find_path(self, start_pos: Vector2D, goal_pos: Vector2D) -> list[Vector2D]:
-        assert self.suitable_position_for_robot(start_pos) and self.suitable_position_for_robot(goal_pos), self.draw_points([start_pos, goal_pos])
+        if not (self.suitable_position_for_robot(start_pos) and self.suitable_position_for_robot(goal_pos)):
+            #self.draw_points([start_pos, goal_pos])
+            raise ValueError('start or goal not suitable')
         start_coord = self.grid_coord(start_pos[0], start_pos[1], self.path_map_division)
         goal_coord = self.grid_coord(goal_pos[0], goal_pos[1], self.path_map_division)
 
@@ -421,16 +424,19 @@ class Map:
 
         return result
 
-    def view_overlap(self, pos1, heading1: Angle, pos2, heading2: Angle, fov,
-                     n_test_rays=100, offset=0.06, mode='plane', vis=None) -> tuple[float, float]:
+    def get_view_points(self,
+        pos: PositionAndOrientation,
+        fov, n_test_rays=100, offset=0.06,
+        mode: Literal['plane', 'lidar']='plane',
+    ) -> list[Vector2D]:
         """
-        Estimate the overlapping area between two camera poses
+        Samples points from a field of view
         :param offset: the amount to offset laser points to make them outside obstacles. The default
                        value should work in most cases.
                mode: 'plane' if assuming a depth camera. 'lidar' if assuming a lidar.
-        :return: (percentage of the image area in camera1 that is visible in camera2,
-                  percentage of the image area in camera2 that is visible in camera1)
+        :return:
         """
+        pos, heading = pos
 
         # Shrink depths slightly to reduce the possibility of laser points being trapped into
         # obstacles.
@@ -442,18 +448,20 @@ class Map:
         assert fov != 0
 
         if mode == 'plane':
-            depth1 = self.get_1d_depth_plane(pos1, n_test_rays, heading1, fov)
-            depth2 = self.get_1d_depth_plane(pos2, n_test_rays, heading2, fov)
-            xy1 = offset_points(depth_to_xy_plane(depth1, pos1, heading1, fov))
-            xy2 = offset_points(depth_to_xy_plane(depth2, pos2, heading2, fov))
+            depth = self.get_1d_depth_plane(pos, n_test_rays, heading, fov)
+            xy = offset_points(depth_to_xy_plane(depth, pos, heading, fov))
         elif mode == 'lidar':
-            depth1 = self.get_1d_depth(pos1, n_test_rays, heading1, fov)
-            depth2 = self.get_1d_depth(pos2, n_test_rays, heading2, fov)
-            xy1 = offset_points(depth_to_xy(depth1, pos1, heading1, fov))
-            xy2 = offset_points(depth_to_xy(depth2, pos2, heading2, fov))
+            depth = self.get_1d_depth(pos, n_test_rays, heading, fov)
+            xy = offset_points(depth_to_xy(depth, pos, heading, fov))
         else:
             raise RuntimeError('Unsupported mode %s' % mode)
+        return xy
 
+    def view_overlap(self, pos1, heading1: Angle, pos2, heading2: Angle, fov, vis=None, **kwargs) -> tuple[float, float]:
+        """
+        :return: (percentage of the image area in camera1 that is visible in camera2,
+                  percentage of the image area in camera2 that is visible in camera1)
+        """
         # Non vectorized version
         # def inside_fov(x, y, pos, heading, fov):
         #     """
@@ -466,6 +474,8 @@ class Map:
         #     return x1 * ux + y1 * uy > math.cos(fov * 0.5)
         # def visible(x, y, pos, heading, fov):
         #     return inside_fov(x, y, pos, heading, fov) and self.visible(x, y, pos[0], pos[1])
+        xy1 = self.get_view_points((pos1, heading1), fov=fov, **kwargs)
+        xy2 = self.get_view_points((pos2, heading2), fov=fov, **kwargs)
 
         if vis:
             import matplotlib.pyplot as plt
@@ -502,7 +512,7 @@ class Map:
         #     xs, ys = zip(*visible_in_cam1)
         #     vis.scatter('visible_in_cam1', xs, ys, c='g', marker='x')
 
-        return sum(visible_in_cam2) / float(n_test_rays), sum(visible_in_cam1) / float(n_test_rays)
+        return sum(visible_in_cam2) / len(visible_in_cam2), sum(visible_in_cam1) / len(visible_in_cam1)
 
     def view_overlap_matrix(self, locations, headings, fov, n_test_rays=100, offset=0.06):
         """
@@ -624,7 +634,8 @@ class MapLayout(Map):
     ''' Transform PNG of top view of map layout to black(occupied) and white(free) image'''
     ''' 2. Transform that image into a black(occupied) and white(free space) image'''
 
-    def png_to_binary(self, filepath):
+    @staticmethod
+    def png_to_binary(filepath):
         filepath = os.path.join(os.path.dirname(__file__), filepath)
         im_gray = cv2.imread(filepath, cv2.IMREAD_GRAYSCALE)
         (thresh, im_bw) = cv2.threshold(im_gray, 128, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)

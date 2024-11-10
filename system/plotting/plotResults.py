@@ -67,13 +67,15 @@ rc('text', usetex=True)
 def plotCognitiveMap(
     ax, cognitive_map,
     path: list['PlaceCell']|None=None,
-    with_labels = False,
-    with_directions = False,
+    with_labels=False,
+    with_directions=False,
+    with_edges=True,
 ):
     G = cognitive_map.node_network
     pos = nx.get_node_attributes(G, 'pos')
     kwargs = {}
-    nx.draw_networkx_edges(G, pos, edge_color='#CCCCC6', ax=ax)
+    if with_edges:
+        nx.draw_networkx_edges(G, pos, edge_color='#CCCCC6', ax=ax)
 
     if with_directions:
         for node in G.nodes:
@@ -90,14 +92,40 @@ def plotCognitiveMap(
     else:
         nx.draw_networkx_nodes(G, pos, node_color='#0065BD80', node_size=60, ax=ax, **kwargs)
         if with_labels:
-            nx.draw_networkx_labels(G, pos, labels={j: str(i) for i, j in enumerate(G.nodes)})
+            nx.draw_networkx_labels(G, pos, ax=ax, labels={j: str(i) for i, j in enumerate(G.nodes)})
 
     if path:
-        # draw_path
-        path_edges = list(zip(path, path[1:]))
-        nx.draw_networkx_nodes(G, pos, nodelist=path, node_color='#E3722280', node_size=60, ax=ax)
-        G = G.to_undirected()
-        nx.draw_networkx_edges(G, pos, edgelist=path_edges, edge_color='#E3722280', width=3, ax=ax)
+        plotPath(ax, cognitive_map, path)
+
+def plotPathSegments(
+    ax, cognitive_map,
+    segments: list[tuple['PlaceCell','PlaceCell']]|list[tuple[int, int]],
+    color='#E3722280',
+):
+    G = cognitive_map.node_network
+    pos = nx.get_node_attributes(G, 'pos')
+    if type(segments[0][0]) is int:
+        pcs = list(cognitive_map.node_network.nodes)
+        segments = [(pcs[seg[0]], pcs[seg[1]]) for seg in segments]
+    G = G.to_undirected()
+    nx.draw_networkx_edges(G, pos, edgelist=segments, edge_color=color, width=3, ax=ax)
+
+
+def plotPath(
+    ax, cognitive_map,
+    path: list['PlaceCell']|list[int],
+    color='#E3722280',
+):
+    G = cognitive_map.node_network
+    pos = nx.get_node_attributes(G, 'pos')
+    if type(path[0]) is int:
+        pcs = list(cognitive_map.node_network.nodes)
+        path = [pcs[i] for i in path]
+    # draw_path
+    path_edges = list(zip(path, path[1:]))
+    nx.draw_networkx_nodes(G, pos, nodelist=path, node_color=color, node_size=60, ax=ax)
+    G = G.to_undirected()
+    nx.draw_networkx_edges(G, pos, edgelist=path_edges, edge_color=color, width=3, ax=ax)
 
 
 def plotTrajectory(ax, xy_coordinates, color='#992225', **kwargs):
@@ -600,7 +628,7 @@ def error_plot(error_array):
     plt.show()
 
 
-def cognitive_map_plot(pc_network, cognitive_map, xy_coordinates=None, pc_active_array=None, environment=None):
+def cognitive_map_plot(pc_network, environment: AllowedMapName, xy_coordinates=None, pc_active_array=None):
     plt.figure()
 
     if xy_coordinates is not None:

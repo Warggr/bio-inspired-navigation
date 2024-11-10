@@ -11,11 +11,7 @@ import numpy as np
 import time
 import h5py
 
-import sys
 import os
-
-if __name__ == "__main__":
-    sys.path.append(os.path.join(os.path.dirname(__file__), "../../../.."))
 
 from system.controller.simulation.pybullet_environment import PybulletEnvironment, Robot
 from system.controller.simulation.environment_config import environment_dimensions
@@ -24,10 +20,11 @@ from system.controller.local_controller.compass import AnalyticalCompass
 from system.controller.local_controller.local_navigation import setup_gc_network, vector_navigation, WaypointInfo
 from system.controller.simulation.environment.map_occupancy import MapLayout
 import system.types as types
+from system.debug import DEBUG, PLOTTING
 
 import system.plotting.plotResults as plot
 
-from typing import List, Iterator, Tuple
+from typing import Iterator
 
 def get_path():
     """ returns path to data storage folder """
@@ -36,15 +33,13 @@ def get_path():
 
 
 # Print debug statements
-debug = os.getenv('DEBUG', False)
+debug = bool(DEBUG)
+plotting = bool(PLOTTING)
 
 
 def print_debug(*params):
     if debug:
         print(*params)
-
-
-plotting = os.getenv('PLOTTING', False)
 
 
 def display_trajectories(filepath):
@@ -82,10 +77,13 @@ def display_trajectories(filepath):
 
 Dimensions = tuple[float, float, float, float]
 
+
+# TODO: I think there's a duplicate function in map_layout or something
 def random_location(dimensions: Dimensions, generator: np.random.RandomState) -> types.Vector2D:
     x = np.around(generator.uniform(dimensions[0], dimensions[1]), 1)
     y = np.around(generator.uniform(dimensions[2], dimensions[3]), 1)
     return [x, y]
+
 
 def waypoint_movement(env: PybulletEnvironment, cam_freq, traj_length, map_layout: MapLayout, gc_network, seed: int) -> list[WaypointInfo]:
     ''' Calculates environment-specific waypoints from start to goal and creates
@@ -99,9 +97,10 @@ def waypoint_movement(env: PybulletEnvironment, cam_freq, traj_length, map_layou
 
     random_state = np.random.RandomState(seed=seed)
     dimensions: Dimensions = environment_dimensions(env.env_model)
-    valid_locations: Iterator[types.Vector2D] = filter( # TODO Pierre: I'm sorry for the unreadable code
-        map_layout.suitable_position_for_robot,
-        iter(lambda: random_location(dimensions, random_state), None),
+    valid_locations: Iterator[types.Vector2D] = filter(
+        map_layout.suitable_position_for_robot, # take only suitable positions...
+        iter(lambda: random_location(dimensions, random_state), None), # from random locations
+        # iter(..., ) calls the function multiple times
     )
 
     # initialize environment
@@ -153,6 +152,9 @@ def waypoint_movement(env: PybulletEnvironment, cam_freq, traj_length, map_layou
     return samples
 
 
+# TODO: I think my code (see dataset.py) uses only the position from the trajectories dataset, not the images - so saving images can maybe be removed
+# maybe even the trajectories dataset can be removed? If we're just drawing random positions (even on the same trajectory),
+# we could do this without putting the positions into a dataset
 def generate_multiple_trajectories(out_hd5_obj, num_traj, trajectory_length, cam_freq, mapname: types.AllowedMapName):
     ''' Generate multiple trajectories
     

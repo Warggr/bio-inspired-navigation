@@ -9,7 +9,6 @@
 """
 
 import os
-import sys
 
 from system.controller.reachability_estimator._types import PlaceInfo
 
@@ -261,7 +260,7 @@ def vector_navigation(
     pc_network: Optional[PlaceCellNetwork] = None, cognitive_map: Optional[CognitiveMapInterface] = None,
     goal_pos: Optional[Vector2D] = None,
     add_nodes=True,
-    hooks: list[NavStepHook] = [],
+    hooks: Iterable[NavStepHook] = (),
 ) -> tuple[bool, list[WaypointInfo]|tuple|int|PlaceCell|None]:
     """
     Agent navigates towards goal.
@@ -302,7 +301,6 @@ def vector_navigation(
     if controller is None:
         controller = LocalController.default()
 
-    # TODO Pierre: do this before the call
     if gc_network and (target_gc_spiking is not None):
         print('Warning: deprecated: please set the target_state beforehand')
         gc_network.set_as_target_state(target_gc_spiking)

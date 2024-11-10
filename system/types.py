@@ -1,5 +1,6 @@
 from typing import Sized, Iterable, Protocol, Literal
 import numpy as np
+from enum import Enum, unique, auto
 
 Angle = float  # assumed to be in radians
 
@@ -74,3 +75,13 @@ class types:
 
 FlatSpikings = 'np.ndarray[float, 9600]'
 WaypointInfo = tuple[types.Vector2D, types.Angle, FlatSpikings]
+
+
+@unique
+class Direction(Enum):
+    NORTH = auto()
+    WEST = auto()
+    SOUTH = auto()
+    EAST = auto()
+
+Orientation = Literal['horizontal', 'vertical']

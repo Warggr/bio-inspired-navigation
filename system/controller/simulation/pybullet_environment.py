@@ -50,7 +50,7 @@ import system.plotting.plotResults as plot
 from system.controller.simulation.environment_config import environment_dimensions
 from system.controller.simulation.math_utils import compute_angle
 from system.debug import DEBUG
-from system.types import AllowedMapName, types, LidarReading, Vector2D
+from system.types import AllowedMapName, types, LidarReading, Vector2D, Orientation
 
 try:
     itertools.batched
@@ -64,7 +64,6 @@ except ImportError:
     Self = 'Self'
 
 Lazy = Optional
-Orientation = Literal['horizontal', 'vertical']
 
 def closest_subsegment(values: list[float]) -> tuple[int, int]:
     values = np.array(values)
@@ -444,10 +443,12 @@ class PybulletEnvironment:
         projection_matrix = p.computeProjectionMatrixFOV(
             fov=120, aspect=1.5, nearVal=0.02, farVal=3.5)
 
-        _height, _width, rgb_img, _data1, _data2 = p.getCameraImage(img_w, img_h,
+        _height, _width, rgb_img, depth, segmentation_mask = p.getCameraImage(img_w, img_h,
                                view_matrix,
                                projection_matrix, shadow=True,
                                renderer=p.ER_BULLET_HARDWARE_OPENGL)
+        assert np.all(rgb_img[:, :, 3] == 255) # alpha (i.e. transparency) values
+        rgb_img[:, :, 3] = depth
 
         return rgb_img
 
@@ -941,7 +942,7 @@ class DatasetCollector:
 
     @property
     def xy_coordinates(self):
-        return [ datapoint[0] for datapoint in self.data ]
+        return [datapoint[0] for datapoint in self.data]
 
     def __getitem__(self, index):
         return self.data[index]
