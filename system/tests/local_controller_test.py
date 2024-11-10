@@ -35,7 +35,6 @@ def test(
             assert robot.position_and_angle == start
         if compass is None:
             compass = AnalyticalCompass(start_pos=start[0], goal_pos=goal[0])
-
         reached, nr_steps = vector_navigation(env, compass, controller=controller, step_limit=2000, collect_nr_steps=True)
     return reached, nr_steps
 

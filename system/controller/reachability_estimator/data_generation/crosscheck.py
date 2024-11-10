@@ -1,8 +1,5 @@
 import os
 
-if __name__ == "__main__":
-    import sys
-    sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 from system.controller.reachability_estimator._types import ReachabilityController
 from system.controller.reachability_estimator.reachability_estimation import ReachabilityEstimator, reachability_estimator_factory
 from dataset import SampleGenerator, get_path, TrajectoriesDataset

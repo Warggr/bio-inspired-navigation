@@ -147,7 +147,7 @@ class CNN(Model):
             input_dim += 1
         if self.sample_config.lidar:
             one_lidar_input_dim = 52 if self.sample_config.lidar == 'raw_lidar' else BoundaryCellActivity.size
-            nets["lidar_encoder"] = NNModuleWithOptimizer( LidarEncoder(2*one_lidar_input_dim, 10), opt=opt)
+            nets["lidar_encoder"] = NNModuleWithOptimizer(LidarEncoder(2*one_lidar_input_dim, 10), opt=opt)
             input_dim += 10
         nets["fully_connected"] = NNModuleWithOptimizer(
             FCLayers(init_scale=1.0, input_dim=input_dim, hidden_layers=hidden_fc_layers, no_weight_init=False, dropout=dropout),
@@ -425,11 +425,12 @@ class LidarEncoder(nn.Module):
         x = self.fc(x)
         return x
 
+
 class FCLayers(nn.Module):
     def __init__(
         self, input_dim, hidden_layers, output_dim=4,
         init_scale=1.0, bias=True, no_weight_init=False,
-        dropout = False,
+        dropout=False,
     ):
         super(FCLayers, self).__init__()
 

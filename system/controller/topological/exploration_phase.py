@@ -22,7 +22,6 @@ from system.debug import DEBUG, PLOTTING
 plotting = 'exploration' in PLOTTING  # if True: plot paths
 
 
-
 class TooManyPlaceCells(Exception):
     def __init__(self, progress: float):
         self.progress = progress

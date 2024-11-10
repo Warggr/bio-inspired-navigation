@@ -194,7 +194,7 @@ class ComboGcCompass(GcCompass):
 
 
 def create_gc_spiking(start: Vector2D, goal: Vector2D, gc_network_at_start: Optional[GridCellNetwork]=None, plotting=plotting) -> types.Spikings:
-    """ 
+    """
     Agent navigates from start to goal across a plane without any obstacles, using the analytically
     calculated goal vector to generate the grid cell spikings necessary for the decoders. During actual
     navigation this would have happened in the exploration phase.

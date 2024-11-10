@@ -76,7 +76,7 @@ class DoubleCompass(Compass):
     @property
     def arrival_threshold(self):
         return self.compass.arrival_threshold
-    def error(self):
+    def error(self) -> tuple[float, Angle]:
         estimated_position = self.compass.calculate_goal_vector()
         true_position = self.true_compass.calculate_goal_vector()
 

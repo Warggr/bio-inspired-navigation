@@ -42,6 +42,7 @@ class DirectionalCompass(Compass[float]):
     def reset_goal(self, new_goal: float):
         self.goal = new_goal
 
+
 def angle_test(
     angle: Angle,
     controller: LocalController,

@@ -157,7 +157,7 @@ def waypoint_movement(env: PybulletEnvironment, cam_freq, traj_length, map_layou
 # we could do this without putting the positions into a dataset
 def generate_multiple_trajectories(out_hd5_obj, num_traj, trajectory_length, cam_freq, mapname: types.AllowedMapName):
     ''' Generate multiple trajectories
-    
+
     arguments:
     out_hd5_obj         -- output file
     num_traj            -- number of trajectories that should be generated for the file
@@ -229,7 +229,7 @@ if __name__ == "__main__":
     Default:
     Generate 1000 trajectories of length 3000 with a saving frequency of 10 
     in the environment "Savinov_val3"
-    
+
     Parameterized:
     Adjust filename, env_model, num_traj, traj_length and cam_freq 
     """

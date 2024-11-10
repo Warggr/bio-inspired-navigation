@@ -165,7 +165,7 @@ class ReachabilityDataset(torch.utils.data.Dataset):
                     image[lowbound:upbound, lowbound:upbound].fill(0)
                 model_args += [torch.tensor(image).float()]
         else:
-            model_args += [ None_tensor, None_tensor ]
+            model_args += [None_tensor, None_tensor]
 
         if self.config.with_dist:
             model_args += [ torch.tensor(np.append(position, angle)) ]

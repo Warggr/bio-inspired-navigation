@@ -196,7 +196,7 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
         config: SampleConfig = SampleConfig(),
         threshold_same=0.933,
         threshold_reachable=0.4,
-        **_kwargs, # kwargs ignored for compatibility with reachability_estimator_factory
+        **_kwargs,  # kwargs ignored for compatibility with reachability_estimator_factory
     ):
         """
         arguments:

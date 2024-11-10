@@ -8,6 +8,7 @@
 ***************************************************************************************
 """
 import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle, Circle
 import numpy as np
 import os
 from system.controller.simulation.environment_config import environment_dimensions
@@ -37,7 +38,7 @@ def add_environment(ax, env_model: AllowedMapName, variant: str|None = None):
         distance = float(variant)-1 if variant is not None else 0
 
         # TODO: read these values from moveable_wall.urdf?
-        box3 = plt.Rectangle((-0.25+distance, -4.25-distance), 3.5, 5, color=TUM_colors['TUMDarkGray'])
+        box3 = Rectangle((-0.25+distance, -4.25-distance), 3.5, 5, color=TUM_colors['TUMDarkGray'])
         ax.add_artist(box3)
     elif env_model == "final_layout":
         if variant == "walls":
@@ -51,13 +52,13 @@ def add_environment(ax, env_model: AllowedMapName, variant: str|None = None):
                     start, h, w = (start[0]-0.05, start[1]), 1, 0.1
                 else:
                     start, h, w = (start[0], start[1]-0.05), 0.1, 1
-                door = plt.Rectangle(start, h, w, color='blue')
+                door = Rectangle(start, h, w, color='blue')
                 ax.add_artist(door)
     else:
         if variant is not None:
             maze_filename += f'+{variant}'
 
-    #load topview of maze
+    # load topview of maze
     dirname = os.path.dirname(__file__)
     dirname = os.path.join(dirname, "..")
     filename = os.path.join(dirname, "controller/simulation/environment", env_model, maze_filename+".png")
@@ -68,22 +69,23 @@ def add_environment(ax, env_model: AllowedMapName, variant: str|None = None):
     else:
         topview = plt.imread(filename)
         dimensions = environment_dimensions(env_model)
-        ax.imshow(topview,cmap="gray",extent=dimensions,origin="upper")
+        ax.imshow(topview, cmap="gray", extent=dimensions, origin="upper")
 
 
 def environment_plot(env_model: AllowedMapName, variant: str|None = None):
-    fig, ax = plt.subplots()
+    _, ax = plt.subplots()
     add_environment(ax, env_model, variant)
     return ax
 
 
 def add_robot(ax, xy: tuple[float, float], angle: float, color=TUM_colors['TUMDarkGray']):
-    circle = plt.Circle((xy[0], xy[1]), 0.2, color=color, alpha=1)
+    circle = Circle((xy[0], xy[1]), 0.2, color=color, alpha=1)
     ax.add_artist(circle)
 
     ax.quiver(xy[0], xy[1], np.cos(angle) * 0.4, np.sin(angle) * 0.4, color=TUM_colors['TUMDarkGray'], headwidth=7,
               angles='xy', scale_units='xy', scale=1)
 
+
 def add_goal(ax, goal: tuple[float, float]):
-    circle = plt.Circle(goal, 0.2, color=TUM_colors['TUMAccentOrange'], alpha=1)
+    circle = Circle(goal, 0.2, color=TUM_colors['TUMAccentOrange'], alpha=1)
     ax.add_artist(circle)
