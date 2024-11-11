@@ -367,17 +367,13 @@ if __name__ == "__main__":
     vector_step_counter = Counter()
     controller.on_reset_goal.append(vector_step_counter)
 
+    tj = TopologicalNavigation(args.env_model, pc_network=pc_network, cognitive_map=cognitive_map, compass=compass, log=args.log)
+
     if args.position_estimation:
-        raise NotImplementedError()
-        """
         from system.controller.local_controller.position_estimation import PositionEstimation
 
-        controller.transform_goal_vector.append(
-            PositionEstimation(pc_network, gc_network, re, compass, current_position=start_pc)
-        )
-        """
-
-    tj = TopologicalNavigation(args.env_model, pc_network=pc_network, cognitive_map=cognitive_map, compass=compass, log=args.log)
+        corrector = PositionEstimation(pc_network, gc_network, re, compass)
+        controller.on_reset_goal.append(corrector)
 
     if args.log_metrics:
         from system.tests.map import unobstructed_lines, mean_distance_between_nodes, scalar_coverage, agreement
@@ -445,6 +441,8 @@ if __name__ == "__main__":
             tj.compass.reset_position(compass.parse(start))
             tj.compass.reset_goal(compass.parse(place_cells[goals[0]]))
             gc_network.set_as_current_state(start.spikings)
+            if args.position_estimation:
+                corrector.current_position = start
 
             if args.mode == 'path' and args.restore and i == 0:
                 filename = f'logs/step{args.restore}.pkl'
