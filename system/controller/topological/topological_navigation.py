@@ -185,15 +185,11 @@ class TopologicalNavigation:
                 print(f'[navigation] Vector navigation: goal={path_indices[path_index+1]}, {success=}')
             curr_path_length += 1
             if not success:
-                last_pc, new_path = self.locate_node(self.compass, pc, goal)
+                current_pc = self.locate_node(self.compass, pc, goal)
                 if self.log:
-                    if not last_pc:
-                        print('[navigation] Last PC: status=not found/assuming current place cell still correct')
-                    else:
-                        print('[navigation] Last PC: status=found,', f'#={self.cognitive_map._place_cell_number(last_pc)}')
-                if not last_pc:
-                    last_pc = path[path_index]
+                    print('[navigation] Last PC: status=found,', f'#={self.cognitive_map._place_cell_number(last_pc)}')
 
+                new_path = self.cognitive_map.find_path(current_pc, goal)
                 # if no path to the goal exists, try to find a random node that has valid path to the goal
                 # if none is found, go straight to the goal
                 if new_path is None:
@@ -237,33 +233,38 @@ class TopologicalNavigation:
             return False
         return True
 
-    def locate_node(self, compass: Compass, pc: PlaceCell, goal: PlaceCell):
+    def locate_node(self, compass: Compass, observation: PlaceInfo, last_pc: PlaceCell):
         """
         Maps a location of the given place cell to the node in the graph.
         Among multiple close nodes prioritize the one that has a valid path to the goal.
 
         arguments:
         compass: Compass   -- A Compass that will be reset to get distance to the goal.
-        pc: PlaceCell      -- a place cell to be located
-        goal: PlaceCell    -- goal node
+        observation: PlaceInfo -- the current place to be located
+        last_pc: PlaceCell    -- the last known position of the agent
 
         returns:
-        PlaceCell          -- mapped node in the graph or the given place cell if no node was found
-        [PlaceCell] | None -- path to the goal if exists
+        PlaceCell          -- mapped node in the graph
         """
-        closest_node = None
-        # TODO: assert compass.current_pos == pc
-        #compass.reset_position(compass.parse(pc))
-        for node in self.cognitive_map.node_network.nodes:
-            compass.reset_goal(new_goal=compass.parse(node))
-            goal_vector = compass.calculate_goal_vector()
-            if np.linalg.norm(goal_vector) < compass.arrival_threshold: # TODO: maybe we could find the *closest* node?
-                closest_node = node
-                new_path = self.cognitive_map.find_path(node, goal)
-                if new_path:
-                    return node, new_path
-        return closest_node or pc, None
+        import networkx as nx
+        # assert compass.current_pos == observation.pos
+        #compass.reset_position(compass.parse(observation))
 
+        # Priors: How likely is it that we ended up on that specific place cell?
+        priors = nx.shortest_path_length(self.cognitive_map.node_network, source=last_pc)
+
+        # Evidence: How much does it look like we are on that specific place cell?
+        def compute_distance(node: PlaceCell):
+            # TODO: why do we use the Compass / node distance instead of using a ReachabilityEstimator?
+            compass.reset_goal_pc(node)
+            goal_vector = compass.calculate_goal_vector()
+            return np.linalg.norm(goal_vector)
+
+        nodes_and_distance = [(pc, compute_distance(pc) * max(0.1, 1 - priors[pc])) for pc in self.cognitive_map.node_network.nodes]
+        nodes_and_distances = sorted(nodes_and_distance, key=lambda p_and_probability: p_and_probability[1])
+
+        closest_node, probability = nodes_and_distances[0]
+        return closest_node
 
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument('env_model', choices=AllowedMapName.options, default='Savinov_val3')
