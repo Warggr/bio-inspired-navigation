@@ -260,7 +260,7 @@ class TopologicalNavigation:
             goal_vector = compass.calculate_goal_vector()
             return np.linalg.norm(goal_vector)
 
-        nodes_and_distance = [(pc, compute_distance(pc) * max(0.1, 1 - priors[pc])) for pc in self.cognitive_map.node_network.nodes]
+        nodes_and_distance = [(pc, compute_distance(pc) * max(0.1, 1 - priors.get(pc, 100))) for pc in self.cognitive_map.node_network.nodes]
         nodes_and_distances = sorted(nodes_and_distance, key=lambda p_and_probability: p_and_probability[1])
 
         closest_node, probability = nodes_and_distances[0]
@@ -436,11 +436,11 @@ if __name__ == "__main__":
 
         successful = 0
         for i, continuous_navigation in enumerate(navigations):
-            start_index, *goals = continuous_navigation
+            start_index = continuous_navigation[0]
             start = place_cells[start_index]
 
             tj.compass.reset_position(compass.parse(start))
-            tj.compass.reset_goal(compass.parse(place_cells[goals[0]]))
+            tj.compass.reset_goal_pc(place_cells[continuous_navigation[1]])
             gc_network.set_as_current_state(start.spikings)
             if args.position_estimation:
                 corrector.current_position = start
@@ -458,8 +458,8 @@ if __name__ == "__main__":
                 start_position = start
 
             with robot:
-                for j, goal_index in enumerate(goals):
-                    goal = place_cells[goal_index]
+                for start_index, goal_index in pairwise(continuous_navigation):
+                    start, goal = place_cells[start_index], place_cells[goal_index]
                     vector_step_counter.reset()
                     success = tj.navigate(start, goal,
                         gc_network=gc_network, controller=controller,
