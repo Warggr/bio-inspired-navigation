@@ -97,7 +97,7 @@ class CognitiveMapInterface(ABC):
     def find_path(self, start: PlaceCell, goal: PlaceCell) -> Optional[list[PlaceCell]]:
         """ Returns a path in the graph from start to goal nodes"""
         try:
-            path = nx.shortest_path(self.node_network, source=start, target=goal)
+            path = nx.shortest_path(self.node_network, source=start, target=goal, weight='weight')
             # TODO Pierre: we could use A* with distances or something
         except nx.NetworkXNoPath:
             return None
