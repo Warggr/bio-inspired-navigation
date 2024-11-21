@@ -102,6 +102,7 @@ class PybulletEnvironment:
 
     WHISKER_LENGTH = 1
     ROBOT_Z_POS = 0.02 # see p3dx model
+    arena_size = 15
 
     def __init__(self,
         env_model: types.AllowedMapName = "Savinov_val3",
@@ -151,7 +152,6 @@ class PybulletEnvironment:
 
         self.env_model = env_model
         self.variant = variant
-        self.arena_size = 15
 
         base_position = [0, 0.05]  # [0, 0.05] ensures that it actually starts at origin
 
@@ -912,6 +912,13 @@ class DatasetCollector:
         SPEED = 2
         SPEED_NORM = 3
         GOAL = 4
+    dtype = np.dtype([
+        ('position', (float, 2)),
+        ('angle', float),
+        ('speed', (float, 2)),
+        ('speed_norm', float),
+        ('goal', (float, 2)),
+    ])
 
     def __init__(self, frame_limit = 50, collectImages = True):
         self.frame_limit = frame_limit

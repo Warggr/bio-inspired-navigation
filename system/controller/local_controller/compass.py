@@ -36,8 +36,8 @@ class Compass(ABC, Generic[PositionRepresentation]):
         ...
 
     @classmethod
-    def goal_vector_between(cls, p: 'PlaceInfo', q: 'PlaceInfo') -> Vector2D:
-        compass = cls()
+    def goal_vector_between(cls, p: 'PlaceInfo', q: 'PlaceInfo', **kwargs) -> Vector2D:
+        compass = cls(**kwargs)
         compass.reset_position_pc(p)
         compass.reset_goal_pc(q)
         return compass.calculate_goal_vector()

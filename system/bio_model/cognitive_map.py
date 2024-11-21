@@ -720,9 +720,12 @@ class LifelongCognitiveMap(CognitiveMapInterface):
         set_q = set(self.node_network[node_q])
         common = len(set_p.intersection(set_q))
 
-        return common >= len(set_p) - self.max_number_unique_neighbors_for_deletion and common >= len(
-            set_q) - self.max_number_unique_neighbors_for_deletion and len(
-            set_p) >= self.min_node_degree_for_deletion and len(set_q) >= self.min_node_degree_for_deletion
+        return (
+            common >= len(set_p) - self.max_number_unique_neighbors_for_deletion and
+            common >= len(set_q) - self.max_number_unique_neighbors_for_deletion and
+            len(set_p) >= self.min_node_degree_for_deletion and
+            len(set_q) >= self.min_node_degree_for_deletion
+        )
 
     def postprocess_topological_navigation(self):
         """ Performs map processing after one full topological navigation cycle. Calls node deduplication if enabled """

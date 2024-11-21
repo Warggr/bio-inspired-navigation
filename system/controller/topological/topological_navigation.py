@@ -182,7 +182,7 @@ class TopologicalNavigation:
                 hook(curr_path_length, success=success, endpoints=(path[path_index], path[path_index+1]), endpoint_indices=(path_indices[path_index], path_indices[path_index+1]))
 
             if self.log:
-                print(f'[navigation] Vector navigation: goal={path_indices[path_index+1]}, {success=}')
+                print(f'[navigation] Vector navigation: goal={path_indices[path_index+1]}, {success=}, position={env.robot.position}')
             curr_path_length += 1
             if not success:
                 current_pc = self.locate_node(self.compass, pc, goal)
@@ -258,7 +258,7 @@ class TopologicalNavigation:
             # TODO: why do we use the Compass / node distance instead of using a ReachabilityEstimator?
             compass.reset_goal_pc(node)
             goal_vector = compass.calculate_goal_vector()
-            return np.linalg.norm(goal_vector)
+            return np.exp(-np.linalg.norm(goal_vector))
 
         nodes_and_distance = [(pc, compute_distance(pc) * max(0.1, 1 - priors.get(pc, 100))) for pc in self.cognitive_map.node_network.nodes]
         nodes_and_distances = sorted(nodes_and_distance, key=lambda p_and_probability: p_and_probability[1])
@@ -356,7 +356,7 @@ if __name__ == "__main__":
 
     gc_network = GridCellNetwork(from_data=True, dt=1e-2)
     pod = PhaseOffsetDetectorNetwork(16, 9, 40)
-    compass = Compass.factory(args.compass, gc_network=gc_network, pod_network=pod)
+    compass = Compass.factory(args.compass, gc_network=gc_network, pod_network=pod, arena_size=PybulletEnvironment.arena_size)
 
     controller = controller_creator(args, env_model=args.env_model)
 

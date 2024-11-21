@@ -165,6 +165,9 @@ class DistanceReachabilityEstimator(ReachabilityEstimator):
         # Since a bigger factor means better reachability, we use negative distance
         return -np.linalg.norm(np.array(start.pos) - np.array(goal.pos))
 
+    def get_connectivity_probability(self, reachability_factor):
+        return np.exp(reachability_factor) # reachability_factor is a negative number, so this will be between 0 and 1
+
     def __str__(self):
         return f"DistanceRE({self.threshold_same},{self.threshold_reachable})"
 
