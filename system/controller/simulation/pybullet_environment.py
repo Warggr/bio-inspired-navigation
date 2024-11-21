@@ -151,7 +151,6 @@ class PybulletEnvironment:
             p.setRealTimeSimulation(1)
 
         self.env_model = env_model
-        self.variant = variant
 
         base_position = [0, 0.05]  # [0, 0.05] ensures that it actually starts at origin
 
@@ -181,8 +180,6 @@ class PybulletEnvironment:
         elif "obstacle" in env_model:
             plane = resource_path(self.env_model, "plane.urdf")
             self.planeID = p.loadURDF(plane)
-            if env_model == "obstacle_map_0":
-                self.switch_variant(variant)
 
         elif env_model == "linear_sunburst":
             base_position = [5.5, 0.55]
@@ -205,16 +202,12 @@ class PybulletEnvironment:
 
         if env_model == "final_layout":
             if variant == "walls":
-                self.add_unit_walls([
-                    ((-3, 2), 'vertical'),
-                    ((-3, 3), 'vertical'),
-                    ((-4, -2), 'vertical'),
-                ])
-            else:
-                self.add_unit_walls([
-                    ((3, -5), 'vertical'),
-                    ((-7, 2), 'vertical'),
-                ])
+                variant = '11100'
+            elif variant is None:
+                variant = '00011'
+        self.variant = None
+        self.variant_data = None
+        self.switch_variant(variant)
 
         p.setGravity(0, 0, -9.81)
 
@@ -288,13 +281,26 @@ class PybulletEnvironment:
         return PybulletEnvironment._loads_state(state)
 
     def switch_variant(self, new_variant: str|None):
-        self.variant = new_variant
         if self.env_model == 'obstacle_map_0':
             if self.mazeID:
                 p.removeBody(self.mazeID[0])
             offset = 0 if new_variant is None else float(new_variant) - 1
             offset = offset * np.array([1, -1, 0])
             self.mazeID = [p.loadURDF(resource_path(self.env_model, 'moveable_wall.urdf'), basePosition=offset)]
+        elif self.env_model == 'final_layout':
+            if self.variant is not None:
+                self.remove_walls(self.variant_data)
+
+            unit_walls: list[tuple[Vector2D, Orientation]] = [
+                    ((-3, 2), 'vertical'),
+                    ((-3, 3), 'vertical'),
+                    ((-4, -2), 'vertical'),
+                    ((3, -5), 'vertical'),
+                    ((-7, 2), 'vertical'),
+                ]
+            assert all(on in '01' for on in new_variant)
+            self.variant_data = self.add_unit_walls([wall for i, wall in enumerate(unit_walls) if new_variant[i] == '1'])
+        self.variant = new_variant
 
     @property
     def dimensions(self):

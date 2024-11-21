@@ -302,6 +302,7 @@ if __name__ == "__main__":
 
     random_parser = subparsers.add_parser('random', help='Perform multiple navigations between random nodes')
     random_parser.add_argument('--seed', type=int, help='Seed for random index generation.')  # for reproducibility / debugging purposes
+    random_parser.add_argument('--randomize-env-variant', action='store_true')
     random_parser.add_argument('--num-topo-nav', '-n', help='number of topological navigations', type=int, default=100)
 
     one_traj_parser = subparsers.add_parser('path', help='(Try to) Navigate from a start to a goal node')
@@ -404,6 +405,7 @@ if __name__ == "__main__":
     place_cells: list[PlaceCell] = list(tj.cognitive_map.node_network.nodes)
     assert len(place_cells) > 1
     navigations: list[list[int]]
+    env_variant: None|str|list[list[str]] = args.env_variant
     # Will be used in the following way (pseudocode):
     # for points in navigations:
     #     reset robot to points[0]
@@ -420,6 +422,12 @@ if __name__ == "__main__":
             while start_index == goal_index:
                 start_index, goal_index = random.integers(0, len(place_cells)-1, size=2)
             navigations.append([start_index, goal_index])
+        if args.randomize_env_variant:
+            assert args.env_model == 'final_layout', "random env variants are only possible in the final_layout"
+            assert args.env_variant is None, "--env-variant and --randomize-env-variant are contradictory"
+            def random_env_variant(rng: np.random.Generator):
+                return ''.join(rng.choice('01', size=5))
+            env_variant = [[random_env_variant(random) for _ in segment[1:]] for segment in navigations]
     elif args.mode == 'path':
         navigations = args.navigations
     else:
@@ -428,7 +436,8 @@ if __name__ == "__main__":
     if args.mode == 'path' and args.head:
         assert len(navigations) == 1 and len(navigations[0]) == 1, "`head` only makes sense for one navigation"
 
-    with PybulletEnvironment(args.env_model, variant=args.env_variant, build_data_set=True, visualize=args.visualize, contains_robot=False, **env_kwargs) as env:
+    starting_variant = env_variant if type(env_variant) is not list else None
+    with PybulletEnvironment(args.env_model, variant=starting_variant, build_data_set=True, visualize=args.visualize, contains_robot=False, **env_kwargs) as env:
         if plotting:
             from system.plotting.plotHelper import environment_plot
             ax = environment_plot(args.env_model, args.env_variant)
@@ -458,8 +467,11 @@ if __name__ == "__main__":
                 start_position = start
 
             with robot:
-                for start_index, goal_index in pairwise(continuous_navigation):
+                for j, (start_index, goal_index) in enumerate(pairwise(continuous_navigation)):
+                    if type(env_variant) is list:
+                        env.switch_variant(env_variant[i][j])
                     start, goal = place_cells[start_index], place_cells[goal_index]
+
                     vector_step_counter.reset()
                     success = tj.navigate(start, goal,
                         gc_network=gc_network, controller=controller,
