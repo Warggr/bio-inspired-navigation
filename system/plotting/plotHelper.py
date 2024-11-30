@@ -41,19 +41,11 @@ def add_environment(ax, env_model: AllowedMapName, variant: str|None = None):
         box3 = Rectangle((-0.25+distance, -4.25-distance), 3.5, 5, color=TUM_colors['TUMDarkGray'])
         ax.add_artist(box3)
     elif env_model == "final_layout":
+        # TODO: remove duplication with pybullet_environment
         if variant == "walls":
-            doors = [ # see pybullet_environment.py
-                ((-3, 2), 'vertical'),
-                ((-3, 3), 'vertical'),
-                ((-4, -2), 'vertical'),
-            ]
-            for start, direction in doors:
-                if direction == 'horizontal':
-                    start, h, w = (start[0]-0.05, start[1]), 1, 0.1
-                else:
-                    start, h, w = (start[0], start[1]-0.05), 0.1, 1
-                door = Rectangle(start, h, w, color='blue')
-                ax.add_artist(door)
+            variant = '11100'
+        if variant is not None:
+            maze_filename += '+empty'
     else:
         if variant is not None:
             maze_filename += f'+{variant}'
@@ -63,6 +55,32 @@ def add_environment(ax, env_model: AllowedMapName, variant: str|None = None):
     dirname = os.path.join(dirname, "..")
     filename = os.path.join(dirname, "controller/simulation/environment", env_model, maze_filename+".png")
     filename = os.path.realpath(filename)
+
+    if env_model == "final_layout" and variant is not None:
+        unit_walls: list[tuple[Vector2D, Orientation]] = [
+            ((-3, 2), 'vertical'),
+            ((-3, 3), 'vertical'),
+            ((-4, -2), 'vertical'),
+            ((3, -5), 'vertical'),
+            ((-7, 2), 'vertical'),
+        ]
+        # TODO: I could directly set unit_walls = [wall_rectangle(wall) for wall in unit_walls]
+        def wall_rectangle(position, orientation):
+            x0, y0 = position
+            x1, y1 = position
+            if orientation == 'horizontal':
+                x1 += 1
+                y0 -= 0.05; y1 += 0.05
+            else:
+                y1 += 1
+                x0 -= 0.05; x1 += 0.05
+            return x0, y0, x1, y1
+        assert all(on in '01' for on in variant)
+        for ((x, y), orientation), on in zip(unit_walls, variant):
+            if on == '1':
+                x0, y0, x1, y1 = wall_rectangle((x, y), orientation)
+                wall = plt.Rectangle((x0, y0), x1-x0, y1-y0, color='#888888')
+                ax.add_artist(wall)
 
     if env_model == "plane":
         pass

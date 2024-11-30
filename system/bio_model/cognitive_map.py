@@ -762,6 +762,8 @@ class LifelongCognitiveMap(CognitiveMapInterface):
         returns:
         nb_steps: int    -- the number of navigation steps
         """
+        import sys
+
         gc_network = None
 
         nb_steps = 0
@@ -770,18 +772,23 @@ class LifelongCognitiveMap(CognitiveMapInterface):
         for i, line in enumerate(lines):
             full_line = line
             try:
-                tag, line_without_tag = line.split(' ', maxsplit=1)
-                if tag.startswith('[') and tag.endswith(']'):
-                    tag = tag[1:-1]
-                    line = line_without_tag
-                else:
-                    tag = None
+                if line.startswith('Correcting:\t'):
+                    line = line.removeprefix('Correcting:\t')
+                tag = None
+                if ' ' in line:
+                    tag, line_without_tag = line.split(' ', maxsplit=1)
+                    if tag.startswith('[') and tag.endswith(']'):
+                        tag = tag[1:-1]
+                        line = line_without_tag
                 if i == 0 and line.startswith('#') or ('python' in line.split(' ')):
-                    import sys
                     print(line, file=sys.stderr)
-                elif tag == 'navigation' or tag == 'drift':
+                elif tag == 'navigation' or tag == 'drift' or tag == 'environment':
                     pass
-                elif any(line.startswith(it) for it in ('Using seed', 'Path', 'Last PC', 'adding edge', 'edge [', 'Vector navigation', 'Recomputed path:', 'LIMIT WAS REACHED STOPPING HERE', 'Fail :(')):
+                elif full_line == '': # Sometimes happens with position estimation
+                    pass
+                elif any(line.startswith(it) for it in ('Using seed', 'Path', 'Last PC', 'adding edge', 'edge [', 'Vector navigation', 'Recomputed path:', 'LIMIT WAS REACHED STOPPING HERE')):
+                    pass
+                elif line.startswith('Fail :(') or line.startswith('Success!'):
                     pass
                 elif line.startswith('Navigation '):
                     nb_steps += 1
@@ -840,14 +847,14 @@ class LifelongCognitiveMap(CognitiveMapInterface):
                     pass
                 else:
                     int(line.split(' ')[0]) # PDB l
+                for callback in callbacks:
+                    callback(i, self, line=full_line)
             except Exception as err:
                 if accept_incomplete_last_line and next(lines, None) is None: # check if the line is really the last
                     # (this will consume the next line if it exists, but we don't care because if it exists we exit the function)
                     pass
                 else:
                     raise ValueError('Couldn\'t parse line:', full_line) from err
-            for callback in callbacks:
-                callback(i, self, line=full_line)
         return nb_steps
 
 if __name__ == "__main__":
