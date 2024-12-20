@@ -16,6 +16,5 @@ scipy>=1.11.2
 pybind11
 tqdm
 tensorboard
--e .
 #./range_libc/pywrapper
 nbdev

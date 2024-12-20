@@ -17,6 +17,7 @@ The code is based on Python3. It has been tested on Python 3.11 and 3.12 and mig
 Install the required packages with
 ```sh
         pip install -r requirements.txt
+        pip install -e .
 ```
 A gcc,g++ and latex installation are required and can be added with the following commands if not installed already. 
 ```sh
