@@ -1,0 +1,8 @@
+#!/bin/sh
+
+dims=$(file $1 | perl -n -e '/(\d+) x (\d+)/ && print "$1, $2\n"')
+if [[ $dims == '640 x 480' ]]; then
+	mogrify -crop 217x217+298+0 $@
+else
+	mogrify -crop 217x217+366+87 $@
+fi
