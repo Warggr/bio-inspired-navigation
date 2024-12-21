@@ -1,7 +1,0 @@
-setup.py
-scripts/rosparam
-src/rosparam/__init__.py
-src/rosparam.egg-info/PKG-INFO
-src/rosparam.egg-info/SOURCES.txt
-src/rosparam.egg-info/dependency_links.txt
-src/rosparam.egg-info/top_level.txt

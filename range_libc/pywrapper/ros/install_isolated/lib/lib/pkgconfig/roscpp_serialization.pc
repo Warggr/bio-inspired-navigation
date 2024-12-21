@@ -1,8 +1,0 @@
-prefix=/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/install_isolated/lib
-
-Name: roscpp_serialization
-Description: Description of roscpp_serialization
-Version: 0.6.14
-Cflags: -I${prefix}/include
-Libs: -L${prefix}/lib -lroscpp_serialization
-Requires: cpp_common roscpp_traits rostime

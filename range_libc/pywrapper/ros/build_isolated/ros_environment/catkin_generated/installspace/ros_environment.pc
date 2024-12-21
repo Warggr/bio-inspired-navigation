@@ -1,8 +1,0 @@
-prefix=/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/install_isolated/lib
-
-Name: ros_environment
-Description: Description of ros_environment
-Version: 1.2.3
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 

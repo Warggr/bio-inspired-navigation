@@ -1,8 +1,0 @@
-prefix=/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/install
-
-Name: nav_msgs
-Description: Description of nav_msgs
-Version: 1.12.8
-Cflags: -I${prefix}/include
-Libs: -L${prefix}/lib 
-Requires: geometry_msgs message_runtime std_msgs actionlib_msgs

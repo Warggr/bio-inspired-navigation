@@ -1,8 +1,0 @@
-prefix=/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/devel_isolated/roscpp_traits
-
-Name: roscpp_traits
-Description: Description of roscpp_traits
-Version: 0.6.14
-Cflags: -I/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/src/roscpp_core/roscpp_traits/include
-Libs: -L${prefix}/lib 
-Requires: cpp_common rostime

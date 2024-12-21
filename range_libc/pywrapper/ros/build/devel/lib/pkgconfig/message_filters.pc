@@ -1,8 +1,0 @@
-prefix=/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/build/devel
-
-Name: message_filters
-Description: Description of message_filters
-Version: 1.14.13
-Cflags: -I/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/src/ros_comm/message_filters/include
-Libs: -L${prefix}/lib -lmessage_filters
-Requires: roscpp rosconsole

@@ -1,8 +1,0 @@
-prefix=/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/devel_isolated/cpp_common
-
-Name: cpp_common
-Description: Description of cpp_common
-Version: 0.6.14
-Cflags: -I/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/src/roscpp_core/cpp_common/include -I/usr/local/include
-Libs: -L${prefix}/lib -lcpp_common /usr/local/lib/libboost_system-mt.dylib /usr/local/lib/libboost_thread-mt.dylib /usr/local/lib/libconsole_bridge.1.0.dylib
-Requires: 

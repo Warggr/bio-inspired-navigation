@@ -1,6 +1,0 @@
-setup.py
-scripts/roscreate-pkg
-src/roscreate/__init__.py
-src/roscreate/core.py
-src/roscreate/roscreatepkg.py
-test/test_roscreate_core.py

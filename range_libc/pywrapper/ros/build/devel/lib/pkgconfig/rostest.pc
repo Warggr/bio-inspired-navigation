@@ -1,8 +1,0 @@
-prefix=/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/build/devel
-
-Name: rostest
-Description: Description of rostest
-Version: 1.14.13
-Cflags: -I/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/src/ros_comm/rostest/include -I/usr/local/include
-Libs: -L${prefix}/lib /usr/local/lib/libboost_system-mt.dylib /usr/local/lib/libboost_thread-mt.dylib
-Requires: 

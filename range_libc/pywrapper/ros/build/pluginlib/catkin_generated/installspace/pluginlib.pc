@@ -1,8 +1,0 @@
-prefix=/usr/local
-
-Name: pluginlib
-Description: Description of pluginlib
-Version: 1.12.1
-Cflags: -I${prefix}/include -I/usr/local/include
-Libs: -L${prefix}/lib /usr/local/lib/libboost_filesystem-mt.dylib /usr/local/lib/libboost_system-mt.dylib /usr/local/lib/libtinyxml2.dylib
-Requires: class_loader rosconsole roslib

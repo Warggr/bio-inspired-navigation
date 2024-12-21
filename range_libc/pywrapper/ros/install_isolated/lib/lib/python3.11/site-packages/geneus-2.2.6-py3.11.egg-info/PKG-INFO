@@ -1,9 +1,0 @@
-Metadata-Version: 2.1
-Name: geneus
-Version: 2.2.6
-Summary: EusLisp ROS message and service generators.
-Author: Kei Okada
-Maintainer: Kei Okada
-Maintainer-email: k-okada@jsk.t.u-tokyo.ac.jp
-License: BSD
-Requires: genmsg

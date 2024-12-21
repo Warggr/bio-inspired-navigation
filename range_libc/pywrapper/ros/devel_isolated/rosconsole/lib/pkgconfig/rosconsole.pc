@@ -1,8 +1,0 @@
-prefix=/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/devel_isolated/rosconsole
-
-Name: rosconsole
-Description: Description of rosconsole
-Version: 1.13.18
-Cflags: -I/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/src/rosconsole/include -I/usr/local/Cellar/glog/0.6.0/include -I/usr/local/include
-Libs: -L${prefix}/lib -lrosconsole -lrosconsole_glog -lrosconsole_backend_interface -lglog /usr/local/lib/libboost_regex-mt.dylib /usr/local/lib/libboost_system-mt.dylib /usr/local/lib/libboost_thread-mt.dylib
-Requires: cpp_common rostime

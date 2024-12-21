@@ -1,8 +1,0 @@
-setup.py
-src/genlisp/__init__.py
-src/genlisp/generate.py
-src/genlisp/genlisp_main.py
-src/genlisp.egg-info/PKG-INFO
-src/genlisp.egg-info/SOURCES.txt
-src/genlisp.egg-info/dependency_links.txt
-src/genlisp.egg-info/top_level.txt

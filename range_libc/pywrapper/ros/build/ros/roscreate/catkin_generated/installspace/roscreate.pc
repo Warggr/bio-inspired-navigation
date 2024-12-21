@@ -1,8 +1,0 @@
-prefix=/usr/local
-
-Name: roscreate
-Description: Description of roscreate
-Version: 1.14.9
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 

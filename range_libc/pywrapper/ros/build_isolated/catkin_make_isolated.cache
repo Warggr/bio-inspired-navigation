@@ -1,2 +1,0 @@
-catkin:roscpp_core/cpp_common:roscpp_core/rostime
--DCMAKE_BUILD_TYPE=Release -DCMAKE_MACOSX_RPATH=ON -DCMAKE_INSTALL_RPATH=/Users/anna/ros_catkin_ws/install_isolated/lib -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -G Unix Makefiles -DCATKIN_DEVEL_PREFIX=/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/devel_isolated -DCMAKE_INSTALL_PREFIX=/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/install_isolated

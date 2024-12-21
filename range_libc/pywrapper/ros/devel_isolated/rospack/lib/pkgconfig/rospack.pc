@@ -1,8 +1,0 @@
-prefix=/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/devel_isolated/rospack
-
-Name: rospack
-Description: Description of rospack
-Version: 2.5.6
-Cflags: -I/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/src/rospack/include -I/usr/local/include
-Libs: -L${prefix}/lib -lrospack /Library/Frameworks/Python.framework/Versions/3.11/lib/libpython3.11.dylib /usr/local/lib/libboost_filesystem-mt.dylib /usr/local/lib/libboost_program_options-mt.dylib /usr/local/lib/libboost_system-mt.dylib /usr/local/lib/libtinyxml2.dylib
-Requires: 

@@ -1,8 +1,0 @@
-prefix=/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/install_isolated
-
-Name: rospy
-Description: Description of rospy
-Version: 1.14.13
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 

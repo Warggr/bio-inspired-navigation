@@ -1,8 +1,0 @@
-prefix=/usr/local
-
-Name: rosbag_storage
-Description: Description of rosbag_storage
-Version: 1.14.13
-Cflags: -I${prefix}/include -I/usr/local/include
-Libs: -L${prefix}/lib -lrosbag_storage /usr/local/lib/libconsole_bridge.1.0.dylib /usr/local/lib/libboost_date_time-mt.dylib /usr/local/lib/libboost_filesystem-mt.dylib /usr/local/lib/libboost_program_options-mt.dylib /usr/local/lib/libboost_regex-mt.dylib
-Requires: pluginlib roslz4

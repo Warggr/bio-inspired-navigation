@@ -1,8 +1,0 @@
-prefix=/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/devel_isolated/mk
-
-Name: mk
-Description: Description of mk
-Version: 1.14.9
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 

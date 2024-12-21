@@ -1,2 +1,0 @@
-set(roscpp_MESSAGE_FILES "/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/src/ros_comm/roscpp/msg/Logger.msg")
-set(roscpp_SERVICE_FILES "/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/src/ros_comm/roscpp/srv/Empty.srv;/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/src/ros_comm/roscpp/srv/GetLoggers.srv;/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/src/ros_comm/roscpp/srv/SetLoggerLevel.srv")

@@ -1,8 +1,0 @@
-prefix=/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/install_isolated/lib
-
-Name: genpy
-Description: Description of genpy
-Version: 0.6.16
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: genmsg

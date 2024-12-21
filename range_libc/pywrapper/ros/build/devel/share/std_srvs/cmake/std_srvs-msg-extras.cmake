@@ -1,2 +1,0 @@
-set(std_srvs_MESSAGE_FILES "")
-set(std_srvs_SERVICE_FILES "/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/src/ros_comm_msgs/std_srvs/srv/Empty.srv;/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/src/ros_comm_msgs/std_srvs/srv/SetBool.srv;/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/src/ros_comm_msgs/std_srvs/srv/Trigger.srv")

@@ -1,9 +1,0 @@
-README.md
-setup.py
-src/geneus/__init__.py
-src/geneus/generate.py
-src/geneus/geneus_main.py
-src/geneus.egg-info/PKG-INFO
-src/geneus.egg-info/SOURCES.txt
-src/geneus.egg-info/dependency_links.txt
-src/geneus.egg-info/top_level.txt

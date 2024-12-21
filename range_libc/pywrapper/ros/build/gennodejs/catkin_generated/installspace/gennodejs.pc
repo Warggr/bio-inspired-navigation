@@ -1,8 +1,0 @@
-prefix=/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/install
-
-Name: gennodejs
-Description: Description of gennodejs
-Version: 2.0.1
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: genmsg

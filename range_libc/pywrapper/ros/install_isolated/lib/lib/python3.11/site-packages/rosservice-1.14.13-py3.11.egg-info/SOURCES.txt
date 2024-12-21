@@ -1,7 +1,0 @@
-setup.py
-scripts/rosservice
-src/rosservice/__init__.py
-src/rosservice.egg-info/PKG-INFO
-src/rosservice.egg-info/SOURCES.txt
-src/rosservice.egg-info/dependency_links.txt
-src/rosservice.egg-info/top_level.txt

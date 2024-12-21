@@ -1,8 +1,0 @@
-prefix=/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/build/devel
-
-Name: class_loader
-Description: Description of class_loader
-Version: 0.4.1
-Cflags: -I/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/src/class_loader/include -I/usr/local/include
-Libs: -L${prefix}/lib -lclass_loader /usr/local/lib/libboost_thread-mt.dylib /usr/local/lib/libboost_system-mt.dylib /usr/local/lib/libPocoFoundation.dylib -ldl /usr/local/lib/libconsole_bridge.1.0.dylib
-Requires: 

@@ -1,1 +1,0 @@
-/usr/bin/clang++  -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk -mmacosx-version-min=12.6 -dynamiclib -Wl,-headerpad_max_install_names -o ../../../devel/lib/libmock_socket.dylib -install_name @rpath/libmock_socket.dylib CMakeFiles/mock_socket.dir/mock_socket.cpp.o 

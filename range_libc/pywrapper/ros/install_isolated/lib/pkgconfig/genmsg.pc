@@ -1,8 +1,0 @@
-prefix=/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/install_isolated
-
-Name: genmsg
-Description: Description of genmsg
-Version: 0.5.17
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 

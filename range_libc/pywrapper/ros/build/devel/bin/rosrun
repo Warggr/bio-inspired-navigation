@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-# generated from catkin/cmake/templates/script.bash.in
-
-"/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/src/ros/rosbash/scripts/rosrun" "$@"

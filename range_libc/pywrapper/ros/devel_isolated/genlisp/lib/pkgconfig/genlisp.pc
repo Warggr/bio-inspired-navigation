@@ -1,8 +1,0 @@
-prefix=/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/devel_isolated/genlisp
-
-Name: genlisp
-Description: Description of genlisp
-Version: 0.4.16
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: genmsg

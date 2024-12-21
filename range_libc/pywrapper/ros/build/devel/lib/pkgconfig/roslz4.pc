@@ -1,8 +1,0 @@
-prefix=/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/build/devel
-
-Name: roslz4
-Description: Description of roslz4
-Version: 1.14.13
-Cflags: -I/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/src/ros_comm/roslz4/include -I/usr/local/include
-Libs: -L${prefix}/lib -lroslz4 /usr/local/lib/liblz4.dylib
-Requires: 

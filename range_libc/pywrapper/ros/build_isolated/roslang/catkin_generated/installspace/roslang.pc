@@ -1,8 +1,0 @@
-prefix=/Users/anna/Documents/TUM/Thesis/ba-bio-inspired-navigation-main/range_libc/pywrapper/ros/install_isolated/lib
-
-Name: roslang
-Description: Description of roslang
-Version: 1.14.9
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 
