@@ -356,7 +356,7 @@ You can reuse the same server for multiple script runs - each script cleans up t
 
 ## Further Questions
 
-To ask questions about the thesis or code please reach out to anna.fedorova.se@gmail.com, or pballif@student.ethz.ch
+To ask questions about the thesis or code please reach out to anna.fedorova.se@gmail.com, or pierre.ballif@tum.de
 
 ## Acknowledgement
 
