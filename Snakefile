@@ -7,8 +7,8 @@ rule:
 	shell: "python scripts/create_occupancy_map.py {wildcards.map}"
 
 rule:
-	output: "system/controller/simulation/environment/final_layout/maze_topview_binary.png"
-	shell: "jupyter nbconvert --execute scripts/Modifying\ maps.ipynb --inplace"
+	output: [ f"system/controller/simulation/environment/{env}/maze_topview_binary.png" for env in ('Savinov_val3', 'final_layout') ]
+	shell: "python scripts/create_occupancy_map_from_obj.py"
 
 pc_network_artifacts = ['env_coordinates', 'gc_connections', 'observations']
 

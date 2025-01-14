@@ -1,4 +1,8 @@
 # coding: utf-8
+
+# This script creates a binary occupancy map based on one or more .urdf files containing all walls.
+# For map layouts that use .obj files, rather than .urdf, use create_occupancy_map_from_obj.py instead.
+
 import xml.etree.ElementTree as ET
 from PIL import Image, ImageDraw, ImageOps
 import numpy as np

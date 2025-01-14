@@ -70,10 +70,10 @@ make system/controller/reachability_estimator/data/reachability/dataset.hd5
 ### Files you have to create yourself
 
 ```sh
-snakemake system/controller/simulation/environment/{Savinov_val3,final_layout}/maze_topview_binary.png
 cd system/controller/simulation/environment/map_occupancy_helpers
 make all
 cd -
+snakemake system/controller/simulation/environment/{Savinov_val3,final_layout}/maze_topview_binary.png
 ```
 
 ## Running the code
