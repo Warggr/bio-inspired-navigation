@@ -1,5 +1,3 @@
-from future.utils import iteritems
-from past.builtins import xrange
 import math
 import numpy as np
 import cv2
@@ -38,7 +36,7 @@ def a_star(obstacle_map, start_pos, goal_pos, soft_obstacle_scale=0.0):
         best_x = 0
         best_y = 0
 
-        for (x, y), (pa, g, h) in iteritems(open_dict):
+        for (x, y), (pa, g, h) in open_dict.items():
             f = g + h
             best_f = best_g + best_h
             # Tie-breaking A*: http://movingai.com/astar.html
@@ -191,7 +189,7 @@ def rasterize(lines, bbox, division=None, resolution=None):
         return int((x - origin[0]) * n_division + 0.5), int((y - origin[1]) * n_division + 0.5)
 
     canvas = np.zeros((height, width), np.uint8)
-    for i in xrange(len(lines)):
+    for i in range(len(lines)):
         x1, y1, x2, y2 = lines[i]
         cv2.line(canvas, grid_coord(x1, y1, division), grid_coord(x2, y2, division), 255, 2)
 
