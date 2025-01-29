@@ -18,3 +18,4 @@ tqdm
 tensorboard
 #./range_libc/pywrapper
 nbdev
+jupyter nbconvert
