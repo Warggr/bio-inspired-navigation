@@ -51,6 +51,7 @@ from system.controller.simulation.environment_config import environment_dimensio
 from system.controller.simulation.math_utils import compute_angle
 from system.debug import DEBUG
 from system.types import AllowedMapName, types, LidarReading, Vector2D, Orientation
+import time
 
 try:
     itertools.batched
@@ -453,6 +454,9 @@ class PybulletEnvironment:
                                view_matrix,
                                projection_matrix, shadow=True,
                                renderer=p.ER_BULLET_HARDWARE_OPENGL)
+        # Reshape rgb_img to the correct dimensions
+        rgb_img = np.reshape(rgb_img, (img_h, img_w, 4))
+        depth = np.reshape(depth, (img_h, img_w))
         assert np.all(rgb_img[:, :, 3] == 255) # alpha (i.e. transparency) values
         rgb_img[:, :, 3] = depth
 
