@@ -15,8 +15,9 @@ system/controller/reachability_estimator/data/models/re_mse_weights.50: data/dat
 	unzip -p $< data/re/re_mse_weights.50 > $@
 
 system/controller/reachability_estimator/data/reachability/dataset.hd5: data/data.zip
+	mkdir -p system/controller/reachability_estimator/data/reachability
 	unzip -p $< data/re/reachability_dataset.hd5 > $@
-
+	
 system/bio_model/data/cognitive_map/after_exploration.gpickle: data/data.zip
 	mkdir -p system/bio_model/data/cognitive_map
 	unzip -p $< data/bio_model/cognitive_map/after_exploration.gpickle > $@
@@ -25,6 +26,7 @@ system/bio_model/data/cognitive_map/after_exploration.gpickle: data/data.zip
 #	python system/controller/topological/exploration_phase.py
 
 system/controller/reachability_estimator/data/trajectories/trajectories.hd5: data/data.zip
+	mkdir -p system/controller/reachability_estimator/data/trajectories
 	unzip -p $< data/re/trajectories.hd5 > $@
 
 walls = $(addsuffix .png,$(addprefix system/controller/simulation/environment/textures/walls/pattern-,$(shell seq 1 59)))
