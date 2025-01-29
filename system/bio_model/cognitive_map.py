@@ -24,7 +24,7 @@ from system.controller.reachability_estimator._types import PlaceInfo
 from system.types import AllowedMapName, PositionAndOrientation
 from typing import Optional, Literal, Callable, Self, Iterable
 from system.debug import DEBUG
-from deprecation import deprecated
+# from deprecation import deprecated
 
 
 def get_path_top() -> str:

@@ -237,17 +237,17 @@ def create_gc_spiking(start: Vector2D, goal: Vector2D, gc_network_at_start: Opti
     if plotting: plot.plotTrajectoryInEnvironment(env_model="plane", xy_coordinates=history)
     return gc_network.consolidate_gc_spiking(virtual=True)
 
-from deprecation import deprecated
+# from deprecation import deprecated
 
-@deprecated()
-def setup_gc_network(dt) -> GridCellNetwork:
-    """ Initialize the grid cell newtork """
-    # Grid-Cell Initialization
+# @deprecated()
+# def setup_gc_network(dt) -> GridCellNetwork:
+#     """ Initialize the grid cell newtork """
+#     # Grid-Cell Initialization
 
-    # note that if gc modules are created from data n and M are overwritten
-    gc_network = GridCellNetwork(dt, from_data=True)
+#     # note that if gc modules are created from data n and M are overwritten
+#     gc_network = GridCellNetwork(dt, from_data=True)
 
-    return gc_network
+#     return gc_network
 
 
 NavStepHook = Callable[[int, Robot], None]
