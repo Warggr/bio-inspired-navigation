@@ -240,7 +240,8 @@ class PlaceCellNetwork:
 
 
 if __name__ == '__main__':
-    from system.controller.local_controller.local_navigation import setup_gc_network, vector_navigation, ComboGcCompass
+    from system.controller.local_controller.local_navigation import GridCellNetwork, vector_navigation, ComboGcCompass
+    from system.controller.local_controller.local_controller import LocalController
     from system.bio_model.cognitive_map import LifelongCognitiveMap
     from system.controller.local_controller.decoder.phase_offset_detector import PhaseOffsetDetectorNetwork
     from system.controller.simulation.pybullet_environment import PybulletEnvironment
@@ -254,16 +255,18 @@ if __name__ == '__main__':
                                         with_spikings=True)
     pc_network = PlaceCellNetwork(from_data=True, reach_estimator=re, map_name=env_model)
     cognitive_map = LifelongCognitiveMap(reachability_estimator=re, load_data_from="after_exploration.gpickle")
-    gc_network = setup_gc_network(1e-2)
+    gc_network = GridCellNetwork()
     pod = PhaseOffsetDetectorNetwork(16, 9, 40)
 
     fr = random.choice(list(cognitive_map.node_network.nodes))
     to = random.choice(list(cognitive_map.node_network.nodes))
     env = PybulletEnvironment(env_model, visualize=False, build_data_set=True,
                               start=list(fr.env_coordinates))
-    compass = ComboGcCompass(gc_network, pod, goal_pos=to.pos)
+    compass = ComboGcCompass(gc_network, pod)
+    compass.reset_goal_pc(to)
     gc_network.set_as_current_state(fr.gc_connections)
-    stop, pc = vector_navigation(env, compass, gc_network, to.gc_connections,
+    controller = LocalController.default()
+    stop, pc = vector_navigation(env, compass, gc_network=gc_network, controller=controller,
                                  exploration_phase=False, pc_network=pc_network,
                                  cognitive_map=cognitive_map, plot_it=True, step_limit=1000)
 
@@ -277,11 +280,11 @@ if __name__ == '__main__':
         nx.draw_networkx_nodes(G, pos, node_color='#0065BD60', node_size=40)
         nx.draw_networkx_edges(G, pos, edge_color='#99999980')
     if pc:
-        circle2 = plt.Circle((pc.env_coordinates[0], pc.env_coordinates[1]), 0.2, color=TUM_colors['TUMAccentGreen'],
+        circle2 = plt.Circle(pc.pos, 0.2, color=TUM_colors['TUMAccentGreen'],
                              alpha=1)
         ax.add_artist(circle2)
-    circle1 = plt.Circle((env.xy_coordinates[-1][0], env.xy_coordinates[-1][1]), 0.2,
+    circle1 = plt.Circle(env.robot.data_collector.xy_coordinates[-1], 0.2,
                          color=TUM_colors['TUMAccentOrange'], alpha=1)
     ax.add_artist(circle1)
-    add_environment(ax, env)
+    add_environment(ax, env.env_model)
     plt.show()

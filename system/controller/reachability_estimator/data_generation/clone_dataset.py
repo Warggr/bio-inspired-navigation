@@ -24,7 +24,7 @@ def clone_dataset(
 
     attrs = dict(infile.attrs)
     attrs.update({'wall_colors': args.wall_colors})
-    if attrs['map_type'] == '':
+    if 'map_type' not in attrs or attrs['map_type'] == '':
         attrs['map_type'] = env.env_model
     for attr in attrs:
         if attr in f.attrs:
@@ -93,10 +93,11 @@ if __name__ == "__main__":
         out_filename = args.infile.removesuffix('.hd5') + '-' + args.wall_colors + '.hd5'
 
     infile = h5py.File(args.infile)
-    env_model, = infile.attrs['map_type'].split(',')
-    if env_model == '':
+    if 'map_type' not in infile.attrs or infile.attrs['map_type'] == '':
         print('Warning: no env model provided in dataset, assuming Savinov_val3', file=sys.stderr)
         env_model = 'Savinov_val3'
+    else:
+        env_model, = infile.attrs['map_type'].split(',')
 
     with PybulletEnvironment(env_model, contains_robot=False, wall_kwargs={'textures': textures}) as env:
         outfile = clone_dataset(infile, out_filename, env, nr_samples=args.num_samples, flush_freq=args.flush_freq)

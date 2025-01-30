@@ -305,15 +305,22 @@ class NetworkReachabilityEstimator(ReachabilityEstimator):
                     return bcActivityForLidar(p.lidar)
                 elif self.config.lidar == 'allo_bc':
                     return allo_bc_spikings(self.boundaryCellEncoder, p)
-            else:
+            elif self.dtype['dst_lidar'].itemsize != 0:
                 return -1 * np.ones(shape=(), dtype=self.dtype['dst_lidar'])
+            else:
+                return None
 
-        p_angle, q_angle = getattr(p, 'angle', 0), getattr(q, 'angle', 0)
+        def get_pc_angle(p: PlaceInfo):
+            angle = getattr(p, 'angle', 0)
+            if angle == NotImplemented:
+                return 0
+            else:
+                return angle
         args = (
             p.img, q.img,
             p.spikings, q.spikings,
             get_lidar(p), get_lidar(q),
-            np.concatenate([np.array(q.pos) - np.array(p.pos), [(q_angle - p_angle) % 2*np.pi]])
+            np.concatenate([np.array(q.pos) - np.array(p.pos), [(get_pc_angle(q) - get_pc_angle(p)) % 2*np.pi]])
         )
         return np.array([args], dtype=self.dtype)
 
