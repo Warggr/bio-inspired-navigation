@@ -125,13 +125,10 @@ where `$flags` can be a collection of:
 
 ##### Random navigation
 ```sh
-flags=...
-cat system/tests/in/random_positions.in | python system/tests/local_controller_test.py ${flags}
-```
-
-Different values for `${flags}` can be found with
-
-```shell
+cat system/tests/in/random_positions.in | python system/tests/local_controller_test.py
+# You can also add flags, e.g.:
+cat system/tests/in/random_positions.in | python system/tests/local_controller_test.py --ray-length 2 --tactile-cone 180
+# All possible flags can be listed with:
 python system/tests/local_controller_test.py --help
 ```
 
@@ -153,7 +150,8 @@ snakemake results/local_controller_angle/results.png results/local_controller_wi
 #### Creating cognitive maps with different reachability estimators
 
 ```sh
-python system/controller/topological/exploration_phase.py -e Savinov_val3 --re ${your_RE} npc 60
+RE='distance' #or another RE type, e.g. RE='neural_network(re_mse_weights.50)'
+python system/controller/topological/exploration_phase.py -e Savinov_val3 --re ${RE} npc -n 60
 ```
 
 #### Cognitive map metrics
