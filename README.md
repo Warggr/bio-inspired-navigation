@@ -74,6 +74,7 @@ cd system/controller/simulation/environment/map_occupancy_helpers
 make all
 cd -
 snakemake system/controller/simulation/environment/{Savinov_val3,final_layout}/maze_topview_binary.png
+snakemake system/bio_model/data/bc_model/transformations.npz
 ```
 
 ## Running the code

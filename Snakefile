@@ -58,3 +58,7 @@ rule:
 		input={input}
 		python system/tests/system_benchmark/long_unknown_nav.py Savinov_val3 ${{input#system/bio_model/data/cognitive_map/}} 0,-1 | tee {output}
 	"""
+
+rule:
+	output: "system/bio_model/data/bc_model/transformations.npz"
+	shell: """ python system/bio_model/bc_network/bc_encoding.py """
